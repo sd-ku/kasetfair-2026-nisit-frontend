@@ -10,23 +10,31 @@ import { Loader2, ArrowRight, Shield } from "lucide-react"
 
 function LoginForm() {
   const router = useRouter()
-  const { status } = useSession()
+  const { status, data } = useSession()
   const params = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
+  const callbackUrl = params.get("callbackUrl") ?? "/"
 
   useEffect(() => {
-    if (status === "authenticated") {
-      router.push("")
-      router.refresh()
+    if (status !== "authenticated" || !data) return
+
+    if (data.profileComplete === false) {
+      router.replace("/register")
+      return
     }
-  }, [status, router])
+
+    if (data.profileComplete) {
+      const target = callbackUrl && callbackUrl !== "/login" ? callbackUrl : "/"
+      router.replace(target)
+    }
+  }, [status, data, router, callbackUrl])
 
   const error = params.get("error")
 
   const handleGoogle = async () => {
     try {
       setIsLoading(true)
-      await signIn("google", { callbackUrl: params.get("callbackUrl") ?? "" })
+      await signIn("google", { callbackUrl })
     } finally {
       setIsLoading(false)
     }
@@ -82,15 +90,6 @@ function LoginForm() {
           </Button>
         </Link>
       </div>
-
-      {/* <div className="mt-6 text-center">
-        <p className="text-sm text-gray-600">
-          Need an account?{" "}
-          <Link href="/register" className="text-emerald-600 hover:text-emerald-700 font-medium">
-            Sign up here
-          </Link>
-        </p>
-      </div> */}
     </>
   )
 }
@@ -114,12 +113,6 @@ export default function LoginPage() {
             </Suspense>
           </CardContent>
         </Card>
-
-        {/* <div className="mt-6 text-center">
-          <Link href="/" className="text-emerald-600 hover:text-emerald-700 text-sm">
-            ← Back to Registration
-          </Link>
-        </div> */}
       </div>
     </div>
   )

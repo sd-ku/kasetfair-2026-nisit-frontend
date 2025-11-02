@@ -5,7 +5,7 @@ import { getToken } from "next-auth/jwt"
 const PUBLIC_PREFIXES = ["/login", "/api/auth", "/api/public"]
 
 export async function middleware(req: NextRequest) {
-  console.log("Middleware running for:", req.nextUrl.pathname)
+  // console.log("Middleware running for:", req.nextUrl.pathname)
   const { pathname } = req.nextUrl
 
   // ปล่อยไฟล์ static (png, css, js, woff ฯลฯ)

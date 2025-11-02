@@ -17,7 +17,6 @@ export default async function HomePage() {
   // มี session → เด้งไป register
   redirect("/register")
 
-  // (โค้ดด้านล่างจะไม่รันเพราะ redirect ออกไปแล้ว)
   return (
     <div className="flex flex-col items-center justify-center min-h-screen">
       <p className="text-gray-600">Redirecting...</p>
