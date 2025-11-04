@@ -11,20 +11,16 @@ import { exchangeWithGoogleIdToken } from "@/services/authService"
 
 function LoginForm() {
   const router = useRouter()
-  const { status, data } = useSession()
+  const { status, data, update } = useSession()
   const params = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
-  // const rawCallback = params.get("callbackUrl") ?? "/"
-
-  // sanitize callbackUrl: ห้ามย้อนกลับ /login
-  // const callbackUrl = rawCallback === "/login" ? "/" : rawCallback
 
   const error = params.get("error")
 
   const handleGoogle = async () => {
     try {
       setIsLoading(true)
-      await signIn("google") // ปล่อยให้ next-auth จัดการ redirect เอง
+      await signIn("google")
     } finally {
       setIsLoading(false)
     }

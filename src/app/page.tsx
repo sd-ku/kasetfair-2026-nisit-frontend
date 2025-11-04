@@ -1,25 +1,9 @@
-import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
-import { RegistrationForm } from "@/components/registration-form"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { LogIn } from "lucide-react"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route" // ✅ import ตัว config
+// import { getServerSession } from "next-auth"
+// import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 
-export default async function HomePage() {
+export default async function RootPage() {
   // const session = await getServerSession(authOptions)
 
-  redirect("/login")
-  // // ไม่มี session → เด้งไป login
-  // if (!session) {
-  // }
-
-  // // มี session → เด้งไป register
-  // redirect("/register")
-
-  // return (
-  //   <div className="flex flex-col items-center justify-center min-h-screen">
-  //     <p className="text-gray-600">Redirecting...</p>
-  //   </div>
-  // )
+  redirect("/home")
 }

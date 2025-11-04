@@ -1,9 +1,7 @@
-// app/home/page.tsx
 "use client"
 
 import { useSession, signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useAuthGate } from "@/lib/useAuthGate";
 
 export default function HomePage() {
   return (

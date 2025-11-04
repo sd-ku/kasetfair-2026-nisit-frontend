@@ -20,15 +20,14 @@ export function useAuthGate(forPage: "register" | "home") {
           return;
         }
         const data = await r.json().catch(() => ({}));
-        const complete = !!data?.profileComplete;
 
         // register: อนุญาตเฉพาะคนที่ "ยังไม่ครบ"
-        if (forPage === "register" && complete) {
+        if (forPage === "register") {
           router.replace("/home");
           return;
         }
         // home: อนุญาตเฉพาะคนที่ "ครบแล้ว"
-        if (forPage === "home" && !complete) {
+        if (forPage === "home") {
           router.replace("/register");
           return;
         }
