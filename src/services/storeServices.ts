@@ -32,8 +32,13 @@ export async function createStore(payload: CreateStoreRequestDto) {
     if (res.status === 201 || res.status === 200) return res.data
     
     throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
-  } catch (error) {
-    console.error(error)
+  } catch (error: any) {
+    console.error("createStore error:", error);
+    const raw = error?.response?.data;
+    const msg = Array.isArray(raw?.message)
+      ? raw.message.join("\n")
+      : raw?.message || raw?.error || error?.message || "เกิดข้อผิดพลาดขณะสร้างร้าน";
+    throw new Error(msg);
   }
 }
 

@@ -9,6 +9,9 @@ import { StepOneForm } from "@/components/createStep/step-one-form"
 import { StepClubInfoForm } from "@/components/createStep/step-club-form"
 import { StepTwoForm } from "@/components/createStep/step-two-form"
 import { StepThreeForm } from "@/components/createStep/step-three-form"
+import { createStore } from "@/services/storeServices"
+
+const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 type ProductFormState = {
   id: string
@@ -97,8 +100,10 @@ export default function StoreCreatePage() {
     applicationFile: null,
     applicationFileName: null,
   })
+  const [storeId, setStoreId] = useState<string | null>(null)
   const [products, setProducts] = useState<ProductFormState[]>([createProduct(), createProduct(), createProduct()])
   const [saving, setSaving] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const stepStatuses = steps.map((step) => ({
     id: step.id,
@@ -120,6 +125,65 @@ export default function StoreCreatePage() {
     },
     [pathname, router, searchParams, storeType, totalSteps]
   )
+
+  const handleCreateStore = useCallback(async () => {
+    setErrorMsg(null);
+
+    if (!storeName.trim()) {
+      setErrorMsg("กรุณากรอกชื่อร้าน");
+      throw new Error("STORE_NAME_REQUIRED");
+    }
+    const filled = members.map(m => m.trim()).filter(Boolean)
+    if (filled.length < MIN_MEMBERS) {
+      setErrorMsg(`กรุณากรอกอีเมลสมาชิกอย่างน้อย ${MIN_MEMBERS} คน`);
+      throw new Error("MEMBER_MIN_REQUIRED");
+    }
+    for (let i = 0; i < Math.min(MIN_MEMBERS, filled.length); i++) {
+      if (!emailRe.test(filled[i].trim())) {
+        setErrorMsg(`รูปแบบอีเมลสมาชิกคนที่ ${i + 1} ไม่ถูกต้อง`);
+        throw new Error("INVALID_EMAIL");
+      }
+    }
+    if (!storeType) {
+      setErrorMsg("กรุณาเลือกประเภทร้าน");
+      return;
+      // throw new Error("STORE_TYPE_REQUIRED");
+    }
+
+    setSaving(true);
+    try {
+
+      // คุณอาจแนบ Idempotency-Key เพื่อกันกดซ้ำ
+      // ตัวอย่าง: http.post(url, body, { headers: { "Idempotency-Key": crypto.randomUUID() } })
+      // console.log("start create store")
+      const res = await createStore({
+        storeName: storeName.trim(),
+        type: storeType,      // "Nisit" | "Club"
+        memberGmails: filled, // แนะนำส่งแต่ที่กรอกจริง
+      })
+
+      // สมมุติ service คืน { id, ... } หรือ { status: 201, data: { id } }
+      const newId = res?.id ?? res?.data?.id
+      if (!newId) {
+        setErrorMsg("ไม่สามารถสร้างร้านได้ (ไม่มีรหัสร้าน)")
+        throw new Error("NO_STORE_ID")
+      }
+
+      setStoreId(newId);
+
+      updateStepParam(currentStep + 1);
+    } catch (e: any) {
+      setErrorMsg(e?.message || "เกิดข้อผิดพลาดระหว่างสร้างร้าน");
+    } finally {
+      setSaving(false)
+    }
+  }, [
+    storeName,
+    members,
+    storeType,
+    MIN_MEMBERS,
+    currentStep,
+  ])
 
   const handleNext = useCallback(
     (step: number) => {
@@ -268,16 +332,23 @@ export default function StoreCreatePage() {
         </header>
 
         {currentStep === 1 && (
-          <StepOneForm
-            storeName={storeName}
-            members={members}
-            onStoreNameChange={setStoreName}
-            onMemberChange={handleMemberChange}
-            onAddMember={handleAddMember}
-            onRemoveMember={handleRemoveMember}
-            onNext={() => handleSimulatedSave(currentStep + 1)}
-            saving={saving}
-          />
+          <>
+            {errorMsg && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {errorMsg}
+              </div>
+            )}
+            <StepOneForm
+              storeName={storeName}
+              members={members}
+              onStoreNameChange={setStoreName}
+              onMemberChange={handleMemberChange}
+              onAddMember={handleAddMember}
+              onRemoveMember={handleRemoveMember}
+              onNext={handleCreateStore}
+              saving={saving}
+              />
+            </>
         )}
 
         {storeType === "Club" && currentStep === 2 && (

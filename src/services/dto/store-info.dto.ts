@@ -11,6 +11,7 @@ export type ClubApplicationDto = {
 type storeState = {
   // ขั้นตอนการสร้างร้าน
   "CreateStore":    string
+  "ClubDetails":    string
   "StoreDetails":   string
   "ProductDetails": string
   "Submitted":      string
