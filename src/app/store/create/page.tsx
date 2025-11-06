@@ -1,17 +1,31 @@
 ﻿"use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import type { StoreType } from "@/services/dto/store-info.dto"
 import { StepIndicator } from "@/components/createStep/step-indicator"
 import { StepOneForm } from "@/components/createStep/step-one-form"
 import { StepClubInfoForm } from "@/components/createStep/step-club-form"
 import { StepTwoForm } from "@/components/createStep/step-two-form"
 import { StepThreeForm } from "@/components/createStep/step-three-form"
-import { createStore } from "@/services/storeServices"
+import {
+  CreateStoreRequestDto,
+  CreateStoreResponseDto,
+  StoreState,
+  StoreStatusRequestDto,
+  StoreStatusResponseDto,
+  StoreType,
+} from "@/services/dto/store-info.dto"
+import {
+  createStore,
+  extractErrorMessage,
+  getStoreStatus,
+  getStoreDraft,
+} from "@/services/storeServices"
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const MIN_MEMBERS = 3
+const STORE_ID_STORAGE_KEY = "kasetfair-active-store-id"
 
 type ProductFormState = {
   id: string
@@ -29,6 +43,8 @@ type ClubInfoState = {
   applicationFile: File | null
   applicationFileName: string | null
 }
+
+type StoreProgress = CreateStoreResponseDto | StoreStatusResponseDto
 
 const STEP_LABELS = {
   createStore: "Create store",
@@ -50,22 +66,95 @@ const STEP_CONFIG_BY_TYPE: Record<StoreType, Array<{ id: number; label: string }
   ],
 }
 
-const MIN_MEMBERS = 3
-
 const createProduct = (): ProductFormState => ({
-  id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `product-${Math.random().toString(16).slice(2)}`,
+  id:
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `product-${Math.random().toString(16).slice(2)}`,
   name: "",
   price: "",
   file: null,
   fileName: null,
 })
 
+const emptyClubInfo: ClubInfoState = {
+  organizationName: "",
+  presidentFirstName: "",
+  presidentLastName: "",
+  presidentStudentId: "",
+  applicationFile: null,
+  applicationFileName: null,
+}
+
+const getLayoutStepIndex = (type: StoreType) => (type === "Club" ? 3 : 2)
+const getProductStepIndex = (type: StoreType) => (type === "Club" ? 4 : 3)
+const getStepsForType = (type: StoreType) => STEP_CONFIG_BY_TYPE[type]
+
+const clampStepToState = (step: number, type: StoreType | null, state: StoreState | null): number => {
+  if (!type) return Math.max(1, step)
+
+  let maxStep = 1
+  switch (state) {
+    case "CreateStore":
+      maxStep = 1
+      break
+    case "StoreDetails":
+      maxStep = getLayoutStepIndex(type)
+      break
+    case "ProductDetails":
+      maxStep = getProductStepIndex(type)
+      break
+    case "Submitted":
+      maxStep = getStepsForType(type).length
+      break
+    default:
+      maxStep = 1
+  }
+
+  if (Number.isFinite(maxStep)) {
+    return Math.max(1, Math.min(step, maxStep))
+  }
+
+  return Math.max(1, step)
+}
+
+const preferredStepForState = (type: StoreType, state: StoreState): number => {
+  switch (state) {
+    case "CreateStore":
+      return 1
+    case "StoreDetails":
+      return type === "Club" ? 2 : getLayoutStepIndex(type)
+    case "ProductDetails":
+    case "Submitted":
+      return getProductStepIndex(type)
+    default:
+      return 1
+  }
+}
+
+// map step number → draft section key ที่ backend รองรับ
+const stepToDraftKey = (type: StoreType, step: number): string | null => {
+  // step 1 = create store (ปกติไม่ต้องดึงอะไรพิเศษ)
+  if (step === 1) return "create-store"
+
+  // ถ้าเป็น Club, step 2 คือข้อมูลชมรม
+  if (type === "Club" && step === 2) return "club-info"
+
+  // ขั้นของรายละเอียดร้าน/เลย์เอาต์
+  if (step === getLayoutStepIndex(type)) return "store-details"
+
+  // ขั้นของสินค้า/สินค้า
+  if (step === getProductStepIndex(type)) return "product-details"
+
+  return null
+}
+
 export default function StoreCreatePage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const storeType = useMemo<StoreType | null>(() => {
+  const typeFromQuery = useMemo<StoreType | null>(() => {
     const raw = searchParams.get("type")
     if (!raw) return null
     const normalized = raw.toLowerCase()
@@ -74,130 +163,207 @@ export default function StoreCreatePage() {
     return null
   }, [searchParams])
 
-  const steps = useMemo(() => (storeType ? STEP_CONFIG_BY_TYPE[storeType] : []), [storeType])
-  const totalSteps = steps.length || 1
-  const layoutStepIndex = storeType === "Club" ? 3 : 2
-  const productStepIndex = storeType === "Club" ? 4 : 3
+  const [storeType, setStoreType] = useState<StoreType | null>(typeFromQuery)
+  const [storeStatus, setStoreStatus] = useState<StoreProgress | null>(null)
+  const [loadingStatus, setLoadingStatus] = useState(false)
 
-  const currentStep = useMemo(() => {
-    const raw = Number(searchParams.get("step")) || 1
-    if (raw < 1) return 1
-    if (raw > totalSteps) return totalSteps
-    return raw
-  }, [searchParams, totalSteps])
+  const steps = useMemo(() => (storeType ? getStepsForType(storeType) : []), [storeType])
+  const layoutStepIndex = storeType ? getLayoutStepIndex(storeType) : 2
+  const productStepIndex = storeType ? getProductStepIndex(storeType) : 3
+
+  const allowedStep = clampStepToState(
+    steps.length || 1,
+    storeType,
+    storeStatus?.state ?? null
+  )
+
+  const rawStep = Number(searchParams.get("step")) || 1
+  const currentStep = storeType ? clampStepToState(rawStep, storeType, storeStatus?.state ?? null) : rawStep
 
   const [storeName, setStoreName] = useState("")
-  const [members, setMembers] = useState<string[]>(
-    Array.from({ length: MIN_MEMBERS }, () => "")
-  )
+  const [members, setMembers] = useState<string[]>(Array.from({ length: MIN_MEMBERS }, () => ""))
+  const [memberEmailStatuses, setMemberEmailStatuses] = useState<
+    Array<{ email: string; status: string }>
+  >([])
   const [layoutDescription, setLayoutDescription] = useState("")
   const [layoutFile, setLayoutFile] = useState<File | null>(null)
-  const [clubInfo, setClubInfo] = useState<ClubInfoState>({
-    organizationName: "",
-    presidentFirstName: "",
-    presidentLastName: "",
-    presidentStudentId: "",
-    applicationFile: null,
-    applicationFileName: null,
-  })
-  const [storeId, setStoreId] = useState<string | null>(null)
-  const [products, setProducts] = useState<ProductFormState[]>([createProduct(), createProduct(), createProduct()])
+  const [clubInfo, setClubInfo] = useState<ClubInfoState>(emptyClubInfo)
+  const [products, setProducts] = useState<ProductFormState[]>([
+    createProduct(),
+    createProduct(),
+    createProduct(),
+  ])
   const [saving, setSaving] = useState(false)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [stepError, setStepError] = useState<string | null>(null)
 
-  const stepStatuses = steps.map((step) => ({
-    id: step.id,
-    label: step.label,
-    status:
-      step.id < currentStep ? "completed" : step.id === currentStep ? "current" : "upcoming",
-  })) as Array<{ id: number; label: string; status: "completed" | "current" | "upcoming" }>
+  useEffect(() => {
+    if (!storeStatus && typeFromQuery && storeType !== typeFromQuery) {
+      setStoreType(typeFromQuery)
+    }
+  }, [storeStatus, storeType, typeFromQuery])
 
-  const updateStepParam = useCallback(
-    (step: number) => {
-      const next = Math.max(1, Math.min(totalSteps, step))
+  const resetFormState = useCallback(() => {
+    setStoreStatus(null)
+    setStoreName("")
+    setMembers(Array.from({ length: MIN_MEMBERS }, () => ""))
+    setLayoutDescription("")
+    setLayoutFile(null)
+    setClubInfo(emptyClubInfo)
+    setProducts([createProduct(), createProduct(), createProduct()])
+    setStepError(null)
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(STORE_ID_STORAGE_KEY)
+    }
+  }, [])
+
+  const setUrlState = useCallback(
+    ({
+      step,
+      type,
+      clampStep = true,
+    }: {
+      step?: number
+      type?: StoreType | null
+      clampStep?: boolean
+    }) => {
       const params = new URLSearchParams(searchParams.toString())
-      params.set("step", String(next))
-      if (storeType) {
-        params.set("type", storeType)
+      const nextType = type ?? storeType ?? null
+
+      if (nextType) {
+        params.set("type", nextType.toLowerCase())
+      } else {
+        params.delete("type")
       }
-      const queryString = params.toString()
-      router.replace(`${pathname}?${queryString}`, { scroll: false })
+
+      if (step !== undefined) {
+        const normalizedStep = clampStep
+          ? clampStepToState(step, nextType, storeStatus?.state ?? null)
+          : Math.max(1, step)
+        params.set("step", String(normalizedStep))
+      }
+
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     },
-    [pathname, router, searchParams, storeType, totalSteps]
+    [pathname, router, searchParams, storeType, storeStatus?.state]
   )
 
-  const handleCreateStore = useCallback(async () => {
-    setErrorMsg(null);
+  const updateStepParam = useCallback(
+    (step: number, options?: { clamp?: boolean }) => {
+      setStepError(null)
+      setUrlState({ step, clampStep: options?.clamp ?? true })
+    },
+    [setUrlState]
+  )
 
-    if (!storeName.trim()) {
-      setErrorMsg("กรุณากรอกชื่อร้าน");
-      throw new Error("STORE_NAME_REQUIRED");
-    }
-    const filled = members.map(m => m.trim()).filter(Boolean)
-    if (filled.length < MIN_MEMBERS) {
-      setErrorMsg(`กรุณากรอกอีเมลสมาชิกอย่างน้อย ${MIN_MEMBERS} คน`);
-      throw new Error("MEMBER_MIN_REQUIRED");
-    }
-    for (let i = 0; i < Math.min(MIN_MEMBERS, filled.length); i++) {
-      if (!emailRe.test(filled[i].trim())) {
-        setErrorMsg(`รูปแบบอีเมลสมาชิกคนที่ ${i + 1} ไม่ถูกต้อง`);
-        throw new Error("INVALID_EMAIL");
-      }
-    }
-    if (!storeType) {
-      setErrorMsg("กรุณาเลือกประเภทร้าน");
-      return;
-      // throw new Error("STORE_TYPE_REQUIRED");
-    }
+  const handleStepOne = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    if (!storeType) return;
 
-    setSaving(true);
+    let cancelled = false;
+    const draftKey = stepToDraftKey(storeType, currentStep);
+
     try {
+      setLoadingStatus(true);
 
-      // คุณอาจแนบ Idempotency-Key เพื่อกันกดซ้ำ
-      // ตัวอย่าง: http.post(url, body, { headers: { "Idempotency-Key": crypto.randomUUID() } })
-      // console.log("start create store")
-      const res = await createStore({
-        storeName: storeName.trim(),
-        type: storeType,      // "Nisit" | "Club"
-        memberGmails: filled, // แนะนำส่งแต่ที่กรอกจริง
-      })
+      const res = draftKey ? await getStoreDraft(draftKey) : null;
+      if (cancelled) return;
 
-      // สมมุติ service คืน { id, ... } หรือ { status: 201, data: { id } }
-      const newId = res?.id ?? res?.data?.id
-      if (!newId) {
-        setErrorMsg("ไม่สามารถสร้างร้านได้ (ไม่มีรหัสร้าน)")
-        throw new Error("NO_STORE_ID")
+      if (!res || !res.id) {
+        setStoreStatus(null);
+        setStoreType(null as any);
+        setStoreName("");
+        setUrlState({ type: undefined as any, step: 1, clampStep: false });
+        window.sessionStorage.removeItem(STORE_ID_STORAGE_KEY);
+        return;
       }
 
-      setStoreId(newId);
+      setStoreStatus(res);
+      setStoreType(res.type);
+      setStoreName(res.storeName ?? "");
+      const base = res.memberEmails.map(e => e.email)
+      while (base.length < MIN_MEMBERS) base.push("")
+      setMembers(base)
+      setMemberEmailStatuses(res.memberEmails)
+      window.sessionStorage.setItem(STORE_ID_STORAGE_KEY, String(res.id));
+      setUrlState({
+        type: res.type,
+        step: preferredStepForState(res.type, res.state),
+        clampStep: false,
+      });
+    } catch (error) {
+      if (cancelled) return;
+      console.error("Failed to recover store status", error);
+      setStepError(extractErrorMessage(error, "Unable to recover store progress"));
+      window.sessionStorage.removeItem(STORE_ID_STORAGE_KEY);
+    } finally {
+      if (cancelled) return;
+      setLoadingStatus(false);
+    }
 
-      updateStepParam(currentStep + 1);
-    } catch (e: any) {
-      setErrorMsg(e?.message || "เกิดข้อผิดพลาดระหว่างสร้างร้าน");
+    return () => {
+      cancelled = true;
+    };
+  }, [storeType, currentStep]);
+
+  const handleCreateStore = useCallback(async () => {
+    if (!storeType) {
+      setStepError("Please select a store type before creating a store.")
+      return
+    }
+
+    if (storeStatus && storeStatus.state !== "CreateStore") {
+      setStepError("This store has already been created.")
+      updateStepParam(preferredStepForState(storeType, storeStatus.state), { clamp: false })
+      return
+    }
+
+    const trimmedName = storeName.trim()
+    const memberEmails = members.map((email) => email.trim()).filter((email) => email.length > 0)
+
+    if (!trimmedName) {
+      setStepError("Please enter a store name.")
+      return
+    }
+
+    if (memberEmails.length < MIN_MEMBERS) {
+      setStepError(`Please provide at least ${MIN_MEMBERS} member emails.`)
+      return
+    }
+
+    if (memberEmails.some((email) => !emailRe.test(email))) {
+      setStepError("One or more member emails are invalid.")
+      return
+    }
+
+    const payload: CreateStoreRequestDto = {
+      storeName: trimmedName,
+      type: storeType,
+      memberGmails: memberEmails,
+    }
+
+    setSaving(true)
+    setStepError(null)
+
+    try {
+      const response = await createStore(payload)
+      setStoreStatus(response)
+      setStoreType(response.type)
+      setStoreName(response.storeName)
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(STORE_ID_STORAGE_KEY, String(response.id))
+      }
+      setUrlState({
+        type: response.type,
+        step: preferredStepForState(response.type, response.state),
+        clampStep: false,
+      })
+    } catch (error) {
+      const message = extractErrorMessage(error, "Failed to create store")
+      setStepError(message)
     } finally {
       setSaving(false)
     }
-  }, [
-    storeName,
-    members,
-    storeType,
-    MIN_MEMBERS,
-    currentStep,
-  ])
-
-  const handleNext = useCallback(
-    (step: number) => {
-      setSaving(false)
-      updateStepParam(step)
-    },
-    [updateStepParam]
-  )
-
-  const handleSimulatedSave = async (targetStep: number) => {
-    setSaving(true)
-    await new Promise((resolve) => setTimeout(resolve, 250))
-    handleNext(targetStep)
-  }
+  }, [members, storeName, storeStatus, storeType, updateStepParam, setUrlState])
 
   const handleMemberChange = (index: number, value: string) => {
     setMembers((prev) => {
@@ -216,7 +382,7 @@ export default function StoreCreatePage() {
   }
 
   const handleClubInfoFieldChange = (
-    key: "organizationName" | "presidentFirstName" | "presidentLastName" | "presidentStudentId",
+    key: keyof Omit<ClubInfoState, "applicationFile" | "applicationFileName">,
     value: string
   ) => {
     setClubInfo((prev) => ({
@@ -235,20 +401,20 @@ export default function StoreCreatePage() {
 
   const handleProductChange = (id: string, field: "name" | "price", value: string) => {
     setProducts((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+      prev.map((product) => (product.id === id ? { ...product, [field]: value } : product))
     )
   }
 
   const handleProductFileChange = (id: string, file: File | null) => {
     setProducts((prev) =>
-      prev.map((item) =>
-        item.id === id
+      prev.map((product) =>
+        product.id === id
           ? {
-              ...item,
+              ...product,
               file,
               fileName: file ? file.name : null,
             }
-          : item
+          : product
       )
     )
   }
@@ -258,24 +424,23 @@ export default function StoreCreatePage() {
   }
 
   const handleRemoveProduct = (id: string) => {
-    setProducts((prev) => (prev.length === 1 ? prev : prev.filter((item) => item.id !== id)))
+    setProducts((prev) => (prev.length === 1 ? prev : prev.filter((product) => product.id !== id)))
   }
 
-  const handleSelectStoreType = (type: StoreType) => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("type", type)
-    params.set("step", "1")
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  const handleSimulatedSave = async (targetStep: number, options?: { clamp?: boolean }) => {
+    setSaving(true)
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    setSaving(false)
+    updateStepParam(targetStep, options)
   }
 
   const handleFinalSubmit = async () => {
     setSaving(true)
     await new Promise((resolve) => setTimeout(resolve, 400))
     console.log("Store draft submitted", {
+      storeStatus,
       storeName,
-      storeType,
       members,
-      clubInfo: storeType === "Club" ? clubInfo : null,
       layoutDescription,
       layoutFile,
       products,
@@ -283,36 +448,70 @@ export default function StoreCreatePage() {
     setSaving(false)
   }
 
+  const handleSelectStoreType = (type: StoreType) => {
+    resetFormState()
+    setStoreType(type)
+    setUrlState({ type, step: 1, clampStep: false })
+  }
+
+  useEffect(() => {
+    if (storeType && rawStep !== currentStep) {
+      updateStepParam(currentStep)
+    }
+  }, [currentStep, rawStep, storeType, updateStepParam])
+
+  useEffect(() => {
+    if (currentStep === 1) {
+      handleStepOne();
+    }
+  }, [currentStep, handleStepOne]);
+
+  const allowCreateSubmit = !storeStatus || storeStatus.state === "CreateStore"
+
+  const stepStatuses = steps.map((step) => ({
+    id: step.id,
+    label: step.label,
+    status:
+      step.id < currentStep ? "completed" : step.id === currentStep ? "current" : "upcoming",
+  })) as Array<{ id: number; label: string; status: "completed" | "current" | "upcoming" }>
+
   if (!storeType) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100 px-4 py-12">
         <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 rounded-3xl bg-white/80 p-10 text-center shadow-xl ring-1 ring-emerald-100">
-          <h1 className="text-2xl font-semibold text-emerald-900">เลือกประเภทร้านค้าก่อนเริ่ม</h1>
-          <p className="text-sm text-emerald-700">
-            กรุณาเลือกว่าร้านค้าที่คุณกำลังสร้างเป็นร้านค้านิสิตหรือร้านค้าขององค์กรนิสิตเพื่อให้แบบฟอร์มแสดงข้อมูลที่ถูกต้อง
-          </p>
-          <div className="grid w-full gap-3 sm:grid-cols-2">
-            <Button
-              className="w-full justify-start gap-3 bg-emerald-600 text-white hover:bg-emerald-700"
-              onClick={() => handleSelectStoreType("Nisit")}
-            >
-              ร้านค้านิสิต
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-              onClick={() => handleSelectStoreType("Club")}
-            >
-              ร้านค้าองค์กรนิสิต
-            </Button>
-          </div>
-          <Button
-            variant="ghost"
-            className="text-emerald-700 hover:bg-emerald-50"
-            onClick={() => router.push("/home")}
-          >
-            กลับหน้าแรก
-          </Button>
+          <h1 className="text-2xl font-semibold text-emerald-900">Choose a store type before starting</h1>
+          {loadingStatus ? (
+            <p className="text-sm text-emerald-700">Loading your latest store progress...</p>
+          ) : (
+            <>
+              <p className="text-sm text-emerald-700">
+                Pick whether you are registering a student-run store or a student organization store so
+                the form matches your requirements.
+              </p>
+              <div className="grid w-full gap-3 sm:grid-cols-2">
+                <Button
+                  className="w-full justify-start gap-3 bg-emerald-600 text-white hover:bg-emerald-700"
+                  onClick={() => handleSelectStoreType("Nisit")}
+                >
+                  Student store
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  onClick={() => handleSelectStoreType("Club")}
+                >
+                  Organization store
+                </Button>
+              </div>
+              <Button
+                variant="ghost"
+                className="text-emerald-700 hover:bg-emerald-50"
+                onClick={() => router.push("/home")}
+              >
+                Back to home
+              </Button>
+            </>
+          )}
         </div>
       </div>
     )
@@ -323,32 +522,34 @@ export default function StoreCreatePage() {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="space-y-6">
           <div>
-            <h1 className="text-3xl font-bold text-emerald-800">ลงทะเบียนสร้างร้าน</h1>
+            <h1 className="text-3xl font-bold text-emerald-800">Kaset Fair store registration</h1>
             <p className="mt-2 text-sm text-emerald-700">
-              กรอกข้อมูลให้ครบทุกขั้นตอนเพื่อเตรียมเปิดร้านในงาน Kaset Fair 2026
+              Complete the steps below to submit your store application. You can return later and continue
+              from where you left off.
             </p>
+            {storeStatus && (
+              <p className="mt-2 text-xs uppercase tracking-wide text-emerald-600">
+                Current state: {storeStatus.state}
+              </p>
+            )}
           </div>
           <StepIndicator steps={stepStatuses} />
         </header>
 
         {currentStep === 1 && (
-          <>
-            {errorMsg && (
-              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                {errorMsg}
-              </div>
-            )}
-            <StepOneForm
-              storeName={storeName}
-              members={members}
-              onStoreNameChange={setStoreName}
-              onMemberChange={handleMemberChange}
-              onAddMember={handleAddMember}
-              onRemoveMember={handleRemoveMember}
-              onNext={handleCreateStore}
-              saving={saving}
-              />
-            </>
+          <StepOneForm
+            storeName={storeName}
+            members={members}
+            memberEmailStatuses={memberEmailStatuses}
+            onStoreNameChange={setStoreName}
+            onMemberChange={handleMemberChange}
+            onAddMember={handleAddMember}
+            onRemoveMember={handleRemoveMember}
+            onNext={handleCreateStore}
+            saving={saving}
+            canSubmit={allowCreateSubmit}
+            errorMessage={stepError}
+          />
         )}
 
         {storeType === "Club" && currentStep === 2 && (
@@ -402,4 +603,3 @@ export default function StoreCreatePage() {
     </div>
   )
 }
-

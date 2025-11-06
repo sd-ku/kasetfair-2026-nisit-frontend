@@ -23,6 +23,7 @@ import {
   Users2,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { getStoreStatus } from "@/services/storeServices"
 
 type Invitation = {
   id: string
@@ -34,6 +35,13 @@ type Invitation = {
   message?: string | null
 }
 
+type myStore = {
+  id: number
+  storeName: string
+  type: string
+  state: string
+}
+
 export default function HomePage() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -42,6 +50,10 @@ export default function HomePage() {
   const [loadingInvites, setLoadingInvites] = useState(true)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [selectingStoreType, setSelectingStoreType] = useState(false)
+
+  const [store, setStore] = useState<myStore | null>(null)
+  const [loadingStore, setLoadingStore] = useState(true)
+  const [storeError, setStoreError] = useState<string | null>(null)
 
   const displayName = useMemo(
     () => session?.user?.name || session?.user?.email || "Kaset Fair Member",
@@ -64,10 +76,33 @@ export default function HomePage() {
     }
   }, [])
 
+  const fetchStoreStatus = useCallback(async () => {
+    setLoadingStore(true)
+    setStoreError(null)
+
+    try {
+      const res = await getStoreStatus()
+      // ถ้าไม่มีร้าน res จะเป็น null หรือ 404 ก็จับใน catch ได้
+      setStore(res || null)
+    } catch (err: any) {
+      console.error("Failed to load store status", err)
+      setStore(null)
+      setStoreError("โหลดสถานะร้านไม่สำเร็จ")
+    } finally {
+      setLoadingStore(false)
+    }
+  }, [])
+
   useEffect(() => {
     fetchInvitations()
-  }, [fetchInvitations])
+    fetchStoreStatus()
+  }, [fetchInvitations, fetchStoreStatus])
 
+  useEffect(() => {
+    const onFocus = () => fetchStoreStatus()
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
+  }, [fetchStoreStatus])
 
   const selectorRef = useRef<HTMLDivElement>(null)
   const handleCreateStore = () => {
@@ -123,63 +158,117 @@ export default function HomePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {/* ปุ่มหลัก: toggle แสดง/ซ่อนพาเนล */}
-            <Button
-              className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
-              aria-expanded={selectingStoreType}
-              onClick={handleCreateStore}
-            >
-              <Plus className="h-5 w-5" />
-              {selectingStoreType ? "Cancel" : "Create a new store"}
-            </Button>
-
-            {/* คำอธิบายย่อใต้ปุ่ม (ซ่อนเมื่อเปิดพาเนล) */}
-            {!selectingStoreType && (
-              <p className="text-[11px] text-emerald-600">
-                Invite your teammates to manage the store together once registration is complete.
-              </p>
+            {/* 1) Loading */}
+            {loadingStore && (
+              <div className="flex items-center justify-center py-8 text-emerald-700">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                กำลังโหลดสถานะร้าน...
+              </div>
             )}
-
-            {/* พาเนลแบบเลื่อนลง */}
-            <AnimatePresence initial={false}>
-              {selectingStoreType && (
-                <motion.div
-                  ref={selectorRef}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.28, ease: "easeOut" }}
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-3 pt-3">
-                    <div>
-                      <p className="text-sm font-medium text-emerald-800">Select store type</p>
-                      <p className="text-xs text-emerald-600">
-                        Choose the type of store you want to register before continuing.
-                      </p>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <Button
-                        className="w-full justify-start gap-3 bg-emerald-600 text-white hover:bg-emerald-700"
-                        onClick={() => handleSelectStoreType("Nisit")}
-                      >
-                        <GraduationCap className="h-5 w-5" />
-                        Nisit store
-                      </Button>
-                      <Button
-                        className="w-full justify-start gap-3 border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"
-                        variant="outline"
-                        onClick={() => handleSelectStoreType("Club")}
-                      >
-                        <Building2 className="h-5 w-5" />
-                        Club store
-                      </Button>
-                    </div>
+            {/* 2) Store error */}
+            {!loadingStore && storeError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <p>{storeError}</p>
+                <div className="mt-3 flex gap-2">
+                  <Button variant="outline" onClick={fetchStoreStatus} className="border-red-200">
+                    ลองใหม่
+                  </Button>
+                </div>
+              </div>
+            )}
+            {/* 3) มีร้านแล้ว */}
+            {!loadingStore && !storeError && store && (
+              <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-semibold text-emerald-900">
+                      {store.storeName}
+                    </h3>
+                    <p className="mt-0.5 text-xs text-emerald-700">
+                      ประเภท: {store.type}
+                    </p>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800">
+                    {store.state}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button
+                    className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
+                    onClick={() => router.push(`/store/create`)}
+                  >
+                    จัดการร้าน
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    onClick={fetchStoreStatus}
+                  >
+                    รีเฟรช
+                  </Button>
+                </div>
+              </div>
+            )}
+            {/* ปุ่มหลัก: toggle แสดง/ซ่อนพาเนล */}
+                <Button
+                  className={`w-full ${
+                    store
+                      ? "bg-emerald-200 text-emerald-500 cursor-not-allowed" // มีร้านแล้ว -> จาง
+                      : "bg-emerald-600 text-white hover:bg-emerald-700"
+                  }`}
+                  aria-expanded={selectingStoreType}
+                  onClick={() => {
+                    if (!store) handleCreateStore()
+                  }}
+                  disabled={!!store} // disable จริง
+                >
+                  <Plus className="h-5 w-5" />
+                  {store ? "คุณมีร้านแล้ว" : selectingStoreType ? "Cancel" : "Create a new store"}
+                </Button>
+                {!selectingStoreType && (
+                  <p className="text-[11px] text-emerald-600 mt-1">
+                    {store
+                      ? "คุณสร้างร้านแล้ว จัดการร้านได้ด้านบน"
+                      : "Invite your teammates to manage the store together once registration is complete."}
+                  </p>
+                )}
+
+                <AnimatePresence initial={false}>
+                  {!store && selectingStoreType && (
+                    <motion.div
+                      ref={selectorRef}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.28, ease: "easeOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="space-y-3 pt-3">
+                        <p className="text-sm font-medium text-emerald-800">
+                          Select store type
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <Button
+                            className="w-full justify-start gap-3 bg-emerald-600 text-white hover:bg-emerald-700"
+                            onClick={() => handleSelectStoreType("Nisit")}
+                          >
+                            <GraduationCap className="h-5 w-5" />
+                            Nisit store
+                          </Button>
+                          <Button
+                            className="w-full justify-start gap-3 border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"
+                            variant="outline"
+                            onClick={() => handleSelectStoreType("Club")}
+                          >
+                            <Building2 className="h-5 w-5" />
+                            Club store
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
           </CardContent>
         </Card>
 

@@ -53,6 +53,8 @@ export const authOptions: NextAuthOptions = {
       } else {
         delete (session as any).id_token
       }
+
+      ;(session as any).exchanged = Boolean((token as any).exchanged)
       return session
     },
   },

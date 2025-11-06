@@ -1,88 +1,120 @@
 "use client"
 
+import { FormEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Trash2 } from "lucide-react"
+import { memberEmailsDraftDto } from "@/services/dto/store-draft.dto"
 
 type StepOneFormProps = {
   storeName: string
   members: string[]
+  memberEmailStatuses: memberEmailsDraftDto[]
   onStoreNameChange: (value: string) => void
   onMemberChange: (index: number, value: string) => void
   onAddMember: () => void
   onRemoveMember: (index: number) => void
-  onNext: () => void
+  onNext: () => Promise<void> | void
   saving: boolean
+  canSubmit?: boolean
+  errorMessage?: string | null
 }
 
 export function StepOneForm({
   storeName,
   members,
+  memberEmailStatuses,
   onStoreNameChange,
   onMemberChange,
   onAddMember,
   onRemoveMember,
   onNext,
   saving,
+  canSubmit = true,
+  errorMessage = null,
 }: StepOneFormProps) {
-  
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    onNext()
+    await onNext()
   }
+
+  const submitDisabled = saving || !canSubmit
 
   return (
     <Card className="border-emerald-100 bg-white/90 shadow-xl">
       <CardHeader>
-        <CardTitle className="text-emerald-800">ข้อมูลร้านค้า</CardTitle>
+        <CardTitle className="text-emerald-800">Create your store team</CardTitle>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-6">
+          {errorMessage && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 whitespace-pre-line">
+              {errorMessage}
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="storeName">ชื่อร้านค้า</Label>
+            <Label htmlFor="storeName">Store name</Label>
             <Input
               id="storeName"
               value={storeName}
               onChange={(event) => onStoreNameChange(event.target.value)}
-              placeholder="เช่น Kaset Fair Store"
+              placeholder="Kaset Fair Store"
               required
             />
           </div>
 
           <div className="space-y-3">
             <div>
-              <Label>สมาชิกในร้าน</Label>
+              <Label>Member emails</Label>
               <p className="mt-1 text-sm text-emerald-700">
-                กรุณากรอกอีเมลของสมาชิกอย่างน้อย 3 คนเพื่อสร้างร้าน
+                Invite at least 3 members using their KU Gmail accounts. You can add more teammates at any
+                time.
               </p>
             </div>
 
             <div className="space-y-3">
               {members.map((member, index) => {
-                const memberLabel = `อีเมลสมาชิกคนที่ ${index + 1}`
                 const canRemove = members.length > 3 && index >= 3
+                const emailStatus = memberEmailStatuses.find(
+                  (m) => m.email.trim().toLowerCase() === member.trim().toLowerCase()
+                )
+                const showWarning = emailStatus && emailStatus.status !== "joined"
+
                 return (
-                  <div key={`member-${index}`} className="flex items-center gap-3">
-                    <Input
-                      type="email"
-                      placeholder={memberLabel}
-                      value={member}
-                      onChange={(event) => onMemberChange(index, event.target.value)}
-                      required={index < 3}
-                    />
-                    {canRemove && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="border-red-200 text-red-500 hover:bg-red-50"
-                        onClick={() => onRemoveMember(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  <div key={`member-${index}`} className="space-y-1">
+                    {showWarning && (
+                      <p className="text-xs text-red-600 ml-1">
+                        This email is currently <strong>{emailStatus.status}</strong>.
+                      </p>
                     )}
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="email"
+                        placeholder={`Member email ${index + 1}`}
+                        value={member}
+                        onChange={(event) => onMemberChange(index, event.target.value)}
+                        required={index < 3}
+                        className={
+                          showWarning
+                            ? "border-red-400 focus-visible:ring-red-400"
+                            : ""
+                        }
+                      />
+                      {canRemove && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="border-red-200 text-red-500 hover:bg-red-50"
+                          onClick={() => onRemoveMember(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )
               })}
@@ -95,7 +127,7 @@ export function StepOneForm({
               onClick={onAddMember}
             >
               <Plus className="h-4 w-4" />
-              เพิ่มสมาชิก
+              Add another member
             </Button>
           </div>
         </CardContent>
@@ -104,9 +136,9 @@ export function StepOneForm({
           <Button
             type="submit"
             className="bg-emerald-600 text-white hover:bg-emerald-700"
-            disabled={saving}
+            disabled={submitDisabled}
           >
-            {saving ? "กำลังบันทึก..." : "บันทึกและไปขั้นถัดไป"}
+            {saving ? "Saving..." : "Next"}
           </Button>
         </CardFooter>
       </form>

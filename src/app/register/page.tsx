@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createNisitInfo } from "@/services/nisitService";
+import { exchangeWithGoogleIdToken } from "@/services/authService";
+import { Session } from "inspector";
 
 type FormState = {
   firstName: string;
@@ -58,6 +60,14 @@ export default function RegisterPage() {
       return;
     }
 
+    if (name === "nisitId") {
+      // อนุญาตเฉพาะตัวเลขสูงสุด 10 หลัก เริ่มด้วย 0
+      const cleaned = value.replace(/\D/g, "").slice(0, 10);
+      setFormData((prev) => ({ ...prev, nisitId: cleaned }));
+      return;
+    }
+
+
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -90,6 +100,22 @@ export default function RegisterPage() {
 
     try {
       const res = await createNisitInfo(payload);              // ฝั่ง API ควรอ่าน email จาก JWT/cookie เอง
+      if (!res) {
+        throw new Error("Registration did not complete");
+      }
+      // const idToken = (data as any)?.id_token
+      // if (!idToken) return
+      // try {
+      //   const result = await exchangeWithGoogleIdToken(idToken)
+      // } catch (e: any) {
+      //   console.error("exchange access_token not success");
+      // }
+      // await new Promise(r => setTimeout(r, 5000));
+      try {
+        await update?.({ exchanged: true } as any);
+      } catch (sessionError) {
+        console.warn("Failed to update NextAuth session after registration", sessionError);
+      }
       router.replace("/home");
     } catch (err: any) {
       const msg =
