@@ -290,11 +290,22 @@ export default function StoreCreatePage() {
         step: preferredStepForState(res.type, res.state),
         clampStep: false,
       });
-    } catch (error) {
+    } catch (error: any) {
       if (cancelled) return;
+
+      const status = error?.response?.status ?? error?.status;
+      if (status === 404) {
+        setStoreStatus(null);
+        setStoreName("");
+        setUrlState({ type: undefined as any, step: 1, clampStep: false });
+        window.sessionStorage.removeItem(STORE_ID_STORAGE_KEY);
+        return
+      }
+      
       console.error("Failed to recover store status", error);
       setStepError(extractErrorMessage(error, "Unable to recover store progress"));
       window.sessionStorage.removeItem(STORE_ID_STORAGE_KEY);
+
     } finally {
       if (cancelled) return;
       setLoadingStatus(false);
