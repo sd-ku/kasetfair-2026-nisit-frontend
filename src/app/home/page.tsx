@@ -82,12 +82,18 @@ export default function HomePage() {
 
     try {
       const res = await getStoreStatus()
-      // ถ้าไม่มีร้าน res จะเป็น null หรือ 404 ก็จับใน catch ได้
-      setStore(res || null)
+      console.log(res)
+      setStore(res || null) // มีร้าน -> แสดงการ์ดร้าน
     } catch (err: any) {
-      console.error("Failed to load store status", err)
-      setStore(null)
-      setStoreError("โหลดสถานะร้านไม่สำเร็จ")
+      const status = err?.response?.status ?? err?.status
+      if (status === 404) {
+        setStore(null)
+        setStoreError(null)
+      } else {
+        console.error("Failed to load store status", err)
+        setStore(null)
+        setStoreError("โหลดสถานะร้านไม่สำเร็จ")
+      }
     } finally {
       setLoadingStore(false)
     }

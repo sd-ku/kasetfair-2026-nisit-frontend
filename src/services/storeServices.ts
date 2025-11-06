@@ -74,17 +74,23 @@ export async function getStoreDraft(step: string): Promise<StoreDarftResponseDto
 }
 
 
-export async function getStoreStatus(): Promise<StoreStatusResponseDto> {
-  try {
-    const res = await http.get(`${STORE_SERVICE_API}/mine`)
-
-    if (res.status === 200) {
-      return res.data
-    }
-
-    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
-  } catch (error) {
-    const message = extractErrorMessage(error, "Failed to load store status")
-    throw new Error(message)
+export async function getStoreStatus() {
+  const res = await http.get(`${STORE_SERVICE_API}/mine`)
+  if (res.status === 200) {
+    return res.data
+  } else {
+    return res
   }
+  // try {
+  //   const res = await http.get(`${STORE_SERVICE_API}/mine`)
+  //   return res
+  //   if (res.status === 200) {
+  //     return res.data
+  //   }
+
+  //   throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
+  // } catch (error) {
+  //   const message = extractErrorMessage(error, "Failed to load store status")
+  //   throw new Error(message)
+  // }
 }
