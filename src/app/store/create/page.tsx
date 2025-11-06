@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { StepIndicator } from "@/components/createStep/step-indicator"
@@ -196,6 +196,51 @@ export default function StoreCreatePage() {
   const [saving, setSaving] = useState(false)
   const [stepError, setStepError] = useState<string | null>(null)
 
+  const didInit = useRef(false)
+
+  useEffect(() => {
+    if (didInit.current) return
+    didInit.current = true
+
+    const fetchInitialStatus = async () => {
+      try {
+        const res: StoreStatusResponseDto = await getStoreStatus()
+        if (!res) return
+
+        // เซ็ตค่าพื้นฐาน
+        setStoreStatus(res)
+        setStoreType(res.type)
+        setStoreName(res.storeName ?? "")
+
+        // เก็บใน sessionStorage เผื่อใช้ต่อ
+        window.sessionStorage.setItem(STORE_ID_STORAGE_KEY, String(res.id))
+
+        // ปรับ step ตาม state ของร้าน
+        setUrlState({
+          type: res.type,
+          step: preferredStepForState(res.type, res.state),
+          clampStep: false,
+        })
+      } catch (error: any) {
+        const status = error?.response?.status ?? error?.status
+
+        if (status === 404) {
+          // ไม่มีร้าน ก็ไม่ต้องโชว์ error เฉย ๆ
+          setStoreStatus(null)
+          setStoreType(null)
+          setStoreName("")
+          window.sessionStorage.removeItem(STORE_ID_STORAGE_KEY)
+          return
+        }
+
+        console.error("Failed to load store status", error)
+        setStepError(extractErrorMessage(error, "Unable to load store status"))
+      }
+    }
+
+    fetchInitialStatus()
+  }, [])
+
   useEffect(() => {
     if (!storeStatus && typeFromQuery && storeType !== typeFromQuery) {
       setStoreType(typeFromQuery)
@@ -301,7 +346,7 @@ export default function StoreCreatePage() {
         window.sessionStorage.removeItem(STORE_ID_STORAGE_KEY);
         return
       }
-      
+
       console.error("Failed to recover store status", error);
       setStepError(extractErrorMessage(error, "Unable to recover store progress"));
       window.sessionStorage.removeItem(STORE_ID_STORAGE_KEY);

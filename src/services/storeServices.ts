@@ -77,13 +77,9 @@ export async function getStoreDraft(step: string): Promise<StoreDarftResponseDto
 }
 
 
-export async function getStoreStatus() {
+export async function getStoreStatus(): Promise<StoreDarftResponseDto> {
   const res = await http.get(`${STORE_SERVICE_API}/mine`)
-  if (res.status === 200) {
-    return res.data
-  } else {
-    return res
-  }
+  return res.data
   // try {
   //   const res = await http.get(`${STORE_SERVICE_API}/mine`)
   //   return res
