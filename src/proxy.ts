@@ -74,6 +74,7 @@ function isExpiredFast(token: string): boolean {
 export default async function proxy(req: NextRequest) {
   const url = req.nextUrl.clone()
   const path = url.pathname
+  const method = req.method
 
   if (shouldBypassProxy(path, req.method)) {
     return NextResponse.next()
@@ -82,6 +83,8 @@ export default async function proxy(req: NextRequest) {
   const bearerToken = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "")
   const cookieToken = req.cookies.get(ACCESS_TOKEN_COOKIE)?.value
   const rawAuth = cookieToken || bearerToken
+
+  const isApi = path.startsWith("/api/")
 
   // ไม่มี token → ปล่อย public หรือส่งไป /login แบบไม่ loop
   if (!rawAuth) {
@@ -112,18 +115,24 @@ export default async function proxy(req: NextRequest) {
     return res
   }
 
-  // บังคับไป register ถ้าโปรไฟล์ยังไม่ครบ
+  // ถ้า profile ยังไม่ complete
   if (!payload?.profileComplete) {
-    const allowed = path.startsWith("/register") || path.startsWith("/auth/processing")
-    if (!allowed) {
-      const target = url.clone()
-      target.pathname = "/register"
-      target.search = ""
-      if (target.href !== url.href) return NextResponse.redirect(target)
+    // ปล่อย API ไปเลย (เพราะ register page ต้องยิง /api/* ได้ เช่น media, nisit ฯลฯ)
+    if (!isApi) {
+      const allowedPage =
+        path.startsWith("/register") || path.startsWith("/auth/processing")
+
+      if (!allowedPage) {
+        const target = url.clone()
+        target.pathname = "/register"
+        target.search = ""
+        if (target.href !== url.href) return NextResponse.redirect(target)
+      }
     }
+
     return NextResponse.next()
   }
-
+  
   // บล็อคหน้าที่ไม่ควรเข้าเมื่อ auth แล้ว
   if (isPathStartsWith(path, BLOCK_WHEN_AUTH)) {
     const target = url.clone()

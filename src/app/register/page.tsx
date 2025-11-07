@@ -1,149 +1,234 @@
-"use client";
+"use client"
 
-import { useEffect, useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { createNisitInfo } from "@/services/nisitService";
-import { exchangeWithGoogleIdToken } from "@/services/authService";
-import { Session } from "inspector";
+import type React from "react"
+
+import { useState, useRef, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useSession } from "next-auth/react"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { createNisitInfo } from "@/services/nisitService"
+import { uploadMedia } from "@/services/mediaService"
+import { MediaPurpose } from "@/services/dto/media.dto"
 
 type FormState = {
-  firstName: string;
-  lastName: string;
-  nisitId: string;
-  phone: string;
-  nisitCardLink: string;
-};
+  firstName: string
+  lastName: string
+  nisitId: string
+  phone: string
+}
+
+type FormErrors = {
+  firstName?: string
+  lastName?: string
+  nisitId?: string
+  phone?: string
+  nisitCard?: string
+}
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const { status, data, update } = useSession();
-  const params = useSearchParams();
+  const router = useRouter()
+  const { status, data, update } = useSession()
+  const params = useSearchParams() // ยังไม่ใช้ก็ช่างมันไว้ก่อน
 
   const [formData, setFormData] = useState<FormState>({
     firstName: "",
     lastName: "",
     nisitId: "",
     phone: "",
-    nisitCardLink: "",
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  })
 
-  // กัน redirect ซ้ำใน dev/StrictMode
-  const hasRoutedRef = useRef(false);
+  // เก็บไฟล์ฝั่ง frontend ก่อน ยังไม่อัป
+  const [nisitCardFile, setNisitCardFile] = useState<File | null>(null)
+  // สำหรับเก็บ mediaId หลังอัปสำเร็จตอน submit
+  const [nisitCardMediaId, setNisitCardMediaId] = useState<string | null>(null)
 
-  // Guard: อนุญาตเฉพาะคนที่ล็อกอินแล้ว และยังไม่ complete
-  useEffect(() => {
-    if (hasRoutedRef.current) return;
-    if (status === "loading" || submitting) return;
+  const [uploadingCard, setUploadingCard] = useState(false) // ใช้ตอน submit ที่กำลังอัปโหลดไฟล์
+  const [isLoading, setIsLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-    if (status === "unauthenticated") {
-      hasRoutedRef.current = true;
-      const callbackUrl = params.get("callbackUrl") ?? "/register";
-      router.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-    }
-  }, [status, router, submitting, params]);
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({})
+  const [apiError, setApiError] = useState<string | null>(null)
+
+  const hasRoutedRef = useRef(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name, value } = e.target
+
+    if (fieldErrors[name as keyof FormErrors]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }))
+    }
 
     if (name === "phone") {
-      // อนุญาตเฉพาะตัวเลขสูงสุด 10 หลัก เริ่มด้วย 0
-      const cleaned = value.replace(/\D/g, "").slice(0, 10);
-      setFormData((prev) => ({ ...prev, phone: cleaned }));
-      return;
+      const cleaned = value.replace(/\D/g, "").slice(0, 10)
+      setFormData((prev) => ({ ...prev, phone: cleaned }))
+      return
     }
 
     if (name === "nisitId") {
-      // อนุญาตเฉพาะตัวเลขสูงสุด 10 หลัก เริ่มด้วย 0
-      const cleaned = value.replace(/\D/g, "").slice(0, 10);
-      setFormData((prev) => ({ ...prev, nisitId: cleaned }));
-      return;
+      const cleaned = value.replace(/\D/g, "").slice(0, 10)
+      setFormData((prev) => ({ ...prev, nisitId: cleaned }))
+      return
     }
 
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
 
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+
+    if (!file) {
+      setNisitCardFile(null)
+      setFieldErrors((prev) => ({
+        ...prev,
+        nisitCard: "กรุณาอัปโหลดรูปบัตรนิสิต",
+      }))
+      return
+    }
+
+    // validate type แบบหยาบๆ
+    const allowed = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "application/pdf",
+    ]
+    if (!allowed.includes(file.type)) {
+      setNisitCardFile(null)
+      setFieldErrors((prev) => ({
+        ...prev,
+        nisitCard: "ประเภทไฟล์ไม่รองรับ",
+      }))
+      e.target.value = ""
+      return
+    }
+
+    setFieldErrors((prev) => ({ ...prev, nisitCard: undefined }))
+    setNisitCardFile(file)
+    // ยังไม่อัปโหลดใดๆ รอ submit
+  }
+
+  const validateForm = (): boolean => {
+    const errors: FormErrors = {}
+
+    if (!formData.firstName.trim()) {
+      errors.firstName = "กรุณากรอกชื่อ"
+    }
+
+    if (!formData.lastName.trim()) {
+      errors.lastName = "กรุณากรอกนามสกุล"
+    }
+
+    if (!formData.nisitId.trim()) {
+      errors.nisitId = "กรุณากรอกรหัสนิสิต"
+    } else if (formData.nisitId.length !== 10) {
+      errors.nisitId = "รหัสนิสิตต้องมี 10 หลัก"
+    }
+
+    const phoneOk = /^0[0-9]{9}$/.test(formData.phone)
+    if (!formData.phone.trim()) {
+      errors.phone = "กรุณากรอกเบอร์โทร"
+    } else if (!phoneOk) {
+      errors.phone = "เบอร์โทรต้องมี 10 หลัก และขึ้นต้นด้วย 0"
+    }
+
+    if (!nisitCardFile) {
+      errors.nisitCard = "กรุณาอัปโหลดรูปบัตรนิสิต"
+    }
+
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submitting) return;
+    e.preventDefault()
+    if (submitting || uploadingCard) return
 
-    // validate เบื้องต้น
-    const phoneOk = /^0[0-9]{9}$/.test(formData.phone);
-    if (!phoneOk) {
-      setError("กรุณากรอกเบอร์โทร 10 หลัก และขึ้นต้นด้วย 0");
-      return;
-    }
-    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.nisitId.trim()) {
-      setError("กรุณากรอกข้อมูลให้ครบ");
-      return;
-    }
+    setApiError(null)
 
-    setSubmitting(true);
-    setIsLoading(true);
-    setError(null);
+    if (!validateForm()) return
+    if (!nisitCardFile) return // กัน TS + กัน edge case
 
-    const payload = {
-      firstName: formData.firstName.trim(),
-      lastName: formData.lastName.trim(),
-      nisitId: formData.nisitId.trim(),
-      phone: formData.phone.trim(),
-      nisitCardLink: formData.nisitCardLink.trim() || null,
-    };
+    setSubmitting(true)
+    setIsLoading(true)
+    setUploadingCard(true)
 
     try {
-      const res = await createNisitInfo(payload);              // ฝั่ง API ควรอ่าน email จาก JWT/cookie เอง
-      if (!res) {
-        throw new Error("Registration did not complete");
+      // 1) อัปโหลดไฟล์ก่อน
+      const uploadRes = await uploadMedia({
+        purpose: MediaPurpose.NISIT_CARD,
+        file: nisitCardFile,
+      })
+      if (!uploadRes.id) throw new Error("อัปโหลดภาพไม่สำเร็จ")
+
+      const mediaId = uploadRes.id
+      setNisitCardMediaId(mediaId)
+
+      // 2) ค่อยยิงสร้าง profile พร้อม mediaId
+      const payload = {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        nisitId: formData.nisitId.trim(),
+        phone: formData.phone.trim(),
+        nisitCardMediaId: mediaId,
       }
-      // const idToken = (data as any)?.id_token
-      // if (!idToken) return
-      // try {
-      //   const result = await exchangeWithGoogleIdToken(idToken)
-      // } catch (e: any) {
-      //   console.error("exchange access_token not success");
-      // }
-      // await new Promise(r => setTimeout(r, 5000));
-      try {
-        await update?.({ exchanged: true } as any);
-      } catch (sessionError) {
-        console.warn("Failed to update NextAuth session after registration", sessionError);
-      }
-      router.replace("/home");
+
+      const res = await createNisitInfo(payload)
+      if (!res) throw new Error("Registration did not complete")
+
+      await update?.({ profileComplete: true } as any)
+      router.replace("/home")
     } catch (err: any) {
+      console.error("Registration failed:", err)
       const msg =
         err?.response?.data?.message ||
         err?.message ||
-        "Registration failed. Please try again.";
-      setError(msg);
+        "Registration failed. Please try again."
+      setApiError(msg)
     } finally {
-      setIsLoading(false);
-      setSubmitting(false);
+      setUploadingCard(false)
+      setIsLoading(false)
+      setSubmitting(false)
     }
-  };
+  }
 
-  // Loading state หน้า
+  useEffect(() => {
+    if (status !== "authenticated") return
+
+    const profileComplete = (data as any)?.profileComplete
+
+    if (profileComplete && !hasRoutedRef.current) {
+      hasRoutedRef.current = true
+      router.replace("/home")
+    }
+  }, [status, data, router])
+
   if (status === "loading") {
-    return <p className="text-center mt-10 text-gray-600">กำลังตรวจสอบสิทธิ์…</p>;
+    return (
+      <p className="text-center mt-10 text-gray-600">
+        กำลังตรวจสอบสิทธิ์…
+      </p>
+    )
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-emerald-800 mb-2">Create Account</h1>
+          <h1 className="text-3xl font-bold text-emerald-800 mb-2">
+            Create Account
+          </h1>
           <p className="text-emerald-600">Join the Kaset Fair</p>
         </div>
 
         <Card className="border-emerald-200 shadow-lg">
-          <form className="flex flex-col gap-6" onSubmit={handleRegister} noValidate>
+          <form
+            className="flex flex-col gap-6"
+            onSubmit={handleRegister}
+            noValidate
+          >
             <CardContent className="space-y-4">
               <Field
                 id="firstName"
@@ -151,8 +236,9 @@ export default function RegisterPage() {
                 label="ชื่อ"
                 value={formData.firstName}
                 onChange={handleInputChange}
-                disabled={isLoading}
+                disabled={isLoading || uploadingCard}
                 autoComplete="given-name"
+                error={fieldErrors.firstName}
                 required
               />
 
@@ -162,8 +248,9 @@ export default function RegisterPage() {
                 label="นามสกุล"
                 value={formData.lastName}
                 onChange={handleInputChange}
-                disabled={isLoading}
+                disabled={isLoading || uploadingCard}
                 autoComplete="family-name"
+                error={fieldErrors.lastName}
                 required
               />
 
@@ -173,8 +260,9 @@ export default function RegisterPage() {
                 label="รหัสนิสิต"
                 value={formData.nisitId}
                 onChange={handleInputChange}
-                disabled={isLoading}
+                disabled={isLoading || uploadingCard}
                 autoComplete="student-id"
+                error={fieldErrors.nisitId}
                 required
               />
 
@@ -184,29 +272,54 @@ export default function RegisterPage() {
                 label="เบอร์โทร"
                 value={formData.phone}
                 onChange={handleInputChange}
-                disabled={isLoading}
+                disabled={isLoading || uploadingCard}
                 type="tel"
                 inputMode="numeric"
-                pattern="^0[0-9]{9}$"
-                title="กรุณากรอกเบอร์โทรศัพท์ 10 หลัก เริ่มต้นด้วย 0"
                 placeholder="08xxxxxxxx"
+                error={fieldErrors.phone}
                 required
               />
 
-              {/* optional */}
-              <Field
-                id="nisitCardLink"
-                name="nisitCardLink"
-                label="ลิงก์บัตรนิสิต (ถ้ามี)"
-                value={formData.nisitCardLink}
-                onChange={handleInputChange}
-                disabled={isLoading}
-                placeholder="https://..."
-              />
+              <div className="space-y-2">
+                <Label
+                  htmlFor="nisitCard"
+                  className={fieldErrors.nisitCard ? "text-red-600" : ""}
+                >
+                  อัปโหลดรูปบัตรนิสิต
+                </Label>
+                <Input
+                  id="nisitCard"
+                  name="nisitCard"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  disabled={isLoading || uploadingCard}
+                  onChange={handleFileChange}
+                  className={fieldErrors.nisitCard ? "border-red-500" : ""}
+                  required
+                />
+                {uploadingCard && (
+                  <p className="text-xs text-emerald-600">
+                    กำลังอัปโหลดรูปบัตรนิสิต…
+                  </p>
+                )}
+                {nisitCardFile && !uploadingCard && (
+                  <p className="text-xs text-emerald-700">
+                    ใช้ไฟล์: {nisitCardFile.name}
+                  </p>
+                )}
+                {fieldErrors.nisitCard && (
+                  <p className="text-xs text-red-600">
+                    {fieldErrors.nisitCard}
+                  </p>
+                )}
+              </div>
 
-              {error && (
-                <p role="alert" className="text-sm text-red-600">
-                  {error}
+              {apiError && (
+                <p
+                  role="alert"
+                  className="text-sm text-red-600 p-3 bg-red-50 rounded-md"
+                >
+                  {apiError}
                 </p>
               )}
             </CardContent>
@@ -215,33 +328,35 @@ export default function RegisterPage() {
               <Button
                 type="submit"
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-emerald-400"
-                disabled={isLoading}
+                disabled={isLoading || uploadingCard}
               >
-                {isLoading ? "Creating..." : "Create account"}
+                {uploadingCard
+                  ? "กำลังอัปโหลดรูป..."
+                  : isLoading
+                  ? "Creating..."
+                  : "Create account"}
               </Button>
             </CardFooter>
           </form>
         </Card>
       </div>
     </div>
-  );
+  )
 }
 
-/** ช่วยลดซ้ำของฟิลด์ */
 function Field(props: {
-  id: string;
-  name: string;
-  label: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  disabled?: boolean;
-  required?: boolean;
-  type?: string;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
-  pattern?: string;
-  title?: string;
-  placeholder?: string;
-  autoComplete?: string;
+  id: string
+  name: string
+  label: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  disabled?: boolean
+  required?: boolean
+  type?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]
+  placeholder?: string
+  autoComplete?: string
+  error?: string
 }) {
   const {
     id,
@@ -253,14 +368,16 @@ function Field(props: {
     required,
     type = "text",
     inputMode,
-    pattern,
-    title,
     placeholder,
     autoComplete,
-  } = props;
+    error,
+  } = props
+
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className={error ? "text-red-600" : ""}>
+        {label}
+      </Label>
       <Input
         id={id}
         name={name}
@@ -270,11 +387,11 @@ function Field(props: {
         required={required}
         type={type}
         inputMode={inputMode}
-        pattern={pattern}
-        title={title}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        className={error ? "border-red-500" : ""}
       />
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
-  );
+  )
 }

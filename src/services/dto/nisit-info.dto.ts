@@ -3,7 +3,7 @@ export type NisitInfo = {
   lastName: string
   nisitId: string
   phone: string
-  nisitCardLink: string | null
+  nisitCardMediaId: string | null
 }
 
 export type RegisterResponse = {
