@@ -16,7 +16,7 @@ export type StoreDarftResponseDto = {
 export type UpdateClubInfoRequestDto = {
     clubName?: string;
     clubApplicationId?: string;
-    leaderId?: string;
+    leaderNisitId?: string;
     leaderFirstName?: string;
     leaderLastName?: string;
     leaderEmail?: string;

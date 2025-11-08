@@ -10,8 +10,11 @@ import {
   StoreStatusResponseDto,
   StoreType,
 } from "@/services/dto/store-info.dto"
-import { createStore, extractErrorMessage, getStoreDraft, getStoreStatus } from "@/services/storeServices"
+import { createStore, extractErrorMessage, getStoreDraft, getStoreStatus, updateClubInfo } from "@/services/storeServices"
 import {
+  CLUB_INFO_REQUEST_FIELD_MAP,
+  CLUB_INFO_REQUIRED_FIELDS,
+  type ClubInfoFieldKey,
   clampStepToState,
   getLayoutStepIndex,
   getProductStepIndex,
@@ -32,13 +35,9 @@ export type ProductFormState = {
   fileName: string | null
 }
 
-export type ClubInfoState = {
-  organizationName: string
-  presidentFirstName: string
-  presidentLastName: string
-  presidentNisitId: string
-  presidentEmail: string
-  presidentPhone: string
+type ClubInfoBaseState = Record<Exclude<ClubInfoFieldKey, "applicationFileName">, string>
+
+export type ClubInfoState = ClubInfoBaseState & {
   applicationFileName: string | null
 }
 
@@ -64,6 +63,30 @@ const emptyClubInfo: ClubInfoState = {
 }
 
 type StoreProgress = CreateStoreResponseDto | StoreStatusResponseDto
+type UpdateClubInfoPayload = Parameters<typeof updateClubInfo>[0]
+
+const clubInfoFieldEntries = Object.entries(CLUB_INFO_REQUEST_FIELD_MAP) as Array<
+  [ClubInfoFieldKey, keyof UpdateClubInfoPayload]
+>
+
+const mapClubInfoToPayload = (info: ClubInfoState): UpdateClubInfoPayload =>
+  clubInfoFieldEntries.reduce((acc, [stateKey, requestKey]) => {
+    const rawValue = info[stateKey]
+    if (rawValue == null) {
+      return acc
+    }
+
+    const normalizedValue =
+      typeof rawValue === "string" && stateKey !== "applicationFileName"
+        ? rawValue.trim()
+        : rawValue
+
+    if (typeof normalizedValue === "string" && normalizedValue.length > 0) {
+      acc[requestKey] = normalizedValue
+    }
+
+    return acc
+  }, {} as UpdateClubInfoPayload)
 
 export function useStoreWizard() {
   const router = useRouter()
@@ -345,6 +368,48 @@ export function useStoreWizard() {
     }))
   }
 
+  const handleSaveClubInfo = useCallback(async () => {
+    if (storeType !== "Club") {
+      updateStepParam(currentStep + 1, { clamp: false })
+      return
+    }
+
+    if (!storeStatus || storeStatus.state === "CreateStore") {
+      setStepError("Please create a store before submitting club information.")
+      updateStepParam(1, { clamp: false })
+      return
+    }
+
+    const missingField = CLUB_INFO_REQUIRED_FIELDS.find((field) => !clubInfo[field].trim())
+    if (missingField) {
+      setStepError("Please fill in all required club information.")
+      return
+    }
+
+    const payload = mapClubInfoToPayload(clubInfo)
+
+    setSaving(true)
+    setStepError(null)
+
+    try {
+      const res = await updateClubInfo(payload)
+      applyStoreSnapshot(res)
+      updateStepParam(currentStep + 1, { clamp: false })
+    } catch (error) {
+      setStepError(extractErrorMessage(error, "Failed to save club information"))
+    } finally {
+      setSaving(false)
+    }
+  }, [
+    applyStoreSnapshot,
+    clubInfo,
+    currentStep,
+    storeStatus,
+    storeType,
+    updateStepParam,
+    setStepError,
+  ])
+
   const handleSimulatedSave = async (targetStep: number, options?: { clamp?: boolean }) => {
     setSaving(true)
     await new Promise((r) => setTimeout(r, 250))
@@ -409,6 +474,7 @@ export function useStoreWizard() {
     handleCreateStore,
     handleClubInfoFieldChange,
     handleClubApplicationFileChange,
+    handleSaveClubInfo,
     handleSimulatedSave,
     handleFinalSubmit,
     updateStepParam,

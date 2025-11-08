@@ -39,6 +39,7 @@ export default function StoreCreatePage() {
     handleCreateStore,
     handleClubInfoFieldChange,
     handleClubApplicationFileChange,
+    handleSaveClubInfo,
     handleSimulatedSave,
     handleFinalSubmit,
     updateStepParam,
@@ -167,7 +168,7 @@ export default function StoreCreatePage() {
             onPresidentPhoneChange={(v) => handleClubInfoFieldChange("presidentPhone", v)}
             onApplicationFileChange={handleClubApplicationFileChange}
             onBack={() => updateStepParam(currentStep - 1)}
-            onNext={() => handleSimulatedSave(currentStep + 1)}
+            onNext={handleSaveClubInfo}
             saving={saving}
           />
         )}

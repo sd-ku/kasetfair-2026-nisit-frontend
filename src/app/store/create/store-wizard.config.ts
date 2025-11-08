@@ -1,4 +1,5 @@
 import { StoreType, StoreState } from "@/services/dto/store-info.dto"
+import type { UpdateClubInfoRequestDto } from "@/services/dto/store-draft.dto"
 
 // step config + helper
 
@@ -81,4 +82,34 @@ export const stepToDraftKey = (type: StoreType, step: number): string | null => 
   if (step === getLayoutStepIndex(type)) return "store-details"
   if (step === getProductStepIndex(type)) return "product-details"
   return null
+}
+
+export type ClubInfoFieldKey =
+  | "organizationName"
+  | "presidentFirstName"
+  | "presidentLastName"
+  | "presidentNisitId"
+  | "presidentEmail"
+  | "presidentPhone"
+  | "applicationFileName"
+
+export const CLUB_INFO_REQUIRED_FIELDS: Exclude<ClubInfoFieldKey, "applicationFileName">[] = [
+  "organizationName",
+  "presidentFirstName",
+  "presidentLastName",
+  "presidentNisitId",
+  "presidentEmail",
+  "presidentPhone",
+]
+
+type ClubInfoPayloadMap = Record<ClubInfoFieldKey, keyof UpdateClubInfoRequestDto>
+
+export const CLUB_INFO_REQUEST_FIELD_MAP: ClubInfoPayloadMap = {
+  organizationName: "clubName",
+  presidentFirstName: "leaderFirstName",
+  presidentLastName: "leaderLastName",
+  presidentNisitId: "leaderNisitId",
+  presidentEmail: "leaderEmail",
+  presidentPhone: "leaderPhone",
+  applicationFileName: "clubApplicationId",
 }

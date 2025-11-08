@@ -58,9 +58,19 @@ export async function createStore(payload: CreateStoreRequestDto): Promise<Creat
   }
 }
 
-export async function updateClubInfo(payload: UpdateClubInfoRequestDto) {
-  const res = await http.patch(`${STORE_SERVICE_API}/mine/club-info`)
-  return res.data
+export async function updateClubInfo(payload: UpdateClubInfoRequestDto): Promise<StoreStatusResponseDto> {
+  try {
+    const res = await http.patch(`${STORE_SERVICE_API}/mine/club-info`, payload)
+
+    if (res.status === 200 || res.status === 201) {
+      return res.data
+    }
+
+    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
+  } catch (error) {
+    const message = extractErrorMessage(error, "Failed to update club information")
+    throw new Error(message)
+  }
 }
 
 export async function getStoreDraft(step: string): Promise<StoreDarftResponseDto> {
