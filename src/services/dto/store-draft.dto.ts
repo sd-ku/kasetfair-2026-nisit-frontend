@@ -12,3 +12,13 @@ export type StoreDarftResponseDto = {
   state: StoreState
   memberEmails: memberEmailsDraftDto[]
 }
+
+export type UpdateClubInfoRequestDto = {
+    clubName?: string;
+    clubApplicationId?: string;
+    leaderId?: string;
+    leaderFirstName?: string;
+    leaderLastName?: string;
+    leaderEmail?: string;
+    leaderPhone?: string;
+}

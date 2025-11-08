@@ -6,7 +6,7 @@ import {
   StoreStatusRequestDto,
   StoreStatusResponseDto,
 } from "./dto/store-info.dto"
-import { StoreDarftResponseDto } from "./dto/store-draft.dto"
+import { StoreDarftResponseDto, UpdateClubInfoRequestDto } from "./dto/store-draft.dto"
 
 const STORE_SERVICE_API = "/api/store"
 
@@ -56,6 +56,11 @@ export async function createStore(payload: CreateStoreRequestDto): Promise<Creat
     const message = extractErrorMessage(error, "Failed to create store")
     throw new Error(message)
   }
+}
+
+export async function updateClubInfo(payload: UpdateClubInfoRequestDto) {
+  const res = await http.patch(`${STORE_SERVICE_API}/mine/club-info`)
+  return res.data
 }
 
 export async function getStoreDraft(step: string): Promise<StoreDarftResponseDto> {

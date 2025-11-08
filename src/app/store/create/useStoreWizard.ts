@@ -1,3 +1,4 @@
+// useStoreWizard.ts
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -35,7 +36,7 @@ export type ClubInfoState = {
   organizationName: string
   presidentFirstName: string
   presidentLastName: string
-  presidentStudentId: string
+  presidentNisitId: string
   presidentEmail: string
   presidentPhone: string
   applicationFileName: string | null
@@ -56,7 +57,7 @@ const emptyClubInfo: ClubInfoState = {
   organizationName: "",
   presidentFirstName: "",
   presidentLastName: "",
-  presidentStudentId: "",
+  presidentNisitId: "",
   presidentEmail: "",
   presidentPhone: "",
   applicationFileName: null,
@@ -176,7 +177,7 @@ export function useStoreWizard() {
         organizationName: ci.organizationName ?? "",
         presidentFirstName: ci.presidentFirstName ?? "",
         presidentLastName: ci.presidentLastName ?? "",
-        presidentStudentId: ci.presidentStudentId ?? "",
+        presidentNisitId: ci.presidentNisitId ?? "",
         presidentEmail: ci.presidentEmail ?? "",
         presidentPhone: ci.presidentPhone ?? "",
         applicationFileName: ci.applicationFileName ?? null,

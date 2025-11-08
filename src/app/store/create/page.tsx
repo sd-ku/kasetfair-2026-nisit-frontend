@@ -1,4 +1,5 @@
-﻿"use client"
+﻿// page.tsx
+"use client"
 
 import { Button } from "@/components/ui/button"
 import { StepIndicator } from "@/components/createStep/step-indicator"
@@ -154,14 +155,14 @@ export default function StoreCreatePage() {
             organizationName={clubInfo.organizationName}
             presidentFirstName={clubInfo.presidentFirstName}
             presidentLastName={clubInfo.presidentLastName}
-            presidentStudentId={clubInfo.presidentStudentId}
+            presidentNisitId={clubInfo.presidentNisitId}
             presidentEmail={clubInfo.presidentEmail}
             presidentPhone={clubInfo.presidentPhone}
             applicationFileName={clubInfo.applicationFileName}
             onOrganizationNameChange={(v) => handleClubInfoFieldChange("organizationName", v)}
             onPresidentFirstNameChange={(v) => handleClubInfoFieldChange("presidentFirstName", v)}
             onPresidentLastNameChange={(v) => handleClubInfoFieldChange("presidentLastName", v)}
-            onPresidentStudentIdChange={(v) => handleClubInfoFieldChange("presidentStudentId", v)}
+            onpresidentNisitIdChange={(v) => handleClubInfoFieldChange("presidentNisitId", v)}
             onPresidentEmailChange={(v) => handleClubInfoFieldChange("presidentEmail", v)}
             onPresidentPhoneChange={(v) => handleClubInfoFieldChange("presidentPhone", v)}
             onApplicationFileChange={handleClubApplicationFileChange}

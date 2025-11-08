@@ -11,14 +11,14 @@ type StepClubInfoFormProps = {
   organizationName: string
   presidentFirstName: string
   presidentLastName: string
-  presidentStudentId: string
+  presidentNisitId: string
   presidentEmail: string
   presidentPhone: string
   applicationFileName: string | null
   onOrganizationNameChange: (value: string) => void
   onPresidentFirstNameChange: (value: string) => void
   onPresidentLastNameChange: (value: string) => void
-  onPresidentStudentIdChange: (value: string) => void
+  onpresidentNisitIdChange: (value: string) => void
   onPresidentEmailChange: (value: string) => void
   onPresidentPhoneChange: (value: string) => void
   onApplicationFileChange: (file: File | null) => void
@@ -31,14 +31,14 @@ export function StepClubInfoForm({
   organizationName,
   presidentFirstName,
   presidentLastName,
-  presidentStudentId,
+  presidentNisitId,
   presidentEmail,
   presidentPhone,
   applicationFileName,
   onOrganizationNameChange,
   onPresidentFirstNameChange,
   onPresidentLastNameChange,
-  onPresidentStudentIdChange,
+  onpresidentNisitIdChange,
   onPresidentEmailChange,
   onPresidentPhoneChange,
   onApplicationFileChange,
@@ -94,11 +94,11 @@ export function StepClubInfoForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="presidentStudentId">รหัสนิสิต (ประธานชมรม)</Label>
+              <Label htmlFor="presidentNisitId">รหัสนิสิต (ประธานชมรม)</Label>
               <Input
-                id="presidentStudentId"
-                value={presidentStudentId}
-                onChange={(event) => onPresidentStudentIdChange(event.target.value)}
+                id="presidentNisitId"
+                value={presidentNisitId}
+                onChange={(event) => onpresidentNisitIdChange(event.target.value)}
                 placeholder="6501234567"
                 inputMode="numeric"
                 required

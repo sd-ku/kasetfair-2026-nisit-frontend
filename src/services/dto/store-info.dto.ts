@@ -6,7 +6,7 @@ export type ClubApplicationDto = {
   organizationName: string
   presidentFirstName: string
   presidentLastName: string
-  presidentStudentId: string
+  presidentNisitId: string
   applicationFileName?: string | null
 }
 
