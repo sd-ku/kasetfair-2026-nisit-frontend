@@ -213,7 +213,7 @@ export default function StoreCreatePage() {
         {currentStep === layoutStepIndex && (
           <StepTwoForm
             layoutDescription={storeDetailsStep.layoutDescription}
-            layoutFileName={storeDetailsStep.layoutFile?.name ?? null}
+            layoutFileName={storeDetailsStep.layoutFileName}
             onDescriptionChange={storeDetailsStep.setLayoutDescription}
             onFileChange={storeDetailsStep.setLayoutFile}
             onBack={() => core.goToStep(currentStep - 1)}

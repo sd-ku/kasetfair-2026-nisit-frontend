@@ -7,7 +7,7 @@ import {
   StoreStatusResponseDto,
   StorePendingValidationResponseDto,
 } from "./dto/store-info.dto"
-import { StoreDarftResponseDto, UpdateClubInfoRequestDto } from "./dto/store-draft.dto"
+import { StoreDarftResponseDto, UpdateDraftStoreRequestDto, UpdateClubInfoRequestDto } from "./dto/store-draft.dto"
 import { CreateGoodRequestDto, GoodsResponseDto, UpdateGoodRequestDto } from "./dto/goods.dto"
 
 const STORE_SERVICE_API = "/api/store"
@@ -71,6 +71,21 @@ export async function updateClubInfo(payload: UpdateClubInfoRequestDto): Promise
     throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
   } catch (error) {
     const message = extractErrorMessage(error, "Failed to update club information")
+    throw new Error(message)
+  }
+}
+
+export async function updateDraftStoreInfo(payload: UpdateDraftStoreRequestDto) {
+    try {
+    const res = await http.patch(`${STORE_SERVICE_API}/mine/draft`, payload)
+
+    if (res.status === 200 || res.status === 201) {
+      return res.data
+    }
+
+    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
+  } catch (error) {
+    const message = extractErrorMessage(error, "Failed to data information")
     throw new Error(message)
   }
 }

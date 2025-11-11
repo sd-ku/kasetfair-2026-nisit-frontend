@@ -39,22 +39,14 @@ export type UpdateClubInfoResponseDto = {
   }
 }
 
-export type UpdateBoothLayoutMediaRequestDto = {
-  boothLayoutMediaId: string,
+export type UpdateDraftStoreRequestDto = {
+  storeId?: string,
+  storeName?: string,
+  boothMediaId?: string
 }
 
-export type UpdateBoothLayoutMediaResponsetDto = {
-  storeId: string,
-  storeName: string,
-  type: string,
-  state: string,
-  clubInfo: {
-    clubName?: string;
-    clubApplicationMediaId?: string;
-    leaderNisitId?: string;
-    leaderFirstName?: string;
-    leaderLastName?: string;
-    leaderEmail?: string;
-    leaderPhone?: string;
-  }
+export type UpdateDraftStoreResponsetDto = {
+  storeId?: string,
+  storeName?: string,
+  boothMediaId?: string
 }

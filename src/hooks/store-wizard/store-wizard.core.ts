@@ -32,8 +32,9 @@ export type StoreProgress = (CreateStoreResponseDto | StoreStatusResponseDto | S
       clubApplicationMediaId?: string | null
       applicationFileId?: string | null
     }
-    layoutDescription: string
-    layoutFileName: string
+    layoutDescription?: string | null
+    layoutFileName?: string | null
+    boothMediaId?: string | null
     products: Array<{
       id?: string | number
       name?: string
