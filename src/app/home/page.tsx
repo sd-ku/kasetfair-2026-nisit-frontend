@@ -289,7 +289,7 @@ export default function HomePage() {
               ตอบรับหรือปฏิเสธคำเชิญได้ที่นี่
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          {/* <CardContent className="space-y-3">
             {loadingInvites ? (
               <div className="flex items-center justify-center py-8 text-emerald-700">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -320,7 +320,7 @@ export default function HomePage() {
                 ))}
               </ul>
             )}
-          </CardContent>
+          </CardContent> */}
         </Card>
       </main>
     </div>

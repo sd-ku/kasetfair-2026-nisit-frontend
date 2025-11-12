@@ -93,7 +93,7 @@ export type UseProductStepResult = {
   handleProductFileChange: (id: string, file: File | null) => void
   addProduct: () => void
   removeProduct: (id: string) => void
-  submitAll: (context?: Record<string, unknown>) => Promise<void>
+  submitAll: (context?: Record<string, unknown>) => Promise<boolean>
 }
 
 export function useProductStep(core: StoreWizardCore): UseProductStepResult {
@@ -255,7 +255,7 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
 
   const submitAll = useCallback(
     async (_context?: Record<string, unknown>) => {
-      if (!ensureStoreIsReady()) return
+      if (!ensureStoreIsReady()) return false
 
       setIsSubmitting(true)
       setStepError(null)
@@ -279,7 +279,7 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
         }
 
         if (!creations.length && !updates.length && !deletions.length) {
-          return
+          return true
         }
 
         for (const payload of creations) {
@@ -293,8 +293,10 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
         setPendingDeleteIds([])
         await loadProducts()
         await reloadStatus()
+        return true
       } catch (error) {
         setStepError(extractErrorMessage(error, "Failed to save product information"))
+        return false
       } finally {
         setIsSubmitting(false)
       }

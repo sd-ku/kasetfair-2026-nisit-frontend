@@ -3,8 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Plus, Trash2, UploadCloud } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 
 type Product = {
   id: string
@@ -20,7 +19,7 @@ type StepThreeFormProps = {
   onAddProduct: () => void
   onRemoveProduct: (id: string) => void
   onBack: () => void
-  onSubmitAll: () => void
+  onSubmitAll: () => Promise<void>
   saving: boolean
 }
 
@@ -34,9 +33,9 @@ export function StepThreeForm({
   onSubmitAll,
   saving,
 }: StepThreeFormProps) {
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    onSubmitAll()
+    await onSubmitAll()
   }
 
   return (
@@ -44,12 +43,12 @@ export function StepThreeForm({
       <CardHeader>
         <CardTitle className="text-emerald-800">ข้อมูลสินค้า</CardTitle>
       </CardHeader>
+
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto] items-center gap-3 text-sm font-semibold text-emerald-700">
+          <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_auto] items-center gap-3 text-sm text-gray-600">
             <span>ชื่อสินค้า</span>
             <span>ราคา</span>
-            <span>ภาพสินค้า</span>
             <span className="sr-only">actions</span>
           </div>
 
@@ -57,36 +56,22 @@ export function StepThreeForm({
             {products.map((product) => (
               <div
                 key={product.id}
-                className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto] items-center gap-3"
+                className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_auto] items-center gap-3"
               >
                 <Input
                   placeholder="ชื่อสินค้า"
                   value={product.name}
-                  onChange={(event) => onProductChange(product.id, "name", event.target.value)}
+                  onChange={(e) => onProductChange(product.id, "name", e.target.value)}
                   required
                 />
+
                 <Input
-                  placeholder="ราคา (บาท)"
+                  placeholder="บาท"
                   value={product.price}
-                  onChange={(event) => onProductChange(product.id, "price", event.target.value)}
+                  onChange={(e) => onProductChange(product.id, "price", e.target.value)}
                   inputMode="decimal"
+                  className="text-right"
                   required
-                />
-                <label
-                  htmlFor={`product-file-${product.id}`}
-                  className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-100"
-                >
-                  <span className="truncate">
-                    {product.fileName ?? "อัปโหลดไฟล์"}
-                  </span>
-                  <UploadCloud className="h-4 w-4 shrink-0" />
-                </label>
-                <Input
-                  id={`product-file-${product.id}`}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) => onProductFileChange(product.id, event.target.files?.[0] ?? null)}
                 />
 
                 <Button
@@ -113,7 +98,7 @@ export function StepThreeForm({
           </Button>
         </CardContent>
 
-        <CardFooter className="flex justify-between">
+        <CardFooter className="flex justify-between mt-6">
           <Button
             type="button"
             variant="outline"
@@ -127,7 +112,7 @@ export function StepThreeForm({
             className="bg-emerald-600 text-white hover:bg-emerald-700"
             disabled={saving}
           >
-            {saving ? "กำลังบันทึก..." : "บันทึกแบบร่าง"}
+            {saving ? "กำลังบันทึกและตรวจสอบ..." : "บันทึกและส่ง"}
           </Button>
         </CardFooter>
       </form>

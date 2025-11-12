@@ -103,8 +103,8 @@ export default function StoreCreatePage() {
   }
 
   const allowCreateSubmit = !storeStatus || storeStatus.state === "CreateStore"
-  const handleFinalSubmit = () =>
-    productStep.submitAll({
+  const handleFinalSubmit = async () => {
+    const submitSucceeded = await productStep.submitAll({
       storeStatus,
       storeName: createStep.storeName,
       members: createStep.members,
@@ -113,23 +113,36 @@ export default function StoreCreatePage() {
       products: productStep.products,
       clubInfo: clubStep.clubInfo,
     })
+
+    if (!submitSucceeded) {
+      return
+    }
+
+    const commitSucceeded = await handleCommitStore()
+    if (commitSucceeded) {
+      router.push("/home")
+    }
+  }
   const isPendingStore = storeStatus?.state === "Pending"
   const canAttemptCommit = Boolean(storeStatus?.id && !isPendingStore)
   const commitSucceeded =
     pendingValidation?.state === "Pending" && pendingValidation.isValid
   const failedChecklistItems = computeInvalidChecklistItems(pendingValidation?.checklist)
 
-  const handleCommitStore = async () => {
-    if (!canAttemptCommit || isCommitting) return
+  const handleCommitStore = async (): Promise<boolean> => {
+    if (!canAttemptCommit || isCommitting) return false
     setIsCommitting(true)
     setStepError(null)
     setPendingValidation(null)
+
+    let succeeded = false
 
     try {
       const response = await commitStoreForPending()
       setPendingValidation(response)
       if (response.state === "Pending" && response.isValid) {
         await reloadStatus()
+        succeeded = true
       } else {
         const invalidItems = computeInvalidChecklistItems(response.checklist)
         if (invalidItems.length) {
@@ -145,6 +158,8 @@ export default function StoreCreatePage() {
     } finally {
       setIsCommitting(false)
     }
+
+    return succeeded
   }
 
   return (
@@ -237,7 +252,7 @@ export default function StoreCreatePage() {
               onRemoveProduct={productStep.removeProduct}
               onBack={() => core.goToStep(currentStep - 1)}
               onSubmitAll={handleFinalSubmit}
-              saving={productStep.isSubmitting}
+              saving={productStep.isSubmitting || isCommitting}
             />
 
             {storeStatus?.id && (
@@ -250,17 +265,13 @@ export default function StoreCreatePage() {
                     <p className="text-sm text-emerald-700">
                       {isPendingStore
                         ? "Your store is already pending approval. You will be notified when the review is finished."
-                        : "Run the validation checklist to move your store into the pending queue."}
+                        : "Use the product save button above to run the validation checklist and move your store into the pending queue."}
                     </p>
                   </div>
                   {!isPendingStore ? (
-                    <Button
-                      className="min-w-[11rem] bg-emerald-600 text-white hover:bg-emerald-700"
-                      onClick={handleCommitStore}
-                      disabled={!canAttemptCommit || isCommitting}
-                    >
-                      {isCommitting ? "Validating..." : "Commit store"}
-                    </Button>
+                    <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700">
+                      Saving products now runs validation automatically
+                    </span>
                   ) : (
                     <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700">
                       Pending review
