@@ -19,7 +19,8 @@ type StepThreeFormProps = {
   onAddProduct: () => void
   onRemoveProduct: (id: string) => void
   onBack: () => void
-  onSubmitAll: () => Promise<void>
+  onSubmitAll: () => Promise<boolean>
+  onSubmitSuccess?: () => void
   saving: boolean
 }
 
@@ -31,11 +32,26 @@ export function StepThreeForm({
   onRemoveProduct,
   onBack,
   onSubmitAll,
+  onSubmitSuccess,
   saving,
 }: StepThreeFormProps) {
+  const reloadPage = () => {
+    if (typeof window !== "undefined") {
+      window.location.reload()
+    }
+  }
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    await onSubmitAll()
+    const shouldShowSuccess = await onSubmitAll()
+
+    if (shouldShowSuccess) {
+      if (onSubmitSuccess) {
+        onSubmitSuccess()
+        return
+      }
+      reloadPage()
+    }
   }
 
   return (

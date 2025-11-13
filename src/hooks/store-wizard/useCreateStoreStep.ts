@@ -122,6 +122,9 @@ export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepRes
     try {
       const response = await createStore(payload)
       core.applyStoreSnapshot(response)
+      await core.reloadStatus().catch((reloadError) => {
+        console.error("Failed to reload store status after creation", reloadError)
+      })
     } catch (error) {
       core.setStepError(extractErrorMessage(error, "Failed to create store"))
     } finally {

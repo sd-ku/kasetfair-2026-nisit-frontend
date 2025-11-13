@@ -106,7 +106,7 @@ export default function StoreCreatePage() {
 
   const allowCreateSubmit = !storeStatus || storeStatus.state === "CreateStore"
   const commitStepIndex = steps[steps.length - 1]?.id ?? productStepIndex
-  const handleFinalSubmit = async () => {
+  const handleFinalSubmit = async (): Promise<boolean> => {
     const submitSucceeded = await productStep.submitAll({
       storeStatus,
       storeName: createStep.storeName,
@@ -118,13 +118,11 @@ export default function StoreCreatePage() {
     })
 
     if (!submitSucceeded) {
-      return
+      return false
     }
 
     const commitSucceeded = await handleCommitStore()
-    if (commitSucceeded) {
-      core.goToStep(commitStepIndex, { clamp: true })
-    }
+    return commitSucceeded
   }
   const isPendingStore = storeStatus?.state === "Pending"
   const canAttemptCommit = Boolean(storeStatus?.id && !isPendingStore)
@@ -257,6 +255,7 @@ export default function StoreCreatePage() {
               onRemoveProduct={productStep.removeProduct}
               onBack={() => core.goToStep(currentStep - 1)}
               onSubmitAll={handleFinalSubmit}
+              onSubmitSuccess={() => core.goToStep(commitStepIndex, { clamp: true })}
               saving={productStep.isSubmitting || isCommitting}
             />
           </>
