@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { CreateStoreRequestDto, StoreType } from "@/services/dto/store-info.dto"
-import { memberEmailsDraftDto } from "@/services/dto/store-draft.dto"
+import { MemberEmailsDraftDto } from "@/services/dto/store-draft.dto"
 import { createStore, extractErrorMessage } from "@/services/storeServices"
-import { preferredStepForState } from "./store-wizard.config"
+import { patchStoreDraft } from "@/services/storeDraftService"
 import type { StoreWizardCore } from "./store-wizard.core"
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -12,11 +12,38 @@ const MIN_MEMBERS = 3
 
 const buildEmptyMembers = () => Array.from({ length: MIN_MEMBERS }, () => "")
 
+const padMembers = (emails: string[]): string[] => {
+  const normalized = emails.map((email) => email.trim())
+  while (normalized.length < MIN_MEMBERS) normalized.push("")
+  return normalized
+}
+
+const mergeMemberStatuses = (
+  emails: string[],
+  missingProfileEmails: string[],
+  previous: MemberEmailsDraftDto[]
+): MemberEmailsDraftDto[] => {
+  if (!emails.length) return []
+  const missingSet = new Set(missingProfileEmails.map((email) => email.trim().toLowerCase()))
+  const previousMap = previous.reduce<Map<string, MemberEmailsDraftDto>>((acc, entry) => {
+    acc.set(entry.email.trim().toLowerCase(), entry)
+    return acc
+  }, new Map())
+
+  return emails.map((email) => {
+    const key = email.trim().toLowerCase()
+    if (missingSet.has(key)) {
+      return { email, status: "missing profile" }
+    }
+    return previousMap.get(key) ?? { email, status: "pending" }
+  })
+}
+
 export type UseCreateStoreStepResult = {
   storeName: string
   setStoreName: (value: string) => void
   members: string[]
-  memberEmailStatuses: memberEmailsDraftDto[]
+  memberEmailStatuses: MemberEmailsDraftDto[]
   isSubmitting: boolean
   selectStoreType: (type: StoreType) => void
   submitCreateStore: () => Promise<void>
@@ -28,7 +55,7 @@ export type UseCreateStoreStepResult = {
 export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepResult {
   const [storeName, setStoreName] = useState("")
   const [members, setMembers] = useState<string[]>(() => buildEmptyMembers())
-  const [memberEmailStatuses, setMemberEmailStatuses] = useState<memberEmailsDraftDto[]>([])
+  const [memberEmailStatuses, setMemberEmailStatuses] = useState<MemberEmailsDraftDto[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const resetFields = useCallback(() => {
@@ -53,8 +80,7 @@ export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepRes
     if (Array.isArray(snapshot.memberEmails)) {
       setMemberEmailStatuses(snapshot.memberEmails)
       const restored = snapshot.memberEmails.map((member) => member.email)
-      while (restored.length < MIN_MEMBERS) restored.push("")
-      setMembers(restored)
+      setMembers(padMembers(restored))
     }
   }, [core.storeStatus])
 
@@ -88,12 +114,6 @@ export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepRes
       return
     }
 
-    if (core.storeStatus && core.storeStatus.state !== "CreateStore") {
-      core.setStepError("This store has already been created.")
-      core.goToStep(preferredStepForState(core.storeType, core.storeStatus.state), { clamp: false })
-      return
-    }
-
     const trimmedName = storeName.trim()
     const memberEmails = members.map((email) => email.trim()).filter(Boolean)
 
@@ -107,6 +127,37 @@ export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepRes
     }
     if (memberEmails.some((email) => !EMAIL_RE.test(email))) {
       core.setStepError("One or more member emails are invalid.")
+      return
+    }
+
+    const hasExistingStore = Boolean(core.storeStatus)
+
+    if (hasExistingStore) {
+      setIsSubmitting(true)
+      core.setStepError(null)
+
+      try {
+        const response = await patchStoreDraft({
+          storeName: trimmedName,
+          type: core.storeType,
+          memberEmails,
+        })
+
+        setStoreName(response.storeName)
+        setMembers(padMembers(response.memberEmails))
+        setMemberEmailStatuses((prev) =>
+          mergeMemberStatuses(response.memberEmails, response.missingProfileEmails ?? [], prev)
+        )
+
+        await core.reloadStatus().catch((reloadError) => {
+          console.error("Failed to reload store status after updating draft", reloadError)
+        })
+      } catch (error) {
+        core.setStepError(extractErrorMessage(error, "Failed to update store members"))
+      } finally {
+        setIsSubmitting(false)
+      }
+
       return
     }
 

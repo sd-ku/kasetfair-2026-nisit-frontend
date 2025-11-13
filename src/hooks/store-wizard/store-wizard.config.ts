@@ -1,11 +1,9 @@
 import { StoreType, StoreState } from "@/services/dto/store-info.dto"
-import type { UpdateClubInfoRequestDto } from "@/services/dto/store-draft.dto"
 
 // step config + helper
 
 export const STEP_LABELS = {
   createStore: "Create store",
-  clubInfo: "Organization information",
   storeDetails: "Store information",
   productDetails: "Product information",
   commitStatus: "Submission status",
@@ -20,15 +18,14 @@ export const STEP_CONFIG_BY_TYPE: Record<StoreType, Array<{ id: number; label: s
   ],
   Club: [
     { id: 1, label: STEP_LABELS.createStore },
-    { id: 2, label: STEP_LABELS.clubInfo },
-    { id: 3, label: STEP_LABELS.storeDetails },
-    { id: 4, label: STEP_LABELS.productDetails },
-    { id: 5, label: STEP_LABELS.commitStatus },
+    { id: 2, label: STEP_LABELS.storeDetails },
+    { id: 3, label: STEP_LABELS.productDetails },
+    { id: 4, label: STEP_LABELS.commitStatus },
   ],
 }
 
-export const getLayoutStepIndex = (type: StoreType) => (type === "Club" ? 3 : 2)
-export const getProductStepIndex = (type: StoreType) => (type === "Club" ? 4 : 3)
+export const getLayoutStepIndex = (_type: StoreType) => 2
+export const getProductStepIndex = (_type: StoreType) => 3
 export const getStepsForType = (type: StoreType) => STEP_CONFIG_BY_TYPE[type]
 
 export const clampStepToState = (
@@ -52,7 +49,6 @@ export const clampStepToState = (
     case "ProductDetails":
       maxStep = getProductStepIndex(type)
       break
-    case "Submitted":
     case "Pending":
       maxStep = getStepsForType(type).length
       break
@@ -73,7 +69,6 @@ export const preferredStepForState = (type: StoreType, state: StoreState): numbe
       return getLayoutStepIndex(type)
     case "ProductDetails":
       return getProductStepIndex(type)
-    case "Submitted":
     case "Pending":
       return getStepsForType(type).length
     default:
@@ -84,39 +79,7 @@ export const preferredStepForState = (type: StoreType, state: StoreState): numbe
 // map step to draft key
 export const stepToDraftKey = (type: StoreType, step: number): string | null => {
   if (step === 1) return "create-store"
-  if (type === "Club" && step === 2) return "club-info"
   if (step === getLayoutStepIndex(type)) return "store-details"
   if (step === getProductStepIndex(type)) return "product-details"
   return null
-}
-
-export type ClubInfoFieldKey =
-  | "organizationName"
-  | "presidentFirstName"
-  | "presidentLastName"
-  | "presidentNisitId"
-  | "presidentEmail"
-  | "presidentPhone"
-  | "clubApplicationMediaId"
-
-export const CLUB_INFO_REQUIRED_FIELDS: ClubInfoFieldKey[] = [
-  "organizationName",
-  "presidentFirstName",
-  "presidentLastName",
-  "presidentNisitId",
-  "presidentEmail",
-  "presidentPhone",
-  "clubApplicationMediaId",
-]
-
-type ClubInfoPayloadMap = Record<ClubInfoFieldKey, keyof UpdateClubInfoRequestDto>
-
-export const CLUB_INFO_REQUEST_FIELD_MAP: ClubInfoPayloadMap = {
-  organizationName: "clubName",
-  presidentFirstName: "leaderFirstName",
-  presidentLastName: "leaderLastName",
-  presidentNisitId: "leaderNisitId",
-  presidentEmail: "leaderEmail",
-  presidentPhone: "leaderPhone",
-  clubApplicationMediaId: "clubApplicationMediaId",
 }

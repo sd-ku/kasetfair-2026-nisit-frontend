@@ -6,12 +6,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Trash2 } from "lucide-react"
-import { memberEmailsDraftDto } from "@/services/dto/store-draft.dto"
+import { MemberEmailsDraftDto } from "@/services/dto/store-draft.dto"
 
 type StepOneFormProps = {
   storeName: string
   members: string[]
-  memberEmailStatuses: memberEmailsDraftDto[]
+  memberEmailStatuses: MemberEmailsDraftDto[]
   onStoreNameChange: (value: string) => void
   onMemberChange: (index: number, value: string) => void
   onAddMember: () => void

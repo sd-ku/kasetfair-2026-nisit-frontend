@@ -7,7 +7,7 @@ import {
   StoreStatusResponseDto,
   StorePendingValidationResponseDto,
 } from "./dto/store-info.dto"
-import { StoreDarftResponseDto, UpdateDraftStoreRequestDto, UpdateClubInfoRequestDto } from "./dto/store-draft.dto"
+import { StoreDarftResponseDto, UpdateDraftStoreRequestDto } from "./dto/store-draft.dto"
 import { CreateGoodRequestDto, GoodsResponseDto, UpdateGoodRequestDto } from "./dto/goods.dto"
 
 const STORE_SERVICE_API = "/api/store"
@@ -47,7 +47,7 @@ export function extractErrorMessage(
 
 export async function createStore(payload: CreateStoreRequestDto): Promise<CreateStoreResponseDto> {
   try {
-    const res = await http.post(`${STORE_SERVICE_API}/create`, payload)
+    const res = await http.post(`${STORE_SERVICE_API}/mine/draft`, payload)
 
     if (res.status === 201 || res.status === 200) {
       return res.data
@@ -56,21 +56,6 @@ export async function createStore(payload: CreateStoreRequestDto): Promise<Creat
     throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
   } catch (error) {
     const message = extractErrorMessage(error, "Failed to create store")
-    throw new Error(message)
-  }
-}
-
-export async function updateClubInfo(payload: UpdateClubInfoRequestDto): Promise<StoreStatusResponseDto> {
-  try {
-    const res = await http.patch(`${STORE_SERVICE_API}/mine/club-info`, payload)
-
-    if (res.status === 200 || res.status === 201) {
-      return res.data
-    }
-
-    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
-  } catch (error) {
-    const message = extractErrorMessage(error, "Failed to update club information")
     throw new Error(message)
   }
 }
@@ -128,7 +113,7 @@ export async function getStoreStatus(): Promise<StoreDarftResponseDto> {
 
 export async function commitStoreForPending(): Promise<StorePendingValidationResponseDto> {
   try {
-    const res = await http.get(`${STORE_SERVICE_API}/mine/commit`)
+    const res = await http.get(`${STORE_SERVICE_API}/mine/draft/commit`)
 
     if (res.status === 200) {
       return res.data

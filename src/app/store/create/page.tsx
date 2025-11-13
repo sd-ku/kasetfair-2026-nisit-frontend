@@ -5,14 +5,12 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { StepIndicator } from "@/components/createStep/step-indicator"
 import { StepOneForm } from "@/components/createStep/step-one-form"
-import { StepClubInfoForm } from "@/components/createStep/step-club-form"
 import { StepTwoForm } from "@/components/createStep/step-two-form"
 import { StepThreeForm } from "@/components/createStep/step-three-form"
 import { StepSuccess } from "@/components/createStep/step-success"
 import {
   useStoreWizardCore,
   useCreateStoreStep,
-  useClubInfoStep,
   useStoreDetailsStep,
   useProductStep,
 } from "@/hooks/store-wizard"
@@ -25,10 +23,8 @@ export default function StoreCreatePage() {
   const router = useRouter()
   const core = useStoreWizardCore()
   const createStep = useCreateStoreStep(core)
-  const clubStep = useClubInfoStep(core)
   const storeDetailsStep = useStoreDetailsStep(core)
   const productStep = useProductStep(core)
-  const clubInfo = clubStep.clubInfo
 
   const {
     storeType,
@@ -41,6 +37,7 @@ export default function StoreCreatePage() {
     steps,
     setStepError,
     reloadStatus,
+    applyStoreSnapshot,
   } = core
   const [pendingValidation, setPendingValidation] = useState<StorePendingValidationResponseDto | null>(
     null
@@ -104,9 +101,10 @@ export default function StoreCreatePage() {
     )
   }
 
-  const allowCreateSubmit = !storeStatus || storeStatus.state === "CreateStore"
+  const allowCreateSubmit =
+    !storeStatus || (storeStatus.state !== "Pending" && storeStatus.state !== "Submitted")
   const commitStepIndex = steps[steps.length - 1]?.id ?? productStepIndex
-  const handleFinalSubmit = async (): Promise<boolean> => {
+  const handleFinalSubmit = async (): Promise<void> => {
     const submitSucceeded = await productStep.submitAll({
       storeStatus,
       storeName: createStep.storeName,
@@ -114,15 +112,16 @@ export default function StoreCreatePage() {
       layoutDescription: storeDetailsStep.layoutDescription,
       layoutFile: storeDetailsStep.layoutFile,
       products: productStep.products,
-      clubInfo: clubStep.clubInfo,
     })
 
     if (!submitSucceeded) {
-      return false
+      return
     }
 
     const commitSucceeded = await handleCommitStore()
-    return commitSucceeded
+    if (commitSucceeded) {
+      core.goToStep(commitStepIndex, { clamp: true })
+    }
   }
   const isPendingStore = storeStatus?.state === "Pending"
   const canAttemptCommit = Boolean(storeStatus?.id && !isPendingStore)
@@ -142,7 +141,13 @@ export default function StoreCreatePage() {
       const response = await commitStoreForPending()
       setPendingValidation(response)
       if (response.state === "Pending" && response.isValid) {
-        await reloadStatus()
+        if (storeStatus) {
+          applyStoreSnapshot(
+            { ...storeStatus, state: response.state },
+            { clampStep: false }
+          )
+        }
+        await reloadStatus({ syncStep: false, preventRegression: true })
         succeeded = true
       } else {
         const invalidItems = computeInvalidChecklistItems(response.checklist)
@@ -206,28 +211,6 @@ export default function StoreCreatePage() {
           />
         )}
 
-        {storeType === "Club" && currentStep === 2 && (
-          <StepClubInfoForm
-            organizationName={clubInfo.organizationName}
-            presidentFirstName={clubInfo.presidentFirstName}
-            presidentLastName={clubInfo.presidentLastName}
-            presidentNisitId={clubInfo.presidentNisitId}
-            presidentEmail={clubInfo.presidentEmail}
-            presidentPhone={clubInfo.presidentPhone}
-            applicationFileName={clubInfo.applicationFileName}
-            onOrganizationNameChange={(value) => clubStep.updateField("organizationName", value)}
-            onPresidentFirstNameChange={(value) => clubStep.updateField("presidentFirstName", value)}
-            onPresidentLastNameChange={(value) => clubStep.updateField("presidentLastName", value)}
-            onpresidentNisitIdChange={(value) => clubStep.updateField("presidentNisitId", value)}
-            onPresidentEmailChange={(value) => clubStep.updateField("presidentEmail", value)}
-            onPresidentPhoneChange={(value) => clubStep.updateField("presidentPhone", value)}
-            onApplicationFileChange={clubStep.updateApplicationFile}
-            onBack={() => core.goToStep(currentStep - 1)}
-            onNext={clubStep.submitClubInfo}
-            saving={clubStep.isSubmitting}
-          />
-        )}
-
         {currentStep === layoutStepIndex && (
           <StepTwoForm
             layoutDescription={storeDetailsStep.layoutDescription}
@@ -254,8 +237,7 @@ export default function StoreCreatePage() {
               onAddProduct={productStep.addProduct}
               onRemoveProduct={productStep.removeProduct}
               onBack={() => core.goToStep(currentStep - 1)}
-              onSubmitAll={handleFinalSubmit}
-              onSubmitSuccess={() => core.goToStep(commitStepIndex, { clamp: true })}
+              onNext={handleFinalSubmit}
               saving={productStep.isSubmitting || isCommitting}
             />
           </>

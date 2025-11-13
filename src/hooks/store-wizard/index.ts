@@ -1,6 +1,5 @@
 export * from "./store-wizard.core"
 export * from "./useCreateStoreStep"
-export * from "./useClubInfoStep"
 export * from "./useStoreDetailsStep"
 export * from "./useProductStep"
 export * from "./store-wizard.config"

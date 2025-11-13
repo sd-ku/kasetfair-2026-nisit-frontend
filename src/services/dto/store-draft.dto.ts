@@ -1,8 +1,8 @@
 import { StoreType, StoreState } from "./store-info.dto"
 
-export type memberEmailsDraftDto = {
-    email: string,
-    status: string,
+export type MemberEmailsDraftDto = {
+  email: string
+  status: string
 }
 
 export type StoreDarftResponseDto = {
@@ -10,43 +10,39 @@ export type StoreDarftResponseDto = {
   storeName: string
   type: StoreType
   state: StoreState
-  memberEmails: memberEmailsDraftDto[]
+  memberEmails: MemberEmailsDraftDto[]
 }
 
 export type UpdateClubInfoRequestDto = {
-    clubName?: string;
-    clubApplicationMediaId?: string;
-    leaderNisitId?: string;
-    leaderFirstName?: string;
-    leaderLastName?: string;
-    leaderEmail?: string;
-    leaderPhone?: string;
+  clubName?: string
+  clubApplicationMediaId?: string | null
+  leaderNisitId?: string
+  leaderFirstName?: string
+  leaderLastName?: string
+  leaderEmail?: string
+  leaderPhone?: string
+  applicationFileName?: string | null
 }
 
 export type UpdateClubInfoResponseDto = {
-  storeId: string,
-  storeName: string,
-  type: string,
-  state: string,
-  clubInfo: {
-    clubName?: string;
-    clubApplicationMediaId?: string;
-    leaderNisitId?: string;
-    leaderFirstName?: string;
-    leaderLastName?: string;
-    leaderEmail?: string;
-    leaderPhone?: string;
-  }
+  storeId: string
+  storeName: string
+  type: StoreType
+  state: StoreState
+  clubInfo: UpdateClubInfoRequestDto
 }
 
 export type UpdateDraftStoreRequestDto = {
-  storeId?: string,
-  storeName?: string,
-  boothMediaId?: string
+  storeName?: string
+  type?: StoreType
+  memberEmails?: string[]
+  boothMediaId?: string | null
 }
 
-export type UpdateDraftStoreResponsetDto = {
-  storeId?: string,
-  storeName?: string,
-  boothMediaId?: string
+export type UpdateDraftStoreResponseDto = {
+  storeName: string
+  type: StoreType
+  memberEmails: string[]
+  missingProfileEmails: string[]
+  boothMediaId: string | null
 }

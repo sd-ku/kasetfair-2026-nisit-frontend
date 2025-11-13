@@ -52,6 +52,13 @@ export type WizardStepIndicator = {
 
 export const STORE_ID_STORAGE_KEY = "kasetfair-active-store-id"
 
+export type SnapshotSyncOptions = {
+  syncStep?: boolean
+  step?: number
+  clampStep?: boolean
+  preventRegression?: boolean
+}
+
 export type StoreWizardCore = {
   storeType: StoreType | null
   storeStatus: StoreProgress | null
@@ -65,14 +72,29 @@ export type StoreWizardCore = {
   steps: WizardStepIndicator[]
   goToStep: (step: number, options?: { clamp?: boolean }) => void
   goNextStep: (options?: { clamp?: boolean }) => void
-  reloadStatus: () => Promise<StoreProgress | null>
+  reloadStatus: (options?: SnapshotSyncOptions) => Promise<StoreProgress | null>
   applyStoreSnapshot: (
     snapshot: StoreProgress,
-    options?: { syncStep?: boolean; step?: number; clampStep?: boolean }
+    options?: SnapshotSyncOptions
   ) => void
   selectStoreType: (type: StoreType) => void
   resetWizard: (options?: { preserveType?: boolean }) => void
   resetSignal: number
+}
+
+const STORE_STATE_ORDER: StoreState[] = [
+  "CreateStore",
+  "ClubInfo",
+  "StoreDetails",
+  "ProductDetails",
+  "Submitted",
+  "Pending",
+]
+
+const getStateRank = (state?: StoreState | null): number => {
+  if (!state) return 0
+  const index = STORE_STATE_ORDER.indexOf(state)
+  return index >= 0 ? index : 0
 }
 
 export function useStoreWizardCore(): StoreWizardCore {
@@ -181,29 +203,39 @@ export function useStoreWizardCore(): StoreWizardCore {
   )
 
   const applyStoreSnapshot = useCallback(
-    (
-      snapshot: StoreProgress,
-      options?: { syncStep?: boolean; step?: number; clampStep?: boolean }
-    ) => {
-      setStoreStatus(snapshot)
-      setStoreType(snapshot.type)
-      if (typeof window !== "undefined" && snapshot.id != null) {
-        window.sessionStorage.setItem(STORE_ID_STORAGE_KEY, String(snapshot.id))
+    (snapshot: StoreProgress, options?: SnapshotSyncOptions) => {
+      let nextSnapshot = snapshot
+
+      if (options?.preventRegression && storeStatus?.state) {
+        const currentRank = getStateRank(storeStatus.state)
+        const nextRank = getStateRank(snapshot.state ?? storeStatus.state)
+        if (nextRank < currentRank) {
+          nextSnapshot = {
+            ...snapshot,
+            state: storeStatus.state,
+          }
+        }
+      }
+
+      setStoreStatus(nextSnapshot)
+      setStoreType(nextSnapshot.type)
+      if (typeof window !== "undefined" && nextSnapshot.id != null) {
+        window.sessionStorage.setItem(STORE_ID_STORAGE_KEY, String(nextSnapshot.id))
       }
 
       const shouldSyncStep = options?.syncStep ?? true
       if (shouldSyncStep) {
-        const snapshotState: StoreState = snapshot.state ?? "CreateStore"
-        const nextStep = options?.step ?? preferredStepForState(snapshot.type, snapshotState)
+        const snapshotState: StoreState = nextSnapshot.state ?? "CreateStore"
+        const nextStep = options?.step ?? preferredStepForState(nextSnapshot.type, snapshotState)
 
         setUrlState({
-          type: snapshot.type,
+          type: nextSnapshot.type,
           step: nextStep,
           clampStep: options?.clampStep ?? false,
         })
       }
     },
-    [setUrlState]
+    [setUrlState, storeStatus?.state]
   )
 
   const handleStatusNotFound = useCallback(() => {
@@ -211,12 +243,13 @@ export function useStoreWizardCore(): StoreWizardCore {
     setStoreType((prev) => prev ?? typeFromQuery ?? null)
   }, [resetWizard, typeFromQuery])
 
-  const loadStatus = useCallback(async (): Promise<StoreProgress | null> => {
-    try {
-      const res = await getStoreStatus()
-      if (!res) return null
-      applyStoreSnapshot(res)
-      return res
+  const loadStatus = useCallback(
+    async (options?: SnapshotSyncOptions): Promise<StoreProgress | null> => {
+      try {
+        const res = await getStoreStatus()
+        if (!res) return null
+        applyStoreSnapshot(res, options)
+        return res
     } catch (error: any) {
       const status = error?.response?.status ?? error?.status
       if (status === 404) {
@@ -229,10 +262,10 @@ export function useStoreWizardCore(): StoreWizardCore {
     }
   }, [applyStoreSnapshot, handleStatusNotFound])
 
-  const reloadStatus = useCallback(async () => {
+  const reloadStatus = useCallback(async (options?: SnapshotSyncOptions) => {
     setLoadingStatus(true)
     try {
-      return await loadStatus()
+      return await loadStatus(options)
     } finally {
       setLoadingStatus(false)
     }
