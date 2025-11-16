@@ -8,12 +8,11 @@ import {
   type StoreDraftClubInfoDto,
   type StoreDraftData,
 } from "./storeDraftService"
-import { UpdateClubInfoRequestDto } from "./dto/store-draft.dto"
+import { CreateClubInfoRequestDto, UpdateClubInfoRequestDto } from "./dto/club-info.dto"
 import { extractErrorMessage } from "./storeServices"
+import { ClubInfoResponseDto } from "./dto/club-info.dto"
 
 const CLUB_INFO_ENDPOINT = "/api/store/mine/club-info"
-
-export type ClubInfoSubmitPayload = UpdateClubInfoRequestDto
 
 export type UpdateClubInfoResponseBody = {
   ok?: boolean
@@ -33,7 +32,17 @@ export const getClubInfoDraft = getStoreDraft
 export const mapClubInfoErrors = mapDraftErrors
 export type { StoreDraftData }
 
-export async function updateClubInfo(payload: ClubInfoSubmitPayload): Promise<UpdateClubInfoResult> {
+export async function createClubInfo(payload: CreateClubInfoRequestDto): Promise<ClubInfoResponseDto> {
+  try {
+    const res = await http.post(CLUB_INFO_ENDPOINT, payload)
+
+    return res.data
+  } catch (error) {
+    throw new Error(extractErrorMessage(error, "Failed to save organization information"))
+  }
+}
+
+export async function updateClubInfo(payload: UpdateClubInfoRequestDto): Promise<UpdateClubInfoResult> {
   try {
     const res = await http.patch(CLUB_INFO_ENDPOINT, payload)
     const body: UpdateClubInfoResponseBody = res.data ?? {}
@@ -50,5 +59,19 @@ export async function updateClubInfo(payload: ClubInfoSubmitPayload): Promise<Up
     }
   } catch (error) {
     throw new Error(extractErrorMessage(error, "Failed to save organization information"))
+  }
+}
+
+export async function getClubInfo(): Promise<ClubInfoResponseDto | null> {
+  try {
+    const res = await http.get(CLUB_INFO_ENDPOINT)
+
+    return res.data ?? null
+  } catch (error: any) {
+    const status = error?.response?.status ?? error?.status
+    if (status === 404) {
+      return null
+    }
+    throw new Error(extractErrorMessage(error, "Failed to load organization information"))
   }
 }

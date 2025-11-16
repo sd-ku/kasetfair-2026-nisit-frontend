@@ -292,7 +292,7 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
 
         setPendingDeleteIds([])
         await loadProducts()
-        await reloadStatus({ syncStep: false, preventRegression: true })
+        // await reloadStatus({ syncStep: false, preventRegression: true })
         return true
       } catch (error) {
         setStepError(extractErrorMessage(error, "Failed to save product information"))

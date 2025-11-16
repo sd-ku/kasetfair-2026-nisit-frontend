@@ -3,6 +3,13 @@ import { GoodsType } from "./dto/goods.dto"
 import { StoreType } from "./dto/store-info.dto"
 import { UpdateDraftStoreRequestDto, UpdateDraftStoreResponseDto } from "./dto/store-draft.dto"
 import { extractErrorMessage } from "./storeServices"
+import {
+  CreateStoreRequestDto,
+  CreateStoreResponseDto,
+  StoreStatusRequestDto,
+  StoreStatusResponseDto,
+  StorePendingValidationResponseDto,
+} from "./dto/store-info.dto"
 
 const STORE_DRAFT_ENDPOINT = "/api/store/mine/draft"
 
@@ -201,18 +208,6 @@ const normalizeDraftUpdateResponse = (
   }
 }
 
-export async function patchStoreDraft(
-  payload: UpdateDraftStoreRequestDto
-): Promise<UpdateDraftStoreResponseDto> {
-  try {
-    const res = await http.patch(STORE_DRAFT_ENDPOINT, payload)
-    const body = res.data ?? {}
-    return normalizeDraftUpdateResponse(body, payload)
-  } catch (error) {
-    throw new Error(extractErrorMessage(error, "Failed to update store draft"))
-  }
-}
-
 export const mapDraftErrors = (errors?: DraftFieldError[]): DraftErrorMap =>
   Array.isArray(errors)
     ? errors.reduce<DraftErrorMap>((acc, err) => {
@@ -220,3 +215,48 @@ export const mapDraftErrors = (errors?: DraftFieldError[]): DraftErrorMap =>
         return acc
       }, {})
     : {}
+    
+export async function createStore(payload: CreateStoreRequestDto): Promise<CreateStoreResponseDto> {
+  try {
+    const res = await http.post(`${STORE_DRAFT_ENDPOINT}`, payload)
+
+    if (res.status === 201 || res.status === 200) {
+      return res.data
+    }
+
+    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
+  } catch (error) {
+    const message = extractErrorMessage(error, "Failed to create store")
+    throw new Error(message)
+  }
+}
+
+export async function updateDraftStore(payload: UpdateDraftStoreRequestDto) {
+    try {
+    const res = await http.patch(`${STORE_DRAFT_ENDPOINT}`, payload)
+
+    if (res.status === 200 || res.status === 201) {
+      return res.data
+    }
+
+    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
+  } catch (error) {
+    const message = extractErrorMessage(error, "Failed to data information")
+    throw new Error(message)
+  }
+}
+
+export async function commitStoreForPending(): Promise<StorePendingValidationResponseDto> {
+  try {
+    const res = await http.get(`${STORE_DRAFT_ENDPOINT}/commit`)
+
+    if (res.status === 200) {
+      return res.data
+    }
+
+    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
+  } catch (error) {
+    const message = extractErrorMessage(error, "Failed to commit store")
+    throw new Error(message)
+  }
+}

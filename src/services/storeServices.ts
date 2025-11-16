@@ -1,14 +1,8 @@
 import { http } from "@/lib/http"
 import { AxiosError } from "axios"
-import {
-  CreateStoreRequestDto,
-  CreateStoreResponseDto,
-  StoreStatusRequestDto,
-  StoreStatusResponseDto,
-  StorePendingValidationResponseDto,
-} from "./dto/store-info.dto"
 import { StoreDarftResponseDto, UpdateDraftStoreRequestDto } from "./dto/store-draft.dto"
 import { CreateGoodRequestDto, GoodsResponseDto, UpdateGoodRequestDto } from "./dto/goods.dto"
+import { StoreResponseDto, UpdateStoreRequestDto } from "./dto/store-info.dto"
 
 const STORE_SERVICE_API = "/api/store"
 
@@ -45,56 +39,12 @@ export function extractErrorMessage(
   return fallback
 }
 
-export async function createStore(payload: CreateStoreRequestDto): Promise<CreateStoreResponseDto> {
-  try {
-    const res = await http.post(`${STORE_SERVICE_API}/mine/draft`, payload)
-
-    if (res.status === 201 || res.status === 200) {
-      return res.data
-    }
-
-    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
-  } catch (error) {
-    const message = extractErrorMessage(error, "Failed to create store")
-    throw new Error(message)
-  }
+export async function leaveMyStore() {
+  const res = await http.delete(`${STORE_SERVICE_API}/mine/member/me`)
+  return res.data
 }
 
-export async function updateDraftStoreInfo(payload: UpdateDraftStoreRequestDto) {
-    try {
-    const res = await http.patch(`${STORE_SERVICE_API}/mine/draft`, payload)
-
-    if (res.status === 200 || res.status === 201) {
-      return res.data
-    }
-
-    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
-  } catch (error) {
-    const message = extractErrorMessage(error, "Failed to data information")
-    throw new Error(message)
-  }
-}
-
-// export async function getStoreDraft(step: string): Promise<StoreDarftResponseDto> {
-  
-//   const res = await http.get(`${STORE_SERVICE_API}/mine/draft?step=${step}`)
-//   return res.data
-//   // try {
-//   //   const res = await http.get(`${STORE_SERVICE_API}/mine/draft?step=${step}`)
-
-//   //   if (res.status === 201 || res.status === 200) {
-//   //     return res.data
-//   //   }
-
-//   //   throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
-//   // } catch (error) {
-//   //   const message = extractErrorMessage(error, "Failed to load store draft")
-//   //   throw new Error(message)
-//   // }
-// }
-
-
-export async function getStoreStatus(): Promise<StoreDarftResponseDto> {
+export async function getStoreStatus(): Promise<StoreResponseDto> {
   const res = await http.get(`${STORE_SERVICE_API}/mine`)
   return res.data
   // try {
@@ -111,19 +61,9 @@ export async function getStoreStatus(): Promise<StoreDarftResponseDto> {
   // }
 }
 
-export async function commitStoreForPending(): Promise<StorePendingValidationResponseDto> {
-  try {
-    const res = await http.get(`${STORE_SERVICE_API}/mine/draft/commit`)
-
-    if (res.status === 200) {
-      return res.data
-    }
-
-    throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
-  } catch (error) {
-    const message = extractErrorMessage(error, "Failed to commit store")
-    throw new Error(message)
-  }
+export async function updateStore(payload: UpdateStoreRequestDto): Promise<StoreResponseDto> {
+  const res = await http.patch(`${STORE_SERVICE_API}/mine`, payload)
+  return res.data
 }
 
 // ---------- Goods ----------

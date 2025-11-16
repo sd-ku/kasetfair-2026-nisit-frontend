@@ -5,31 +5,28 @@ export type MemberEmailsDraftDto = {
   status: string
 }
 
+export type CreateStoreRequestDto = {
+  storeName: string
+  type: StoreType
+  memberGmails: string[]
+}
+
+export type CreateStoreResponseDto = {
+  id: number
+  storeName: string
+  type: StoreType
+  state: StoreState
+  missingProfileEmails?: string[]
+  createdAt?: string
+  updatedAt?: string
+}
+
 export type StoreDarftResponseDto = {
   id: number
   storeName: string
   type: StoreType
   state: StoreState
   memberEmails: MemberEmailsDraftDto[]
-}
-
-export type UpdateClubInfoRequestDto = {
-  clubName?: string
-  clubApplicationMediaId?: string | null
-  leaderNisitId?: string
-  leaderFirstName?: string
-  leaderLastName?: string
-  leaderEmail?: string
-  leaderPhone?: string
-  applicationFileName?: string | null
-}
-
-export type UpdateClubInfoResponseDto = {
-  storeId: string
-  storeName: string
-  type: StoreType
-  state: StoreState
-  clubInfo: UpdateClubInfoRequestDto
 }
 
 export type UpdateDraftStoreRequestDto = {

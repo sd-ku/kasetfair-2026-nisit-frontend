@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { MediaPurpose } from "@/services/dto/media.dto"
 import { uploadMedia } from "@/services/mediaService"
-import { extractErrorMessage, updateDraftStoreInfo } from "@/services/storeServices"
+import { extractErrorMessage } from "@/services/storeServices"
+import { updateDraftStore } from "@/services/storeDraftService"
 import type { StoreWizardCore, StoreProgress } from "./store-wizard.core"
 
 export type UseStoreDetailsStepResult = {
@@ -107,7 +108,7 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
         return
       }
 
-      await updateDraftStoreInfo({
+      await updateDraftStore({
         // storeId: String(storeId),
         boothMediaId: nextMediaId,
       })

@@ -84,7 +84,6 @@ export type StoreWizardCore = {
 
 const STORE_STATE_ORDER: StoreState[] = [
   "CreateStore",
-  "ClubInfo",
   "StoreDetails",
   "ProductDetails",
   "Submitted",

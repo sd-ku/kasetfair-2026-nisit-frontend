@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { CreateStoreRequestDto, StoreType } from "@/services/dto/store-info.dto"
 import { MemberEmailsDraftDto } from "@/services/dto/store-draft.dto"
-import { createStore, extractErrorMessage } from "@/services/storeServices"
-import { patchStoreDraft } from "@/services/storeDraftService"
+import { extractErrorMessage } from "@/services/storeServices"
+import {
+  createStore,
+  updateDraftStore
+} from "@/services/storeDraftService"
+import {  } from "@/services/storeDraftService"
 import type { StoreWizardCore } from "./store-wizard.core"
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -137,7 +141,7 @@ export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepRes
       core.setStepError(null)
 
       try {
-        const response = await patchStoreDraft({
+        const response = await updateDraftStore({
           storeName: trimmedName,
           type: core.storeType,
           memberEmails,

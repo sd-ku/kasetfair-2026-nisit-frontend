@@ -42,6 +42,27 @@ type myStore = {
   state: string
 }
 
+const draftStates = ["CreateStore", "ClubInfo", "StoreDetails", "ProductDetails"]
+
+export const convertStateToLabel = (
+  state: string,
+): string => {
+  if (!state) return "ไม่ระบุ"
+
+  switch (state) {
+    case "CreateStore":
+      return "สร้างร้านค้า"
+    case "StoreDetails":
+      return "รายละเอียดร้านค้า"
+    case "ProductDetails":
+      return "รายละเอียดสินค้า"
+    case "Pending":
+      return "รอจับฉลาก"
+    default:
+      return "ไม่ระบุ"
+  }
+}
+
 export default function HomePage() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -121,7 +142,11 @@ export default function HomePage() {
   }, [selectingStoreType])
 
   const handleSelectStoreType = (type: "Nisit" | "Club") => {
-    router.push(`/store/create?type=${type}`)
+    if (type === "Club") {
+      router.push(`/store/create/club-info`)
+    } else {
+      router.push(`/store/create?type=Nisit`)
+    }
   }
 
   return (
@@ -195,14 +220,17 @@ export default function HomePage() {
                     </p>
                   </div>
                   <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800">
-                    {store.state}
+                    {convertStateToLabel(store.state)}
                   </span>
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Button
                     className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
-                    onClick={() => router.push(`/store/create`)}
+                    onClick={() => {
+                      const isDraft = draftStates.includes(store.state)
+                      router.push(isDraft ? "/store/create" : "/store")
+                    }}
                   >
                     จัดการร้าน
                   </Button>

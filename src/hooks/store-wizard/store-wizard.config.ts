@@ -26,6 +26,7 @@ export const STEP_CONFIG_BY_TYPE: Record<StoreType, Array<{ id: number; label: s
 
 export const getLayoutStepIndex = (_type: StoreType) => 2
 export const getProductStepIndex = (_type: StoreType) => 3
+export const getCommitStepIndex = (_type: StoreType) => 4
 export const getStepsForType = (type: StoreType) => STEP_CONFIG_BY_TYPE[type]
 
 export const clampStepToState = (
@@ -40,17 +41,14 @@ export const clampStepToState = (
     case "CreateStore":
       maxStep = 1
       break
-    case "ClubInfo":
-      maxStep = 2
-      break
     case "StoreDetails":
       maxStep = getLayoutStepIndex(type)
       break
     case "ProductDetails":
       maxStep = getProductStepIndex(type)
       break
-    case "Pending":
-      maxStep = getStepsForType(type).length
+    case "Pending":                     // ⬅️ เหลือแค่นี้
+      maxStep = 4// getCommitStepIndex(type)
       break
     default:
       maxStep = 1
@@ -63,14 +61,12 @@ export const preferredStepForState = (type: StoreType, state: StoreState): numbe
   switch (state) {
     case "CreateStore":
       return 1
-    case "ClubInfo":
-      return 2
     case "StoreDetails":
       return getLayoutStepIndex(type)
     case "ProductDetails":
       return getProductStepIndex(type)
-    case "Pending":
-      return getStepsForType(type).length
+    case "Pending":                    // ⬅️ Submitted ถูกลบออก
+      return 4// getCommitStepIndex(type)
     default:
       return 1
   }

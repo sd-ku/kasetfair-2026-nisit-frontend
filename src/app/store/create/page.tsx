@@ -14,7 +14,8 @@ import {
   useStoreDetailsStep,
   useProductStep,
 } from "@/hooks/store-wizard"
-import { commitStoreForPending, extractErrorMessage } from "@/services/storeServices"
+import { commitStoreForPending } from "@/services/storeDraftService"
+import { extractErrorMessage } from "@/services/storeServices"
 import type { StorePendingValidationResponseDto } from "@/services/dto/store-info.dto"
 import { useRouter } from "next/navigation"
 import { Plus, Trash2, UploadCloud, CheckCircle } from "lucide-react"

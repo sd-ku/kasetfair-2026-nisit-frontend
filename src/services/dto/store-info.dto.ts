@@ -2,19 +2,10 @@ export type StoreType = "Nisit" | "Club"
 
 export type StoreState = "CreateStore" | "ClubInfo" | "StoreDetails" | "ProductDetails" | "Submitted" | "Pending"
 
-export type ClubApplicationDto = {
-  organizationName: string
-  presidentFirstName: string
-  presidentLastName: string
-  presidentNisitId: string
-  applicationFileName?: string | null
-}
-
 export type CreateStoreRequestDto = {
   storeName: string
   type: StoreType
   memberGmails: string[]
-  clubApplication?: ClubApplicationDto
 }
 
 export type CreateStoreResponseDto = {
@@ -25,6 +16,12 @@ export type CreateStoreResponseDto = {
   missingProfileEmails?: string[]
   createdAt?: string
   updatedAt?: string
+}
+
+export type UpdateStoreRequestDto = {
+  storeName?: string;
+  memberEmails?: string[];
+  boothMediaId?: string | null;
 }
 
 export type StoreStatusRequestDto = {
@@ -54,3 +51,21 @@ export type StorePendingValidationResponseDto = {
   isValid: boolean
   checklist: StoreValidationChecklistItemDto[]
 }
+
+export type StoreMemberDto = {
+  email: string;
+  status: string;
+}
+
+export type StoreResponseDto = {
+  id: number;
+  storeName: string;
+  boothNumber: string | null;
+  type: StoreType;
+  state: StoreState;
+  members: StoreMemberDto[];
+  boothLayoutMediaId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
