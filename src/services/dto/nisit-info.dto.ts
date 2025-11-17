@@ -4,6 +4,8 @@ export type NisitInfo = {
   nisitId: string
   phone: string
   nisitCardMediaId: string | null
+  consentTextId: string;
+  consentAccepted: boolean;
 }
 
 export type RegisterResponse = {

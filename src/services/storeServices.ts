@@ -39,11 +39,6 @@ export function extractErrorMessage(
   return fallback
 }
 
-export async function leaveMyStore() {
-  const res = await http.delete(`${STORE_SERVICE_API}/mine/member/me`)
-  return res.data
-}
-
 export async function getStoreStatus(): Promise<StoreResponseDto> {
   const res = await http.get(`${STORE_SERVICE_API}/mine`)
   return res.data
@@ -63,6 +58,11 @@ export async function getStoreStatus(): Promise<StoreResponseDto> {
 
 export async function updateStore(payload: UpdateStoreRequestDto): Promise<StoreResponseDto> {
   const res = await http.patch(`${STORE_SERVICE_API}/mine`, payload)
+  return res.data
+}
+
+export async function leaveStore() {
+  const res = await http.delete(`${STORE_SERVICE_API}/mine/members/me`)
   return res.data
 }
 

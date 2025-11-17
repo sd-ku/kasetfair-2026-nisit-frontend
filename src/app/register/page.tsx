@@ -13,6 +13,17 @@ import { createNisitInfo } from "@/services/nisitService"
 import { uploadMedia } from "@/services/mediaService"
 import { MediaPurpose } from "@/services/dto/media.dto"
 
+// ⬇️ เพิ่ม dialog ของ shadcn
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter as DialogFooterUI,
+} from "@/components/ui/dialog"
+import { getConsentText } from "@/services/consentService"
+
 type FormState = {
   firstName: string
   lastName: string
@@ -28,6 +39,13 @@ type FormErrors = {
   nisitCard?: string
 }
 
+type ConsentText = {
+  id: string
+  title: string
+  consent: string
+  language: string
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const { status, data, update } = useSession()
@@ -40,12 +58,10 @@ export default function RegisterPage() {
     phone: "",
   })
 
-  // เก็บไฟล์ฝั่ง frontend ก่อน ยังไม่อัป
   const [nisitCardFile, setNisitCardFile] = useState<File | null>(null)
-  // สำหรับเก็บ mediaId หลังอัปสำเร็จตอน submit
   const [nisitCardMediaId, setNisitCardMediaId] = useState<string | null>(null)
 
-  const [uploadingCard, setUploadingCard] = useState(false) // ใช้ตอน submit ที่กำลังอัปโหลดไฟล์
+  const [uploadingCard, setUploadingCard] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -53,6 +69,13 @@ export default function RegisterPage() {
   const [apiError, setApiError] = useState<string | null>(null)
 
   const hasRoutedRef = useRef(false)
+
+  // ---------- consent modal state ----------
+  const [showConsentDialog, setShowConsentDialog] = useState(false)
+  const [consentLoading, setConsentLoading] = useState(false)
+  const [consentError, setConsentError] = useState<string | null>(null)
+  const [consentChecked, setConsentChecked] = useState(false)
+  const [consentText, setConsentText] = useState<ConsentText | null>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -88,7 +111,6 @@ export default function RegisterPage() {
       return
     }
 
-    // validate type แบบหยาบๆ
     const allowed = [
       "image/jpeg",
       "image/png",
@@ -107,7 +129,6 @@ export default function RegisterPage() {
 
     setFieldErrors((prev) => ({ ...prev, nisitCard: undefined }))
     setNisitCardFile(file)
-    // ยังไม่อัปโหลดใดๆ รอ submit
   }
 
   const validateForm = (): boolean => {
@@ -142,6 +163,32 @@ export default function RegisterPage() {
     return Object.keys(errors).length === 0
   }
 
+  // โหลดข้อความ consent ปัจจุบัน (แก้ endpoint ให้ตรง backend นายเอง)
+  const loadActiveConsent = async () => {
+    if (consentText) return // โหลดแล้วไม่ต้องโหลดซ้ำ
+    setConsentLoading(true)
+    setConsentError(null)
+    try {
+      const data = await getConsentText()
+      if (!data) {
+        throw new Error("ไม่สามารถโหลดข้อความยินยอมได้")
+      }
+      setConsentText({
+        id: data.id,
+        title: data.title,
+        consent: data.consent,
+        language: data.language,
+      })
+    } catch (err: any) {
+      console.error("Load consent failed:", err)
+      setConsentError(
+        err?.message || "โหลดข้อความยินยอมไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+      )
+    } finally {
+      setConsentLoading(false)
+    }
+  }
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (submitting || uploadingCard) return
@@ -149,14 +196,30 @@ export default function RegisterPage() {
     setApiError(null)
 
     if (!validateForm()) return
-    if (!nisitCardFile) return // กัน TS + กัน edge case
+    if (!nisitCardFile) return
+
+    // แทนที่จะ register เลย → เปิด consent dialog ก่อน
+    setConsentChecked(false)
+    setConsentError(null)
+    setShowConsentDialog(true)
+    void loadActiveConsent()
+  }
+
+  // ฟังก์ชันที่ทำงานจริงหลังจาก user กดยินยอมใน modal แล้ว
+  const performRegistrationWithConsent = async () => {
+    if (!nisitCardFile) return // กัน edge case
+    if (!consentText) {
+      setConsentError("ไม่พบข้อความยินยอมที่ต้องใช้ กรุณารีเฟรชหน้าแล้วลองใหม่")
+      return
+    }
 
     setSubmitting(true)
     setIsLoading(true)
     setUploadingCard(true)
+    setApiError(null)
 
     try {
-      // 1) อัปโหลดไฟล์ก่อน
+      // 1) อัปโหลดไฟล์บัตรนิสิต
       const uploadRes = await uploadMedia({
         purpose: MediaPurpose.NISIT_CARD,
         file: nisitCardFile,
@@ -166,13 +229,15 @@ export default function RegisterPage() {
       const mediaId = uploadRes.id
       setNisitCardMediaId(mediaId)
 
-      // 2) ค่อยยิงสร้าง profile พร้อม mediaId
+      // 2) ยิงสร้าง profile พร้อม mediaId + consent
       const payload = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         nisitId: formData.nisitId.trim(),
         phone: formData.phone.trim(),
         nisitCardMediaId: mediaId,
+        consentTextId: consentText.id,
+        consentAccepted: true,
       }
 
       const res = await createNisitInfo(payload)
@@ -192,6 +257,16 @@ export default function RegisterPage() {
       setIsLoading(false)
       setSubmitting(false)
     }
+  }
+
+  const handleConfirmConsent = async () => {
+    if (!consentChecked) {
+      setConsentError("กรุณาติ๊กยืนยันว่าคุณได้อ่านและยอมรับเงื่อนไขแล้ว")
+      return
+    }
+    setConsentError(null)
+    setShowConsentDialog(false)
+    await performRegistrationWithConsent()
   }
 
   useEffect(() => {
@@ -214,133 +289,193 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-emerald-800 mb-2">
-            Create Account
-          </h1>
-          <p className="text-emerald-600">Join the Kaset Fair</p>
-        </div>
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-emerald-800 mb-2">
+              Create Account
+            </h1>
+            <p className="text-emerald-600">Join the Kaset Fair</p>
+          </div>
 
-        <Card className="border-emerald-200 shadow-lg">
-          <form
-            className="flex flex-col gap-6"
-            onSubmit={handleRegister}
-            noValidate
-          >
-            <CardContent className="space-y-4">
-              <Field
-                id="firstName"
-                name="firstName"
-                label="ชื่อ"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                disabled={isLoading || uploadingCard}
-                autoComplete="given-name"
-                error={fieldErrors.firstName}
-                required
-              />
-
-              <Field
-                id="lastName"
-                name="lastName"
-                label="นามสกุล"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                disabled={isLoading || uploadingCard}
-                autoComplete="family-name"
-                error={fieldErrors.lastName}
-                required
-              />
-
-              <Field
-                id="nisitId"
-                name="nisitId"
-                label="รหัสนิสิต"
-                value={formData.nisitId}
-                onChange={handleInputChange}
-                disabled={isLoading || uploadingCard}
-                autoComplete="student-id"
-                error={fieldErrors.nisitId}
-                required
-              />
-
-              <Field
-                id="phone"
-                name="phone"
-                label="เบอร์โทร"
-                value={formData.phone}
-                onChange={handleInputChange}
-                disabled={isLoading || uploadingCard}
-                type="tel"
-                inputMode="numeric"
-                placeholder="08xxxxxxxx"
-                error={fieldErrors.phone}
-                required
-              />
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="nisitCard"
-                  className={fieldErrors.nisitCard ? "text-red-600" : ""}
-                >
-                  อัปโหลดรูปบัตรนิสิต
-                </Label>
-                <Input
-                  id="nisitCard"
-                  name="nisitCard"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
+          <Card className="border-emerald-200 shadow-lg">
+            <form
+              className="flex flex-col gap-6"
+              onSubmit={handleRegister}
+              noValidate
+            >
+              <CardContent className="space-y-4">
+                <Field
+                  id="firstName"
+                  name="firstName"
+                  label="ชื่อ"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
                   disabled={isLoading || uploadingCard}
-                  onChange={handleFileChange}
-                  className={fieldErrors.nisitCard ? "border-red-500" : ""}
+                  autoComplete="given-name"
+                  error={fieldErrors.firstName}
                   required
                 />
-                {uploadingCard && (
-                  <p className="text-xs text-emerald-600">
-                    กำลังอัปโหลดรูปบัตรนิสิต…
-                  </p>
-                )}
-                {nisitCardFile && !uploadingCard && (
-                  <p className="text-xs text-emerald-700">
-                    ใช้ไฟล์: {nisitCardFile.name}
-                  </p>
-                )}
-                {fieldErrors.nisitCard && (
-                  <p className="text-xs text-red-600">
-                    {fieldErrors.nisitCard}
-                  </p>
-                )}
-              </div>
 
-              {apiError && (
-                <p
-                  role="alert"
-                  className="text-sm text-red-600 p-3 bg-red-50 rounded-md"
+                <Field
+                  id="lastName"
+                  name="lastName"
+                  label="นามสกุล"
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  disabled={isLoading || uploadingCard}
+                  autoComplete="family-name"
+                  error={fieldErrors.lastName}
+                  required
+                />
+
+                <Field
+                  id="nisitId"
+                  name="nisitId"
+                  label="รหัสนิสิต"
+                  value={formData.nisitId}
+                  onChange={handleInputChange}
+                  disabled={isLoading || uploadingCard}
+                  autoComplete="student-id"
+                  error={fieldErrors.nisitId}
+                  required
+                />
+
+                <Field
+                  id="phone"
+                  name="phone"
+                  label="เบอร์โทร"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  disabled={isLoading || uploadingCard}
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="08xxxxxxxx"
+                  error={fieldErrors.phone}
+                  required
+                />
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="nisitCard"
+                    className={fieldErrors.nisitCard ? "text-red-600" : ""}
+                  >
+                    อัปโหลดรูปบัตรนิสิต
+                  </Label>
+                  <Input
+                    id="nisitCard"
+                    name="nisitCard"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    disabled={isLoading || uploadingCard}
+                    onChange={handleFileChange}
+                    className={fieldErrors.nisitCard ? "border-red-500" : ""}
+                    required
+                  />
+                  {uploadingCard && (
+                    <p className="text-xs text-emerald-600">
+                      กำลังอัปโหลดรูปบัตรนิสิต…
+                    </p>
+                  )}
+                  {nisitCardFile && !uploadingCard && (
+                    <p className="text-xs text-emerald-700">
+                      ใช้ไฟล์: {nisitCardFile.name}
+                    </p>
+                  )}
+                  {fieldErrors.nisitCard && (
+                    <p className="text-xs text-red-600">
+                      {fieldErrors.nisitCard}
+                    </p>
+                  )}
+                </div>
+
+                {apiError && (
+                  <p
+                    role="alert"
+                    className="text-sm text-red-600 p-3 bg-red-50 rounded-md"
+                  >
+                    {apiError}
+                  </p>
+                )}
+              </CardContent>
+
+              <CardFooter>
+                <Button
+                  type="submit"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-emerald-400"
+                  disabled={isLoading || uploadingCard || submitting}
                 >
-                  {apiError}
-                </p>
-              )}
-            </CardContent>
-
-            <CardFooter>
-              <Button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-emerald-400"
-                disabled={isLoading || uploadingCard}
-              >
-                {uploadingCard
-                  ? "กำลังอัปโหลดรูป..."
-                  : isLoading
-                  ? "Creating..."
-                  : "Create account"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
+                  {uploadingCard
+                    ? "กำลังอัปโหลดรูป..."
+                    : submitting
+                    ? "กำลังสร้างบัญชี..."
+                    : "Create account"}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        </div>
       </div>
-    </div>
+
+      {/* ---------- Consent Dialog ---------- */}
+      <Dialog open={showConsentDialog} onOpenChange={setShowConsentDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {consentText?.title || "ข้อตกลงในการเก็บและใช้ข้อมูลส่วนบุคคล"}
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="text-left mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap text-sm text-gray-700">
+                {consentLoading
+                  ? "กำลังโหลดข้อความยินยอม..."
+                  : consentText?.consent ||
+                    "ไม่สามารถโหลดข้อความยินยอมได้ กรุณาลองใหม่อีกครั้ง"}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-4 flex items-start gap-2">
+            <input
+              id="consentCheckbox"
+              type="checkbox"
+              className="mt-1"
+              checked={consentChecked}
+              onChange={(e) => {
+                setConsentChecked(e.target.checked)
+                if (consentError) setConsentError(null)
+              }}
+              disabled={consentLoading}
+            />
+            <Label htmlFor="consentCheckbox" className="text-sm text-gray-800">
+              ข้าพเจ้าได้อ่านและเข้าใจข้อความข้างต้น และยินยอมให้มีการเก็บและใช้ข้อมูลส่วนบุคคลตามที่ระบุไว้
+            </Label>
+          </div>
+
+          {consentError && (
+            <p className="mt-2 text-xs text-red-600">{consentError}</p>
+          )}
+
+          <DialogFooterUI className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setShowConsentDialog(false)}
+              disabled={submitting}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmConsent}
+              disabled={consentLoading || submitting}
+            >
+              {submitting ? "กำลังสร้างบัญชี..." : "ยืนยันและสร้างบัญชี"}
+            </Button>
+          </DialogFooterUI>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
