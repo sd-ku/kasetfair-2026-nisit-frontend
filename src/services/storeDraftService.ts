@@ -46,6 +46,7 @@ export type StoreDraftDto = {
   id?: number | null
   type?: StoreType | null
   storeName?: string | null
+  storeAdminNisitId?: string | null
   description?: string | null
   boothMediaId?: string | null
   boothLayoutFileName?: string | null
@@ -80,6 +81,7 @@ export type StoreDraftData = {
   id: number | null
   type: StoreType | null
   storeName: string
+  storeAdminNisitId: string | null
   description: string
   boothMediaId: string | null
   boothLayoutFileName: string | null
@@ -151,6 +153,7 @@ const normalizeDraft = (draft?: StoreDraftDto | null): StoreDraftData | null => 
     id: typeof draft.id === "number" ? draft.id : null,
     type: isStoreType(draft.type) ? draft.type : null,
     storeName: normalizeString(draft.storeName),
+    storeAdminNisitId: normalizeNullableString(draft.storeAdminNisitId, null),
     description: normalizeString(draft.description),
     boothMediaId: draft.boothMediaId ?? null,
     boothLayoutFileName: draft.boothLayoutFileName ?? draft.layoutFileName ?? null,

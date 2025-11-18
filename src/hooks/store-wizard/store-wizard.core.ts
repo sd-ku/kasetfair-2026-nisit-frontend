@@ -10,6 +10,8 @@ import {
 } from "@/services/dto/store-info.dto"
 import { StoreDarftResponseDto } from "@/services/dto/store-draft.dto"
 import { extractErrorMessage, getStoreStatus } from "@/services/storeServices"
+import { getNisitInfo } from "@/services/nisitService"
+import { isStoreAdmin as isStoreAdminUtil } from "@/utils/storeAdmin"
 import {
   clampStepToState,
   getLayoutStepIndex,
@@ -62,6 +64,9 @@ export type SnapshotSyncOptions = {
 export type StoreWizardCore = {
   storeType: StoreType | null
   storeStatus: StoreProgress | null
+  storeAdminNisitId: string | null
+  currentUserNisitId: string | null
+  isStoreAdmin: boolean
   loadingStatus: boolean
   stepError: string | null
   setStepError: (value: string | null) => void
@@ -103,6 +108,7 @@ export function useStoreWizardCore(): StoreWizardCore {
 
   const [storeType, setStoreType] = useState<StoreType | null>(null)
   const [storeStatus, setStoreStatus] = useState<StoreProgress | null>(null)
+  const [currentUserNisitId, setCurrentUserNisitId] = useState<string | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(true)
   const [stepError, setStepError] = useState<string | null>(null)
   const [resetSignal, setResetSignal] = useState(0)
@@ -237,6 +243,12 @@ export function useStoreWizardCore(): StoreWizardCore {
     [setUrlState, storeStatus?.state]
   )
 
+  const storeAdminNisitId = storeStatus?.storeAdminNisitId ?? null
+  const isStoreAdmin = useMemo(
+    () => isStoreAdminUtil(currentUserNisitId, storeAdminNisitId),
+    [currentUserNisitId, storeAdminNisitId]
+  )
+
   const handleStatusNotFound = useCallback(() => {
     resetWizard({ preserveType: true })
     setStoreType((prev) => prev ?? typeFromQuery ?? null)
@@ -286,6 +298,19 @@ export function useStoreWizardCore(): StoreWizardCore {
   }, [loadStatus])
 
   useEffect(() => {
+    ;(async () => {
+      try {
+        const profile = await getNisitInfo()
+        if (profile?.nisitId) {
+          setCurrentUserNisitId(profile.nisitId)
+        }
+      } catch (error) {
+        console.error("Failed to load current user profile", error)
+      }
+    })()
+  }, [])
+
+  useEffect(() => {
     if (!storeStatus && typeFromQuery && storeType !== typeFromQuery) {
       setStoreType(typeFromQuery)
     }
@@ -303,6 +328,9 @@ export function useStoreWizardCore(): StoreWizardCore {
   return {
     storeType,
     storeStatus,
+    storeAdminNisitId,
+    currentUserNisitId,
+    isStoreAdmin,
     loadingStatus,
     stepError,
     setStepError,

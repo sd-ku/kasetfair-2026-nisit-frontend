@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import { useSession, signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import {
   Card,
   CardContent,
@@ -90,6 +91,10 @@ export default function HomePage() {
   const displayName = useMemo(
     () => session?.user?.name || session?.user?.email || "Kaset Fair Member",
     [session?.user?.email, session?.user?.name]
+  )
+  const displayInitial = useMemo(
+    () => (displayName?.charAt(0)?.toUpperCase() ?? "U"),
+    [displayName]
   )
 
   const fetchInvitations = useCallback(async () => {
@@ -194,15 +199,24 @@ export default function HomePage() {
               จัดการร้านและคำเชิญของคุณ
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 shrink-0 border-emerald-200 text-emerald-700"
-            onClick={() => signOut({ callbackUrl: "/login" })}
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="ml-1 hidden sm:inline">ออกจากระบบ</span>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/info"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-emerald-800 shadow hover:ring-2 hover:ring-emerald-200"
+              aria-label="Profile"
+            >
+              <span className="text-sm font-semibold">{displayInitial}</span>
+            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0 border-emerald-200 text-emerald-700"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="ml-1 hidden sm:inline">ออกจากระบบ</span>
+            </Button>
+          </div>
         </div>
       </header>
 

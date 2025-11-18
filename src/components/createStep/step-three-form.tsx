@@ -14,6 +14,8 @@ type Product = {
 
 type StepThreeFormProps = {
   products: Product[]
+  isStoreAdmin: boolean
+  storeAdminNisitId?: string | null
   onProductChange: (id: string, field: "name" | "price", value: string) => void
   onProductFileChange: (id: string, file: File | null) => void
   onAddProduct: () => void
@@ -25,6 +27,8 @@ type StepThreeFormProps = {
 
 export function StepThreeForm({
   products,
+  isStoreAdmin,
+  storeAdminNisitId,
   onProductChange,
   onProductFileChange,
   onAddProduct,
@@ -33,15 +37,27 @@ export function StepThreeForm({
   onNext,
   saving,
 }: StepThreeFormProps) {
+  void onProductFileChange
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     onNext()
   }
 
+  const readOnly = !isStoreAdmin
+
   return (
     <Card className="border-emerald-100 bg-white/90 shadow-xl">
       <CardHeader>
-        <CardTitle className="text-emerald-800">ข้อมูลสินค้า</CardTitle>
+        <CardTitle className="text-emerald-800">รายการสินค้า</CardTitle>
+        {readOnly && (
+          <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            You can view this data but only the store admin can edit.
+            {storeAdminNisitId ? (
+              <span className="ml-2 text-xs text-amber-900">Admin: {storeAdminNisitId}</span>
+            ) : null}
+          </div>
+        )}
       </CardHeader>
 
       <form onSubmit={handleSubmit}>
@@ -63,15 +79,17 @@ export function StepThreeForm({
                   value={product.name}
                   onChange={(e) => onProductChange(product.id, "name", e.target.value)}
                   required
+                  disabled={readOnly}
                 />
 
                 <Input
-                  placeholder="บาท"
+                  placeholder="ราคา"
                   value={product.price}
                   onChange={(e) => onProductChange(product.id, "price", e.target.value)}
                   inputMode="decimal"
                   className="text-right"
                   required
+                  disabled={readOnly}
                 />
 
                 <Button
@@ -79,7 +97,7 @@ export function StepThreeForm({
                   variant="ghost"
                   className="text-red-500 hover:bg-red-50"
                   onClick={() => onRemoveProduct(product.id)}
-                  disabled={products.length === 1}
+                  disabled={products.length === 1 || readOnly}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -92,6 +110,7 @@ export function StepThreeForm({
             variant="outline"
             className="w-full border-dashed border-emerald-200 text-emerald-700 hover:bg-emerald-50"
             onClick={onAddProduct}
+            disabled={readOnly}
           >
             <Plus className="h-4 w-4" />
             เพิ่มสินค้า
@@ -110,9 +129,9 @@ export function StepThreeForm({
           <Button
             type="submit"
             className="bg-emerald-600 text-white hover:bg-emerald-700"
-            disabled={saving}
+            disabled={saving || readOnly}
           >
-            {saving ? "กำลังบันทึกและตรวจสอบ..." : "บันทึกและส่ง"}
+            {saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
           </Button>
         </CardFooter>
       </form>

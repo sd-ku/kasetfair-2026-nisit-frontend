@@ -18,7 +18,8 @@ export type UseStoreDetailsStepResult = {
 }
 
 export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepResult {
-  const { storeStatus, resetSignal, setStepError, goToStep, reloadStatus, goNextStep } = core
+  const { storeStatus, resetSignal, setStepError, goToStep, reloadStatus, goNextStep, isStoreAdmin } =
+    core
 
   const [layoutDescription, setLayoutDescription] = useState("")
   const [layoutFile, setLayoutFileState] = useState<File | null>(null)
@@ -75,6 +76,11 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
       return
     }
 
+    if (!isStoreAdmin) {
+      setStepError("Only the store admin can update store details.")
+      return
+    }
+
     if (storeState === "Pending") {
       setStepError("This store is pending review and cannot be edited.")
       return
@@ -123,6 +129,7 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
   }, [
     goNextStep,
     goToStep,
+    isStoreAdmin,
     layoutFile,
     layoutMediaId,
     reloadStatus,

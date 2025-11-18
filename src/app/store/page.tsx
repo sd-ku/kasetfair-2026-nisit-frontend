@@ -14,6 +14,7 @@ import {
   CardDescription,
   CardTitle,
 } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -34,6 +35,8 @@ import {
   updateStore,
   extractErrorMessage,
 } from "@/services/storeServices"
+import { getNisitInfo } from "@/services/nisitService"
+import { isStoreAdmin as isStoreAdminUtil } from "@/utils/storeAdmin"
 
 type GoodDraft = {
   name: string
@@ -78,10 +81,21 @@ export default function StorePage() {
   const [savingGoodsMap, setSavingGoodsMap] = useState<Record<string, boolean>>({})
   const [deletingGoodsMap, setDeletingGoodsMap] = useState<Record<string, boolean>>({})
   const [draftNewGoods, setDraftNewGoods] = useState<DraftNewGood[]>([])
+  const [goodFieldErrors, setGoodFieldErrors] = useState<
+    Record<string, { name?: string; price?: string }>
+  >({})
   const [savingAllGoods, setSavingAllGoods] = useState(false)
+  const [goodRowErrors, setGoodRowErrors] = useState<Record<string, string>>({})
   const totalProductRows = goods.length + draftNewGoods.length
+  const [currentUserNisitId, setCurrentUserNisitId] = useState<string | null>(null)
 
   const router = useRouter()
+
+  const isStoreAdmin = useMemo(
+    () => isStoreAdminUtil(currentUserNisitId, store?.storeAdminNisitId ?? null),
+    [currentUserNisitId, store?.storeAdminNisitId]
+  )
+  const canEditStore = Boolean(store && isStoreAdmin)
 
   const memberStatusMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -145,6 +159,7 @@ export default function StorePage() {
           return acc
         }, {})
       )
+      setGoodFieldErrors({})
     } catch (error) {
       setGoodsError(extractErrorMessage(error, "ไม่สามารถโหลดสินค้าของร้านได้"))
     } finally {
@@ -153,23 +168,85 @@ export default function StorePage() {
   }, [])
     
   const handleSaveAllGoods = async (event?: React.FormEvent<HTMLFormElement>) => {
-    // ถ้าต้องการ handle error/report ทีละตัว อนาคตค่อยแตก logic เพิ่มได้
     event?.preventDefault()
+    setGoodsError("")
+    setGoodsMessage("")
     setSavingAllGoods(true)
+
     try {
-      await Promise.all([
-        ...goods.map((good) => handleSaveGood(good.id)),
-        ...draftNewGoods.map((draft) => handleCreateDraftNewGood(draft)),
-      ])
+      // 1) เลือกเฉพาะตัวที่ "ควรยิง" (เช่น dirty เท่านั้น)
+      const dirtyExistingGoods = goods.filter((good) => {
+        const draft = goodDrafts[good.id]
+        if (!draft) return false
+
+        const nameChanged = draft.name.trim() !== good.name
+        const priceChanged = Number(draft.price) !== Number(good.price)
+        return nameChanged || priceChanged
+      })
+
+      const validNewDrafts = draftNewGoods.filter(
+        (draft) => draft.name.trim() !== "" && draft.price.trim() !== "",
+      )
+
+      // 2) ยิงทุกตัว แต่ใช้ allSettled เพื่อให้ partial success ได้
+      const updateResults = await Promise.allSettled(
+        dirtyExistingGoods.map((good) =>
+          handleSaveGood(good.id), // ตรงนี้ให้ฟังก์ชันโยน error ตามปกติ
+        ),
+      )
+
+      const createResults = await Promise.allSettled(
+        validNewDrafts.map((draft) => handleCreateDraftNewGood(draft)),
+      )
+
+      const allResults = [...updateResults, ...createResults]
+
+      const successCount = allResults.filter((r) => r.status === "fulfilled").length
+      const failure = allResults.filter((r) => r.status === "rejected") as PromiseRejectedResult[]
+
+      if (failure.length > 0) {
+        // ตรงนี้จะมีทั้งเคสเน็ตพัง / 404 / 500 ฯลฯ
+        // ถ้าอยากเช็คเฉพาะ 404 ก็ไปดูจาก error.response.status เอา
+        setGoodsError(
+          `บันทึกสำเร็จ ${successCount} รายการ แต่มี ${failure.length} รายการบันทึกไม่สำเร็จ อาจถูกลบไปแล้วหรือเกิดข้อผิดพลาด กรุณารีหน้าเพื่อตรวจสอบอีกครั้ง`,
+        )
+      } else {
+        setGoodsMessage(`บันทึกการเปลี่ยนแปลงสำเร็จ ${successCount} รายการ`)
+      }
+
+      // 3) จะให้ชัวร์สุดก็ refetch goods ใหม่จาก backend ตรงนี้เลย
+      // await reloadGoods()
     } finally {
       setSavingAllGoods(false)
     }
   }
 
+
+  // useEffect(() => {
+  //   fetchStore()
+  //   fetchGoods()
+  // }, [fetchStore, fetchGoods])
+
   useEffect(() => {
     fetchStore()
+  }, [fetchStore])
+
+  useEffect(() => {
     fetchGoods()
-  }, [fetchGoods, fetchStore])
+  }, [fetchGoods])
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const profile = await getNisitInfo()
+        if (profile?.nisitId) {
+          setCurrentUserNisitId(profile.nisitId)
+        }
+      } catch (error) {
+        console.error("Failed to load current user profile", error)
+      }
+    })()
+  }, [])
 
   useEffect(() => {
     if (!loadingGoods && goods.length === 0 && draftNewGoods.length === 0) {
@@ -178,6 +255,7 @@ export default function StorePage() {
   }, [draftNewGoods, goods, loadingGoods])
 
   const handleMemberChange = (index: number, value: string) => {
+    if (!canEditStore) return
     setStoreMembers((prev) => {
       const next = [...prev]
       next[index] = value
@@ -186,10 +264,12 @@ export default function StorePage() {
   }
 
   const handleAddMember = () => {
+    if (!canEditStore) return
     setStoreMembers((prev) => [...prev, ""])
   }
 
   const handleRemoveMember = (index: number) => {
+    if (!canEditStore) return
     setStoreMembers((prev) => {
       if (prev.length === 1) return prev
       return prev.filter((_, memberIndex) => memberIndex !== index)
@@ -198,6 +278,10 @@ export default function StorePage() {
 
   const handleStoreSubmit = async (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
+    if (!canEditStore) {
+      setStoreError("Only the store admin can update store information.")
+      return
+    }
     if (!store) return
 
     const trimmedName = storeName.trim()
@@ -236,6 +320,27 @@ export default function StorePage() {
 
   const handleGoodDraftChange = useCallback(
     <K extends keyof GoodDraft>(id: string, field: K, value: GoodDraft[K]) => {
+      // เคลียร์ error ของทั้งแถว ถ้า user แก้อะไรบางอย่าง
+      setGoodRowErrors((prev) => {
+        if (!prev[id]) return prev
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+
+      setGoodFieldErrors((prev) => {
+        const next = { ...prev }
+        if (next[id]) {
+          const updated = { ...next[id], [field]: undefined }
+          if (!updated.name && !updated.price) {
+            delete next[id]
+          } else {
+            next[id] = updated
+          }
+        }
+        return next
+      })
+
       setGoodDrafts((prev) => {
         const existing = prev[id] ?? { name: "", price: "", type: "Food" }
         return {
@@ -247,7 +352,7 @@ export default function StorePage() {
         }
       })
     },
-    []
+    [canEditStore],
   )
 
   const handleSaveGood = async (goodId: string) => {
@@ -258,16 +363,30 @@ export default function StorePage() {
     const parsedPrice = Number(draft.price)
 
     if (!trimmedName) {
-      setGoodsError("กรุณากรอกชื่อสินค้า")
+      setGoodFieldErrors((prev) => ({
+        ...prev,
+        [goodId]: { ...(prev[goodId] ?? {}), name: "กรุณากรอกชื่อสินค้า" },
+      }))
+      setGoodsError(null)
       return
     }
     if (typeof parsedPrice !== "number" || Number.isNaN(parsedPrice)) {
-      setGoodsError("กรุณากรอกราคาสินค้าให้ถูกต้อง")
+      setGoodFieldErrors((prev) => ({
+        ...prev,
+        [goodId]: { ...(prev[goodId] ?? {}), price: "กรุณากรอกราคาสินค้าให้ถูกต้อง" },
+      }))
+      setGoodsError(null)
       return
     }
 
     setGoodsError(null)
     setGoodsMessage(null)
+    // เคลียร์ error แถวก่อนยิง
+    setGoodRowErrors((prev) => {
+      const next = { ...prev }
+      delete next[goodId]
+      return next
+    })
     setSavingGoodsMap((prev) => ({ ...prev, [goodId]: true }))
 
     try {
@@ -276,9 +395,16 @@ export default function StorePage() {
         price: parsedPrice,
         type: draft.type,
       })
+
       setGoods((prev) =>
-        prev.map((good) => (good.id === goodId ? updated : good))
+        prev.map((good) => (good.id === goodId ? updated : good)),
       )
+
+      setGoodFieldErrors((prev) => {
+        const next = { ...prev }
+        delete next[goodId]
+        return next
+      })
       setGoodDrafts((prev) => ({
         ...prev,
         [goodId]: {
@@ -287,15 +413,27 @@ export default function StorePage() {
           type: updated.type,
         },
       }))
-      setGoodsMessage("บันทึกข้อมูลสินค้าสำเร็จ")
+      // row นี้โอเค ไม่ต้องมี global message ก็ได้
     } catch (error) {
-      setGoodsError(extractErrorMessage(error, "ไม่สามารถบันทึกข้อมูลสินค้าได้"))
+      const msg = extractErrorMessage(
+        error,
+        "ไม่สามารถบันทึกสินค้านี้ได้ กรุณาลองใหม่หรือลองรีหน้า",
+      )
+      // ให้ error อยู่เฉพาะแถวนี้
+      setGoodRowErrors((prev) => ({
+        ...prev,
+        [goodId]: msg,
+      }))
     } finally {
       setSavingGoodsMap((prev) => ({ ...prev, [goodId]: false }))
     }
   }
 
   const handleDeleteGood = async (goodId: string) => {
+    // if (!canEditStore) {
+    //   setGoodsError("Only the store admin can manage goods.")
+    //   return
+    // }
     if (!window.confirm("ต้องการลบสินค้านี้หรือไม่?")) return
     setGoodsError(null)
     setGoodsMessage(null)
@@ -322,47 +460,83 @@ export default function StorePage() {
     const parsedPrice = Number(draft.price)
 
     if (!trimmedName) {
-        setGoodsError("กรุณากรอกชื่อสินค้า")
-        return
+      setGoodFieldErrors((prev) => ({
+        ...prev,
+        [draft.tempId]: { ...(prev[draft.tempId] ?? {}), name: "กรุณากรอกชื่อสินค้า" },
+      }))
+      setGoodsError(null)
+      return
     }
 
     if (typeof parsedPrice !== "number" || Number.isNaN(parsedPrice)) {
-        setGoodsError("กรุณากรอกราคาเป็นตัวเลข")
-        return
+      setGoodFieldErrors((prev) => ({
+        ...prev,
+        [draft.tempId]: {
+          ...(prev[draft.tempId] ?? {}),
+          price: "กรุณากรอกราคาเป็นตัวเลข",
+        },
+      }))
+      setGoodsError(null)
+      return
     }
 
     setGoodsError(null)
     setGoodsMessage(null)
+    setGoodRowErrors((prev) => {
+      const next = { ...prev }
+      delete next[draft.tempId]
+      return next
+    })
 
     try {
-        const created = await createGood({
+      const created = await createGood({
         name: trimmedName,
         price: parsedPrice,
         type: "Food",
-        })
+      })
 
-        setGoods((prev) => [...prev, created])
+      setGoods((prev) => [...prev, created])
 
-        setGoodDrafts((prev) => ({
+      setGoodDrafts((prev) => ({
         ...prev,
         [created.id]: {
-            name: created.name,
-            price: created.price,
-            type: created.type,
+          name: created.name,
+          price: created.price,
+          type: created.type,
         },
-        }))
+      }))
 
-        setDraftNewGoods((prev) => prev.filter((item) => item.tempId !== draft.tempId))
+      setDraftNewGoods((prev) =>
+        prev.filter((item) => item.tempId !== draft.tempId),
+      )
 
-        setGoodsMessage("เพิ่มสินค้าสำเร็จ")
+      setGoodFieldErrors((prev) => {
+        const next = { ...prev }
+        delete next[draft.tempId]
+        return next
+      })
+
+      // ลบ error แถวเผื่อมี
+      setGoodRowErrors((prev) => {
+        const next = { ...prev }
+        delete next[draft.tempId]
+        return next
+      })
     } catch (error) {
-        setGoodsError(
-        extractErrorMessage(error, "ไม่สามารถเพิ่มสินค้าได้ กรุณาลองใหม่อีกครั้ง")
-        )
+      const msg = extractErrorMessage(
+        error,
+        "ไม่สามารถเพิ่มสินค้านี้ได้ กรุณาลองใหม่",
+      )
+      setGoodRowErrors((prev) => ({
+        ...prev,
+        [draft.tempId]: msg,
+      }))
     }
   }
 
+
   const handleAddDraftNewGood = () => {
+    // if (!canEditStore) return
     setDraftNewGoods((prev) => [...prev, createDraftNewGood()])
   }
 
@@ -371,6 +545,13 @@ export default function StorePage() {
     key: keyof Omit<DraftNewGood, "tempId">,
     value: string
   ) => {
+    setGoodRowErrors((prev) => {
+      if (!prev[tempId]) return prev
+      const next = { ...prev }
+      delete next[tempId]
+      return next
+    })
+
     setDraftNewGoods((prev) =>
       prev.map((draft) =>
         draft.tempId === tempId
@@ -384,11 +565,17 @@ export default function StorePage() {
   }
 
   const handleRemoveDraftNewGood = (tempId: string) => {
+    // if (!canEditStore) return
     setDraftNewGoods((prev) => {
       const next = prev.filter((draft) => draft.tempId !== tempId)
       if (next.length === 0 && goods.length === 0) {
         return [createDraftNewGood()]
       }
+      return next
+    })
+    setGoodFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next[tempId]
       return next
     })
   }
@@ -441,6 +628,17 @@ export default function StorePage() {
             <CardDescription className="text-sm">
                 ตรวจสอบและแก้ไขข้อมูลพื้นฐานของร้าน รวมถึงอีเมลสมาชิก
             </CardDescription>
+            {/* {store?.storeAdminNisitId && (
+            <div className="text-sm text-emerald-700 flex items-center gap-2">
+                <Badge variant="outline">Store Admin</Badge>
+                <span>{store.storeAdminNisitId}</span>
+                {isStoreAdmin && <Badge variant="secondary">You</Badge>}
+            </div>
+            )}
+            {!canEditStore && (
+            <p className="text-sm text-amber-700">You can view this data but only the store admin can edit.</p>
+            )} */}
+
             </div>
 
             {store && (
@@ -477,6 +675,7 @@ export default function StorePage() {
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
                     placeholder="กรอกชื่อร้าน"
+                    disabled={!canEditStore}
                     />
                 </div>
 
@@ -536,6 +735,7 @@ export default function StorePage() {
                                     ? "border-red-400 focus-visible:ring-red-400"
                                     : undefined
                                 }
+                                disabled={!canEditStore}
                             />
 
                             {canRemove && (
@@ -544,6 +744,7 @@ export default function StorePage() {
                                 variant="outline"
                                 size="icon"
                                 className="border-red-200 text-red-500 hover:bg-red-50"
+                                disabled={!canEditStore}
                                 onClick={() => {
                                     if (window.confirm("ต้องการลบสมาชิกคนนี้จริงหรือไม่?")) {
                                         handleRemoveMember(index)
@@ -564,6 +765,7 @@ export default function StorePage() {
                     variant="outline"
                     className="w-full border-dashed border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                     onClick={handleAddMember}
+                    disabled={!canEditStore}
                     >
                     <Plus className="h-4 w-4" />
                     เพิ่มสมาชิก
@@ -579,14 +781,14 @@ export default function StorePage() {
                 type="button"
                 variant="outline"
                 onClick={() => resetStoreForm(store)}
-                disabled={savingStore}
+                disabled={savingStore || !canEditStore}
             >
                 ย้อนกลับค่าเดิม
             </Button> */}
             <Button
                 type="submit"
                 className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
-                disabled={savingStore}
+                disabled={savingStore || !canEditStore}
             >
                 {savingStore ? (
                 <>
@@ -632,69 +834,135 @@ export default function StorePage() {
                             price: "",
                             type: good.type,
                         }
+                        const fieldErrors = goodFieldErrors[good.id]
+                        const rowError = goodRowErrors[good.id]
 
                         return (
-                            <div
+                          <div
                             key={good.id}
-                            className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_auto] items-center gap-3"
-                            >
-                            <Input
+                            className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_auto] items-start gap-3"
+                          >
+                            <div className="flex flex-col gap-1">
+                              <Input
                                 placeholder="ชื่อสินค้า"
                                 value={draft.name}
-                                onChange={(e) => handleGoodDraftChange(good.id, "name", e.target.value)}
+                                onChange={(e) =>
+                                  handleGoodDraftChange(good.id, "name", e.target.value)
+                                }
                                 required
-                            />
-                            <Input
+                                className={
+                                  fieldErrors?.name ? "border-red-400 focus-visible:ring-red-400" : ""
+                                }
+                              />
+                              {fieldErrors?.name && (
+                                <p className="text-xs text-red-600">{fieldErrors.name}</p>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                              <Input
                                 placeholder="ราคา (บาท)"
                                 value={draft.price}
-                                onChange={(e) => handleGoodDraftChange(good.id, "price", e.target.value)}
+                                onChange={(e) =>
+                                  handleGoodDraftChange(good.id, "price", e.target.value)
+                                }
                                 inputMode="decimal"
-                                className="text-right"
+                                className={`text-right ${
+                                  fieldErrors?.price
+                                    ? "border-red-400 focus-visible:ring-red-400"
+                                    : ""
+                                }`}
                                 required
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                className="text-red-500 hover:bg-red-50"
-                                onClick={() => handleDeleteGood(good.id)}
-                                disabled={totalProductRows === 1 || !!deletingGoodsMap[good.id]}
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
+                              />
+                              {fieldErrors?.price && (
+                                <p className="text-xs text-red-600 text-right">
+                                  {fieldErrors.price}
+                                </p>
+                              )}
                             </div>
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="text-red-500 hover:bg-red-50"
+                              onClick={() => handleDeleteGood(good.id)}
+                              disabled={goods.length === 0 && draftNewGoods.length === 1}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+
+                            {rowError && (
+                              <p className="col-span-3 text-xs text-red-600">{rowError}</p>
+                            )}
+                          </div>
                         )
                         })}
 
-                        {draftNewGoods.map((draft) => (
-                        <div
-                            key={draft.tempId}
-                            className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_auto] items-center gap-3"
-                        >
-                            <Input
-                                placeholder="ชื่อสินค้า"
-                                value={draft.name}
-                                onChange={(e) => handleDraftNewGoodChange(draft.tempId, "name", e.target.value)}
-                                required
-                            />
-                            <Input
-                                placeholder="ราคา (บาท)"
-                                value={draft.price}
-                                onChange={(e) => handleDraftNewGoodChange(draft.tempId, "price", e.target.value)}
-                                inputMode="decimal"
-                                className="text-right"
-                                required
-                            />
-                            <Button
+                        {draftNewGoods.map((draft) => {
+                          const fieldErrors = goodFieldErrors[draft.tempId]
+                          const rowError = goodRowErrors[draft.tempId]
+
+                          return (
+                            <div
+                              key={draft.tempId}
+                              className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_auto] items-start gap-3"
+                            >
+                              <div className="flex flex-col gap-1">
+                                <Input
+                                  placeholder="ชื่อสินค้า"
+                                  value={draft.name}
+                                  onChange={(e) =>
+                                    handleDraftNewGoodChange(draft.tempId, "name", e.target.value)
+                                  }
+                                  required
+                                  className={
+                                    fieldErrors?.name ? "border-red-400 focus-visible:ring-red-400" : ""
+                                  }
+                                />
+                                {fieldErrors?.name && (
+                                  <p className="text-xs text-red-600">{fieldErrors.name}</p>
+                                )}
+                              </div>
+
+                              <div className="flex flex-col gap-1">
+                                <Input
+                                  placeholder="ราคา (บาท)"
+                                  value={draft.price}
+                                  onChange={(e) =>
+                                    handleDraftNewGoodChange(draft.tempId, "price", e.target.value)
+                                  }
+                                  inputMode="decimal"
+                                  className={`text-right ${
+                                    fieldErrors?.price
+                                      ? "border-red-400 focus-visible:ring-red-400"
+                                      : ""
+                                  }`}
+                                  required
+                                />
+                                {fieldErrors?.price && (
+                                  <p className="text-xs text-red-600 text-right">
+                                    {fieldErrors.price}
+                                  </p>
+                                )}
+                              </div>
+
+                              <Button
                                 type="button"
                                 variant="ghost"
                                 className="text-red-500 hover:bg-red-50"
                                 onClick={() => handleRemoveDraftNewGood(draft.tempId)}
                                 disabled={goods.length === 0 && draftNewGoods.length === 1}
-                            >
+                              >
                                 <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
-                        ))}
+                              </Button>
+
+                              {rowError && (
+                                <p className="col-span-3 text-xs text-red-600">{rowError}</p>
+                              )}
+                            </div>
+                          )
+                        })}
+
                     </div>
 
                     <Button
@@ -702,6 +970,7 @@ export default function StorePage() {
                         variant="outline"
                         className="w-full border-dashed border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                         onClick={handleAddDraftNewGood}
+                        // disabled={!canEditStore}
                     >
                         <Plus className="h-4 w-4" />
                         เพิ่มรายการสินค้าใหม่
@@ -711,16 +980,17 @@ export default function StorePage() {
                 </CardContent>
 
                 <CardFooter className="mt-6 flex justify-end">
-                    <Button
-                        type="submit"
-                        className="bg-emerald-600 text-white hover:bg-emerald-700"
-                        disabled={savingAllGoods || loadingGoods}
-                    >
-                        <Save className="h-4 w-4" />
-                        {savingAllGoods
-                        ? "กำลังบันทึกการเปลี่ยนแปลง..."
-                        : "บันทึกการเปลี่ยนแปลง"}
-                    </Button>
+                  <Button
+                    type="submit"
+                    className="bg-emerald-600 text-white hover:bg-emerald-700"
+                    // disabled={savingAllGoods || loadingGoods || !canEditStore}
+                    disabled={savingAllGoods || loadingGoods}
+                  >
+                    <Save className="h-4 w-4" />
+                    {savingAllGoods
+                    ? "กำลังบันทึกการเปลี่ยนแปลง..."
+                    : "บันทึกการเปลี่ยนแปลง"}
+                  </Button>
                 </CardFooter>
             </form>
         </Card>

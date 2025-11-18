@@ -16,6 +16,7 @@ export type CreateStoreResponseDto = {
   storeName: string
   type: StoreType
   state: StoreState
+  storeAdminNisitId: string
   missingProfileEmails?: string[]
   createdAt?: string
   updatedAt?: string
@@ -26,6 +27,7 @@ export type StoreDarftResponseDto = {
   storeName: string
   type: StoreType
   state: StoreState
+  storeAdminNisitId: string
   memberEmails: MemberEmailsDraftDto[]
 }
 
@@ -42,4 +44,5 @@ export type UpdateDraftStoreResponseDto = {
   memberEmails: string[]
   missingProfileEmails: string[]
   boothMediaId: string | null
+  storeAdminNisitId?: string
 }

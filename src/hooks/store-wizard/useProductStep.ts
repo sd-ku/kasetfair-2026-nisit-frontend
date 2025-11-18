@@ -104,6 +104,7 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
     goToStep,
     layoutStepIndex,
     reloadStatus,
+    isStoreAdmin,
   } = core
 
   const storeId = storeStatus?.id ?? null
@@ -152,6 +153,7 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
 
   const handleProductChange = useCallback(
     (id: string, field: "name" | "price", value: string) => {
+      if (!isStoreAdmin) return
       setProducts((prev) =>
         prev.map((product) =>
           product.id === id
@@ -164,29 +166,35 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
         )
       )
     },
-    []
+    [isStoreAdmin]
   )
 
-  const handleProductFileChange = useCallback((id: string, file: File | null) => {
-    setProducts((prev) =>
-      prev.map((product) =>
-        product.id === id
-          ? {
-              ...product,
-              file,
-              fileName: file ? file.name : product.fileName,
-              isDirty: true,
-            }
-          : product
+  const handleProductFileChange = useCallback(
+    (id: string, file: File | null) => {
+      if (!isStoreAdmin) return
+      setProducts((prev) =>
+        prev.map((product) =>
+          product.id === id
+            ? {
+                ...product,
+                file,
+                fileName: file ? file.name : product.fileName,
+                isDirty: true,
+              }
+            : product
+        )
       )
-    )
-  }, [])
+    },
+    [isStoreAdmin]
+  )
 
   const addProduct = useCallback(() => {
+    if (!isStoreAdmin) return
     setProducts((prev) => [...prev, createProduct()])
-  }, [])
+  }, [isStoreAdmin])
 
   const removeProduct = useCallback((id: string) => {
+    if (!isStoreAdmin) return
     setProducts((prev) => {
       if (prev.length === 1) return prev
       const target = prev.find((product) => product.id === id)
@@ -200,9 +208,13 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
       const next = prev.filter((product) => product.id !== id)
       return next.length ? next : [createProduct()]
     })
-  }, [])
+  }, [isStoreAdmin])
 
   const ensureStoreIsReady = useCallback((): boolean => {
+    if (!isStoreAdmin) {
+      setStepError("Only the store admin can manage products.")
+      return false
+    }
     if (!storeId) {
       setStepError("Please create a store before adding products.")
       goToStep(1, { clamp: false })
@@ -218,7 +230,7 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
       return false
     }
     return true
-  }, [goToStep, layoutStepIndex, setStepError, storeId, storeState])
+  }, [goToStep, isStoreAdmin, layoutStepIndex, setStepError, storeId, storeState])
 
   const resolveMediaId = useCallback(async (product: ProductFormState): Promise<string | null> => {
     if (product.file) {
@@ -255,6 +267,10 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
 
   const submitAll = useCallback(
     async (_context?: Record<string, unknown>) => {
+      if (!isStoreAdmin) {
+        setStepError("Only the store admin can save product information.")
+        return false
+      }
       if (!ensureStoreIsReady()) return false
 
       setIsSubmitting(true)
@@ -309,6 +325,7 @@ export function useProductStep(core: StoreWizardCore): UseProductStepResult {
       products,
       reloadStatus,
       setStepError,
+      isStoreAdmin,
     ]
   )
 

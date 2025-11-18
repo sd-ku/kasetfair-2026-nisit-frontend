@@ -3,6 +3,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { StepIndicator } from "@/components/createStep/step-indicator"
 import { StepOneForm } from "@/components/createStep/step-one-form"
 import { StepTwoForm } from "@/components/createStep/step-two-form"
@@ -31,11 +32,14 @@ export default function StoreCreatePage() {
   const {
     storeType,
     storeStatus,
+    storeAdminNisitId,
+    isStoreAdmin,
     loadingStatus,
     stepError,
     currentStep,
     layoutStepIndex,
     productStepIndex,
+    goNextStep,
     steps,
     setStepError,
     reloadStatus,
@@ -103,10 +107,15 @@ export default function StoreCreatePage() {
     )
   }
 
+  const canEditStore = !storeStatus || isStoreAdmin
   const allowCreateSubmit =
-    !storeStatus || (storeStatus.state !== "Pending" && storeStatus.state !== "Submitted")
+    canEditStore && (!storeStatus || (storeStatus.state !== "Pending" && storeStatus.state !== "Submitted"))
   const commitStepIndex = steps[steps.length - 1]?.id ?? productStepIndex
   const handleFinalSubmit = async (): Promise<void> => {
+    if (storeStatus && !isStoreAdmin) {
+      setStepError("Only the store admin can submit updates.")
+      return
+    }
     const submitSucceeded = await productStep.submitAll({
       storeStatus,
       storeName: createStep.storeName,
@@ -133,6 +142,10 @@ export default function StoreCreatePage() {
 
   const handleCommitStore = async (): Promise<boolean> => {
     if (!canAttemptCommit || isCommitting) return false
+    if (storeStatus && !isStoreAdmin) {
+      setStepError("Only the store admin can commit store updates.")
+      return false
+    }
     setIsCommitting(true)
     setStepError(null)
     setPendingValidation(null)
@@ -183,11 +196,24 @@ export default function StoreCreatePage() {
                 กรุณากรอกขั้นตอนด้านล่างให้ครบ คุณสามารถกลับมาแก้ไขภายหลังได้
               </CardDescription>
 
-              {storeStatus && (
+              {/* {storeStatus?.storeAdminNisitId && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-emerald-700">
+                  <Badge variant="outline">Store Admin</Badge>
+                  <span>{storeStatus.storeAdminNisitId}</span>
+                  {isStoreAdmin && <Badge variant="secondary">You</Badge>}
+                </div>
+              )} */}
+              {!canEditStore && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    คุณสามารถดูข้อมูลนี้ได้ แต่มีเพียงผู้ดูแลร้านเท่านั้นที่สามารถแก้ไขได้
+                  </p>
+              )}
+
+              {/* {storeStatus && (
                 <p className="mt-2 text-xs uppercase tracking-wide text-emerald-600">
                   สถานะปัจจุบัน: {storeStatus.state}
                 </p>
-              )}
+              )} */}
 
               {stepError && (
                 <p className="mt-2 text-xs text-red-600">
@@ -207,11 +233,14 @@ export default function StoreCreatePage() {
             storeName={createStep.storeName}
             members={createStep.members}
             memberEmailStatuses={createStep.memberEmailStatuses}
+            isStoreAdmin={canEditStore}
+            storeAdminNisitId={storeStatus?.storeAdminNisitId ?? storeAdminNisitId}
             onStoreNameChange={createStep.setStoreName}
             onMemberChange={createStep.handleMemberChange}
             onAddMember={createStep.addMember}
             onRemoveMember={createStep.removeMember}
             onNext={createStep.submitCreateStore}
+            onViewOnlyNext={() => core.goNextStep()}
             saving={createStep.isSubmitting}
             canSubmit={allowCreateSubmit}
             errorMessage={stepError ?? undefined}
@@ -222,6 +251,8 @@ export default function StoreCreatePage() {
           <StepTwoForm
             layoutDescription={storeDetailsStep.layoutDescription}
             layoutFileName={storeDetailsStep.layoutFileName}
+            isStoreAdmin={isStoreAdmin}
+            storeAdminNisitId={storeStatus?.storeAdminNisitId ?? storeAdminNisitId}
             onDescriptionChange={storeDetailsStep.setLayoutDescription}
             onFileChange={storeDetailsStep.setLayoutFile}
             onBack={() => core.goToStep(currentStep - 1)}
@@ -239,6 +270,8 @@ export default function StoreCreatePage() {
                 price,
                 fileName,
               }))}
+              isStoreAdmin={isStoreAdmin}
+              storeAdminNisitId={storeStatus?.storeAdminNisitId ?? storeAdminNisitId}
               onProductChange={productStep.handleProductChange}
               onProductFileChange={productStep.handleProductFileChange}
               onAddProduct={productStep.addProduct}

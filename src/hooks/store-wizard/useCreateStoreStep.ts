@@ -49,6 +49,8 @@ export type UseCreateStoreStepResult = {
   members: string[]
   memberEmailStatuses: MemberEmailsDraftDto[]
   isSubmitting: boolean
+  isStoreAdmin: boolean
+  canEdit: boolean
   selectStoreType: (type: StoreType) => void
   submitCreateStore: () => Promise<void>
   handleMemberChange: (index: number, value: string) => void
@@ -85,24 +87,43 @@ export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepRes
       setMemberEmailStatuses(snapshot.memberEmails)
       const restored = snapshot.memberEmails.map((member) => member.email)
       setMembers(padMembers(restored))
+      return
+    }
+
+    const snapshotWithMembers = snapshot as unknown as {
+      members?: { email: string; status: string }[]
+    }
+    if (Array.isArray(snapshotWithMembers.members)) {
+      setMemberEmailStatuses(snapshotWithMembers.members)
+      const restored = snapshotWithMembers.members.map((member) => member.email)
+      setMembers(padMembers(restored))
     }
   }, [core.storeStatus])
 
-  const handleMemberChange = useCallback((index: number, value: string) => {
-    setMembers((prev) => {
-      const next = [...prev]
-      next[index] = value
-      return next
-    })
-  }, [])
+  const handleMemberChange = useCallback(
+    (index: number, value: string) => {
+      if (core.storeStatus && !core.isStoreAdmin) return
+      setMembers((prev) => {
+        const next = [...prev]
+        next[index] = value
+        return next
+      })
+    },
+    [core.isStoreAdmin, core.storeStatus]
+  )
 
   const addMember = useCallback(() => {
+    if (core.storeStatus && !core.isStoreAdmin) return
     setMembers((prev) => [...prev, ""])
-  }, [])
+  }, [core.isStoreAdmin, core.storeStatus])
 
-  const removeMember = useCallback((index: number) => {
-    setMembers((prev) => prev.filter((_, memberIndex) => memberIndex !== index))
-  }, [])
+  const removeMember = useCallback(
+    (index: number) => {
+      if (core.storeStatus && !core.isStoreAdmin) return
+      setMembers((prev) => prev.filter((_, memberIndex) => memberIndex !== index))
+    },
+    [core.isStoreAdmin, core.storeStatus]
+  )
 
   const selectStoreType = useCallback(
     (type: StoreType) => {
@@ -115,6 +136,12 @@ export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepRes
   const submitCreateStore = useCallback(async () => {
     if (!core.storeType) {
       core.setStepError("Please select a store type before creating a store.")
+      return
+    }
+
+    const canEditStore = !core.storeStatus || core.isStoreAdmin
+    if (!canEditStore) {
+      core.setStepError("Only the store admin can update store information.")
       return
     }
 
@@ -198,5 +225,7 @@ export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepRes
     handleMemberChange,
     addMember,
     removeMember,
+    isStoreAdmin: core.isStoreAdmin,
+    canEdit: !core.storeStatus || core.isStoreAdmin,
   }
 }

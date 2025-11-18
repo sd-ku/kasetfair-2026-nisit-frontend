@@ -13,6 +13,7 @@ export type CreateStoreResponseDto = {
   storeName: string
   type: StoreType
   state: StoreState
+  storeAdminNisitId: string
   missingProfileEmails?: string[]
   createdAt?: string
   updatedAt?: string
@@ -33,6 +34,7 @@ export type StoreStatusResponseDto = {
   storeName: string
   type: StoreType
   state: StoreState
+  storeAdminNisitId: string
 }
 
 export type StoreValidationChecklistItemDto = {
@@ -63,9 +65,9 @@ export type StoreResponseDto = {
   boothNumber: string | null;
   type: StoreType;
   state: StoreState;
+  storeAdminNisitId: string;
   members: StoreMemberDto[];
   boothLayoutMediaId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
-
