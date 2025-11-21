@@ -202,7 +202,7 @@ export default function StoreCreatePage() {
                 </button>
 
                 <div className="flex-1 space-y-2">
-                  <CardTitle className="text-3xl font-bold tracking-tight text-emerald-900">
+                  <CardTitle className="text-2xl font-bold tracking-tight text-emerald-900">
                     ลงทะเบียนร้านสำหรับงาน Kaset Fair
                   </CardTitle>
                   <CardDescription className="text-base text-emerald-700/80">
@@ -231,12 +231,11 @@ export default function StoreCreatePage() {
                 </div>
               )}
             </CardHeader>
-
           </Card>
         )}
-            <StepIndicator steps={steps} />
-            {/* <CardContent className="pt-0"> */}
-            {/* </CardContent> */}
+          <StepIndicator steps={steps} />
+          {/* <CardContent className="pt-0"> */}
+          {/* </CardContent> */}
 
         {currentStep === 1 && (
           <StepOneForm
