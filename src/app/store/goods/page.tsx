@@ -8,6 +8,9 @@ import { Loader2, Plus, Save, Trash2, ArrowLeft, Utensils, ImageIcon, Pencil, X 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { GoogleFileUpload } from "@/components/uploadFile"
+import { MediaPurpose } from "@/services/dto/media.dto"
+import { getMediaUrl, uploadMediaViaPresign } from "@/services/mediaService"
 import type { GoodsResponseDto, GoodsType } from "@/services/dto/goods.dto"
 import { createGood, deleteGood, listGoods, updateGood, extractErrorMessage } from "@/services/storeServices"
 
@@ -15,6 +18,7 @@ type GoodDraft = {
   name: string
   price: string
   type: GoodsType
+  goodMediaId?: string | null
 }
 
 type DraftNewGood = {
@@ -32,6 +36,7 @@ const createDraftNewGood = (): DraftNewGood => ({
 export default function StoreGoodsPage() {
   const [goods, setGoods] = useState<GoodsResponseDto[]>([])
   const [goodDrafts, setGoodDrafts] = useState<Record<string, GoodDraft>>({})
+  const [goodImageUrls, setGoodImageUrls] = useState<Record<string, string>>({})
   const [loadingGoods, setLoadingGoods] = useState(true)
   const [goodsError, setGoodsError] = useState<string | null>(null)
   const [goodsMessage, setGoodsMessage] = useState<string | null>(null)
@@ -42,8 +47,43 @@ export default function StoreGoodsPage() {
   const [savingAllGoods, setSavingAllGoods] = useState(false)
   const [goodRowErrors, setGoodRowErrors] = useState<Record<string, string>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [goodUploadingMap, setGoodUploadingMap] = useState<Record<string, boolean>>({})
+  const [goodUploadErrors, setGoodUploadErrors] = useState<Record<string, string | null>>({})
 
   const router = useRouter()
+
+  const loadGoodImages = useCallback(async (items: GoodsResponseDto[]) => {
+    const goodsWithMedia = items.filter((item) => item.goodMediaId)
+    if (goodsWithMedia.length === 0) {
+      setGoodImageUrls({})
+      return
+    }
+
+    try {
+      const entries = await Promise.all(
+        goodsWithMedia.map(async (item) => {
+          try {
+            const media = await getMediaUrl(item.goodMediaId as string)
+            return { id: item.id, url: media.link ?? "" }
+          } catch (error) {
+            console.error(`Failed to load media for good ${item.goodMediaId}`, error)
+            return { id: item.id, url: "" }
+          }
+        }),
+      )
+
+      setGoodImageUrls(
+        entries.reduce<Record<string, string>>((acc, entry) => {
+          if (entry.url) {
+            acc[entry.id] = entry.url
+          }
+          return acc
+        }, {}),
+      )
+    } catch (error) {
+      console.error("Failed to load goods media", error)
+    }
+  }, [])
 
   const fetchGoods = useCallback(async () => {
     setLoadingGoods(true)
@@ -58,17 +98,19 @@ export default function StoreGoodsPage() {
             name: item.name ?? "",
             price: item.price?.toString() ?? "",
             type: item.type,
+            goodMediaId: item.goodMediaId,
           }
           return acc
         }, {}),
       )
+      await loadGoodImages(data)
       setGoodFieldErrors({})
     } catch (error) {
       setGoodsError(extractErrorMessage(error, "ไม่สามารถโหลดสินค้าของร้านได้"))
     } finally {
       setLoadingGoods(false)
     }
-  }, [])
+  }, [loadGoodImages])
 
   useEffect(() => {
     fetchGoods()
@@ -79,6 +121,49 @@ export default function StoreGoodsPage() {
       setDraftNewGoods([createDraftNewGood()])
     }
   }, [draftNewGoods, goods, loadingGoods])
+
+  const handleGoodFileChange = useCallback(
+    async (goodId: string, files: File[]) => {
+      if (!files || files.length === 0) return
+
+      const file = files[0]
+      setGoodUploadErrors((prev) => ({ ...prev, [goodId]: null }))
+      setGoodUploadingMap((prev) => ({ ...prev, [goodId]: true }))
+
+      try {
+        const uploadRes = await uploadMediaViaPresign({
+          purpose: MediaPurpose.STORE_GOODS,
+          file,
+        })
+
+        if (!uploadRes?.mediaId) {
+          throw new Error("�1,�,Y�,��1O�,-�,�1^�,-�,�,>�1,�,��,��,\"�,��,�,�,�,�,��,��1^")
+        }
+
+        setGoodDrafts((prev) => ({
+          ...prev,
+          [goodId]: {
+            ...(prev[goodId] ?? { name: "", price: "", type: "Food", goodMediaId: null }),
+            goodMediaId: uploadRes.mediaId,
+          },
+        }))
+
+        setGoodImageUrls((prev) => ({
+          ...prev,
+          [goodId]: URL.createObjectURL(file),
+        }))
+      } catch (error) {
+        console.error("Failed to upload good image", error)
+        setGoodUploadErrors((prev) => ({
+          ...prev,
+          [goodId]: extractErrorMessage(error, "�1?�,?�,'�,"�,,�1%�,-�,o�,'�,\"�,z�,��,��,\"�,��,��,��,�1^�,��,؅,s�,�,T�,-�,�,?"),
+        }))
+      } finally {
+        setGoodUploadingMap((prev) => ({ ...prev, [goodId]: false }))
+      }
+    },
+    [],
+  )
 
   const handleGoodDraftChange = useCallback(<K extends keyof GoodDraft>(id: string, field: K, value: GoodDraft[K]) => {
     setGoodRowErrors((prev) => {
@@ -102,7 +187,7 @@ export default function StoreGoodsPage() {
     })
 
     setGoodDrafts((prev) => {
-      const existing = prev[id] ?? { name: "", price: "", type: "Food" }
+      const existing = prev[id] ?? { name: "", price: "", type: "Food", goodMediaId: null }
       return {
         ...prev,
         [id]: {
@@ -130,6 +215,7 @@ export default function StoreGoodsPage() {
           name: original.name,
           price: original.price.toString(),
           type: original.type,
+          goodMediaId: original.goodMediaId,
         },
       }))
     }
@@ -173,9 +259,14 @@ export default function StoreGoodsPage() {
         name: trimmedName,
         price: parsedPrice,
         type: draft.type,
+        goodMediaId: draft.goodMediaId,
       })
 
-      setGoods((prev) => prev.map((good) => (good.id === goodId ? updated : good)))
+      setGoods((prev) => {
+        const next = prev.map((good) => (good.id === goodId ? updated : good))
+        loadGoodImages(next)
+        return next
+      })
 
       setEditingId(null)
 
@@ -190,6 +281,7 @@ export default function StoreGoodsPage() {
           name: updated.name,
           price: updated.price,
           type: updated.type,
+          goodMediaId: updated.goodMediaId,
         },
       }))
     } catch (error) {
@@ -212,7 +304,11 @@ export default function StoreGoodsPage() {
 
     try {
       await deleteGood(goodId)
-      setGoods((prev) => prev.filter((good) => good.id !== goodId))
+      setGoods((prev) => {
+        const next = prev.filter((good) => good.id !== goodId)
+        loadGoodImages(next)
+        return next
+      })
       setGoodDrafts((prev) => {
         const next = { ...prev }
         delete next[goodId]
@@ -266,7 +362,11 @@ export default function StoreGoodsPage() {
         type: "Food",
       })
 
-      setGoods((prev) => [...prev, created])
+      setGoods((prev) => {
+        const next = [...prev, created]
+        loadGoodImages(next)
+        return next
+      })
 
       setGoodDrafts((prev) => ({
         ...prev,
@@ -274,6 +374,7 @@ export default function StoreGoodsPage() {
           name: created.name,
           price: created.price,
           type: created.type,
+          goodMediaId: created.goodMediaId,
         },
       }))
 
@@ -400,7 +501,7 @@ export default function StoreGoodsPage() {
             </Button>
             <h1 className="text-2xl font-bold text-emerald-900">รายการอาหาร</h1>
           </div>
-          <Button
+          {/* <Button
             onClick={(e) => handleSaveAllGoods(e as any)}
             className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-md rounded-full px-6"
             disabled={savingAllGoods || loadingGoods}
@@ -416,7 +517,7 @@ export default function StoreGoodsPage() {
                 บันทึกการแก้ไข
               </>
             )}
-          </Button>
+          </Button> */}
         </div>
 
         {goodsError && <div className="rounded-lg bg-red-50 p-4 text-red-600 border border-red-100">{goodsError}</div>}
@@ -437,12 +538,15 @@ export default function StoreGoodsPage() {
                 name: "",
                 price: "",
                 type: good.type,
+                goodMediaId: good.goodMediaId,
               }
               const fieldErrors = goodFieldErrors[good.id]
               const rowError = goodRowErrors[good.id]
               const deleting = deletingGoodsMap[good.id]
               const saving = savingGoodsMap[good.id]
               const isEditing = editingId === good.id
+              const imageUrl = goodImageUrls[good.id]
+              const uploading = goodUploadingMap[good.id]
 
               return (
                 <Card
@@ -452,8 +556,26 @@ export default function StoreGoodsPage() {
                   }`}
                 >
                   <div className="relative aspect-[4/3] w-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                    {imageUrl && (
+                      <img
+                        src={imageUrl}
+                        alt={draft.name || "Good image"}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent" />
-                    <Utensils className="h-12 w-12 text-gray-300" />
+                    {!imageUrl && <Utensils className="h-12 w-12 text-gray-300" />}
+                    {isEditing && (
+                      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center p-2">
+                        <GoogleFileUpload
+                          maxFiles={1}
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          onFilesChange={(files) => handleGoodFileChange(good.id, files)}
+                          disabled={uploading}
+                          className="w-full max-h-full overflow-auto bg-transparent"
+                        />
+                      </div>
+                    )}
 
                     {!isEditing && (
                       <Button
@@ -546,6 +668,7 @@ export default function StoreGoodsPage() {
                     )}
 
                     {rowError && <p className="text-xs text-red-500 mt-1">{rowError}</p>}
+                    {goodUploadErrors[good.id] && <p className="text-[11px] text-red-500">{goodUploadErrors[good.id]}</p>}
                   </CardContent>
                 </Card>
               )
@@ -604,9 +727,31 @@ export default function StoreGoodsPage() {
                         />
                       </div>
                     </div>
+
+                    <div className="flex gap-1 pt-1 mt-auto">
+                        <Button
+                            onClick={(e) => handleSaveAllGoods(e as any)}
+                            className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-md rounded-full px-6"
+                            disabled={savingAllGoods || loadingGoods}
+                        >
+                            {savingAllGoods ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                กำลังบันทึก...
+                            </>
+                            ) : (
+                            <>
+                                <Save className="mr-2 h-4 w-4" />
+                                บันทึกการแก้ไข
+                            </>
+                            )}
+                        </Button>
+                    </div>
                     {fieldErrors?.price && <p className="text-xs text-red-500 px-1">{fieldErrors.price}</p>}
                     {rowError && <p className="text-xs text-red-500 px-1 mt-1">{rowError}</p>}
                   </CardContent>
+                
+
                 </Card>
               )
             })}
