@@ -115,6 +115,14 @@ export function GoogleFileUpload({
     [uploadedFiles, maxFiles, maxSize, disabled, onFilesChange],
   )
 
+  const handleOpenFile = useCallback((file: UploadedFile) => {
+    // เอาไว้เผื่ออนาคตคุณอยากแยก preview กับ url จริง
+    const url = file.preview
+    if (!url) return
+
+    window.open(url, "_blank", "noopener,noreferrer")
+  }, [])
+
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
@@ -243,6 +251,7 @@ export function GoogleFileUpload({
             {uploadedFiles.map((uploadedFile) => (
               <div
                 key={uploadedFile.id}
+                onClick={() => handleOpenFile(uploadedFile)}
                 className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-white p-3 hover:bg-emerald-50/50 transition-colors"
               >
                 <div className="flex-shrink-0">
@@ -260,15 +269,22 @@ export function GoogleFileUpload({
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-emerald-800 truncate">{uploadedFile.file.name}</p>
-                  <p className="text-xs text-emerald-600">{formatFileSize(uploadedFile.file.size)}</p>
+                  <p className="text-sm font-medium text-emerald-800 truncate">
+                    {uploadedFile.file.name}
+                  </p>
+                  <p className="text-xs text-emerald-600">
+                    {formatFileSize(uploadedFile.file.size)}
+                  </p>
                 </div>
 
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => removeFile(uploadedFile.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeFile(uploadedFile.id)
+                  }}
                   disabled={disabled}
                   className="flex-shrink-0 h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                 >

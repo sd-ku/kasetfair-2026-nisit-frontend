@@ -3,14 +3,15 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { createNisitInfo, updateNisitInfo } from "@/services/nisitService"
-import { uploadMedia } from "@/services/mediaService"
+import { createNisitInfo } from "@/services/nisitService"
+import { GoogleFileUpload } from "@/components/uploadFile"
+import { getMediaUrl, uploadMediaViaPresign } from "@/services/mediaService"
 import { MediaPurpose } from "@/services/dto/media.dto"
 import { getNisitInfo } from "@/services/nisitService"
 
@@ -47,10 +48,17 @@ type ConsentText = {
   language: string
 }
 
+type InitialUploadedFile = {
+  id: string
+  name: string
+  url: string
+  size?: number
+  type?: string
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const { status, data, update } = useSession()
-  const params = useSearchParams() // ยังไม่ใช้ก็ช่างมันไว้ก่อน
 
   const [formData, setFormData] = useState<FormState>({
     firstName: "",
@@ -59,7 +67,8 @@ export default function RegisterPage() {
     phone: "",
   })
 
-  const [nisitCardFile, setNisitCardFile] = useState<File | null>(null)
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [initialCardUploadedFiles, setInitialCardUploadedFiles] = useState<InitialUploadedFile[]>([])
   const [nisitCardMediaId, setNisitCardMediaId] = useState<string | null>(null)
 
   const [uploadingCard, setUploadingCard] = useState(false)
@@ -113,10 +122,29 @@ export default function RegisterPage() {
         }
 
         const mediaId = existing?.nisitCardMediaId ?? null
+        let initialFiles: InitialUploadedFile[] = []
+
+        if (mediaId) {
+          try {
+            const mediaRes = await getMediaUrl(mediaId)
+            initialFiles = [
+              {
+                id: mediaId,
+                name: mediaRes.originalName ?? "card_name",
+                url: mediaRes.link ?? "",
+                size: mediaRes.size,
+                type: mediaRes.mimeType,
+              },
+            ]
+          } catch (err) {
+            console.error(err)
+          }
+        }
 
         if (!cancelled) {
           setFormData(merged)
           setNisitCardMediaId(mediaId)
+          setInitialCardUploadedFiles(initialFiles)
 
           setLocked({
             firstName: !!merged.firstName,
@@ -160,36 +188,11 @@ export default function RegisterPage() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-
-    if (!file) {
-      setNisitCardFile(null)
-      setFieldErrors((prev) => ({
-        ...prev,
-        nisitCard: "กรุณาอัปโหลดรูปบัตรนิสิต",
-      }))
-      return
+  const handleFilesChange = (files: File[]) => {
+    setUploadedFiles(files)
+    if (files.length > 0 && fieldErrors.nisitCard) {
+      setFieldErrors((prev) => ({ ...prev, nisitCard: undefined }))
     }
-
-    const allowed = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "application/pdf",
-    ]
-    if (!allowed.includes(file.type)) {
-      setNisitCardFile(null)
-      setFieldErrors((prev) => ({
-        ...prev,
-        nisitCard: "ประเภทไฟล์ไม่รองรับ",
-      }))
-      e.target.value = ""
-      return
-    }
-
-    setFieldErrors((prev) => ({ ...prev, nisitCard: undefined }))
-    setNisitCardFile(file)
   }
 
   const validateForm = (): boolean => {
@@ -223,7 +226,7 @@ export default function RegisterPage() {
       }
     }
 
-    if (!locked.nisitCard && !nisitCardFile) {
+    if (!locked.nisitCard && uploadedFiles.length === 0) {
       errors.nisitCard = "กรุณาอัปโหลดรูปบัตรนิสิต"
     }
 
@@ -264,7 +267,7 @@ export default function RegisterPage() {
     setApiError(null)
 
     if (!validateForm()) return
-    if (!nisitCardFile) return
+    if (!locked.nisitCard && uploadedFiles.length === 0) return
 
     // แทนที่จะ register เลย → เปิด consent dialog ก่อน
     setConsentChecked(false)
@@ -275,11 +278,12 @@ export default function RegisterPage() {
 
   // ฟังก์ชันที่ทำงานจริงหลังจาก user กดยินยอมใน modal แล้ว
   const performRegistrationWithConsent = async () => {
-    if (!nisitCardFile) return // กัน edge case
     if (!consentText) {
       setConsentError("ไม่พบข้อความยินยอมที่ต้องใช้ กรุณารีเฟรชหน้าแล้วลองใหม่")
       return
     }
+
+    const fileToUpload = uploadedFiles[0]
 
     setSubmitting(true)
     setIsLoading(true)
@@ -287,15 +291,24 @@ export default function RegisterPage() {
     setApiError(null)
 
     try {
-      // 1) อัปโหลดไฟล์บัตรนิสิต
-      const uploadRes = await uploadMedia({
-        purpose: MediaPurpose.NISIT_CARD,
-        file: nisitCardFile,
-      })
-      if (!uploadRes.id) throw new Error("อัปโหลดภาพไม่สำเร็จ")
+      let mediaId = nisitCardMediaId
 
-      const mediaId = uploadRes.id
-      setNisitCardMediaId(mediaId)
+      if (!locked.nisitCard) {
+        if (!fileToUpload) {
+          throw new Error("กรุณาอัปโหลดรูปบัตรนิสิต")
+        }
+
+        const uploadRes = await uploadMediaViaPresign({
+          purpose: MediaPurpose.NISIT_CARD,
+          file: fileToUpload,
+        })
+        if (!uploadRes?.mediaId) throw new Error("อัปโหลดภาพไม่สำเร็จ")
+
+        mediaId = uploadRes.mediaId
+        setNisitCardMediaId(mediaId)
+      }
+
+      if (!mediaId) throw new Error("กรุณาอัปโหลดรูปบัตรนิสิต")
 
       // 2) ยิงสร้าง profile พร้อม mediaId + consent
       const payload = {
@@ -433,39 +446,21 @@ export default function RegisterPage() {
                     htmlFor="nisitCard"
                     className={fieldErrors.nisitCard ? "text-red-600" : ""}
                   >
-                    อัปโหลดรูปบัตรนิสิต
+                    Upload student card
                   </Label>
 
-                  {/* ถ้ามี mediaId แล้ว → แสดงว่า “อัปโหลดแล้ว” และห้ามเปลี่ยน */}
-                  {locked.nisitCard ? (
-                    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-700">
-                      อัปโหลดเรียบร้อยแล้ว (แก้ไขไม่ได้)
-                    </div>
-                  ) : (
-                    <>
-                      <Input
-                        id="nisitCard"
-                        name="nisitCard"
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,application/pdf"
-                        disabled={isLoading || uploadingCard}
-                        onChange={handleFileChange}
-                        className={fieldErrors.nisitCard ? "border-red-500" : ""}
-                        required
-                      />
-                      {uploadingCard && (
-                        <p className="text-xs text-emerald-600">กำลังอัปโหลดรูปบัตรนิสิต…</p>
-                      )}
-                      {nisitCardFile && !uploadingCard && (
-                        <p className="text-xs text-emerald-700">ใช้ไฟล์: {nisitCardFile.name}</p>
-                      )}
-                      {fieldErrors.nisitCard && (
-                        <p className="text-xs text-red-600">{fieldErrors.nisitCard}</p>
-                      )}
-                    </>
+                  <GoogleFileUpload
+                    maxFiles={1}
+                    accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
+                    maxSize={5 * 1024 * 1024}
+                    onFilesChange={handleFilesChange}
+                    disabled={isLoading || uploadingCard || locked.nisitCard}
+                    initialFiles={initialCardUploadedFiles}
+                  />
+                  {fieldErrors.nisitCard && (
+                    <p className="text-xs text-red-600">{fieldErrors.nisitCard}</p>
                   )}
                 </div>
-
                 {apiError && (
                   <p
                     role="alert"
@@ -585,10 +580,6 @@ function Field(props: {
     autoComplete,
     error,
   } = props
-
-  const lockedStyle = readOnly
-    ? "bg-gray-50 text-gray-700 border-gray-200"
-    : ""
 
   return (
     <div className="space-y-2">
