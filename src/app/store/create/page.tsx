@@ -260,10 +260,12 @@ export default function StoreCreatePage() {
           <StepTwoForm
             layoutDescription={storeDetailsStep.layoutDescription}
             layoutFileName={storeDetailsStep.layoutFileName}
+            goodType={storeDetailsStep.goodType}
             isStoreAdmin={isStoreAdmin}
             storeAdminNisitId={storeStatus?.storeAdminNisitId ?? storeAdminNisitId}
             onDescriptionChange={storeDetailsStep.setLayoutDescription}
             onFileChange={storeDetailsStep.setLayoutFile}
+            onGoodTypeChange={storeDetailsStep.setGoodType}
             onBack={() => core.goToStep(currentStep - 1)}
             onNext={storeDetailsStep.saveAndContinue}
             saving={storeDetailsStep.isSaving}

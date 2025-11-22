@@ -1,4 +1,4 @@
-import { StoreType, StoreState } from "./store-info.dto"
+import { StoreType, StoreState, GoodsType } from "./store-info.dto"
 
 export type MemberEmailsDraftDto = {
   email: string
@@ -36,6 +36,7 @@ export type UpdateDraftStoreRequestDto = {
   type?: StoreType
   memberEmails?: string[]
   boothMediaId?: string | null
+  goodType?: GoodsType
 }
 
 export type UpdateDraftStoreResponseDto = {

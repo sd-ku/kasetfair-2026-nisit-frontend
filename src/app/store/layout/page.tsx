@@ -14,7 +14,8 @@ import { MediaPurpose } from "@/services/dto/media.dto"
 import { getStoreStatus, updateStore, extractErrorMessage } from "@/services/storeServices"
 import { getNisitInfo } from "@/services/nisitService"
 import { isStoreAdmin as isStoreAdminUtil } from "@/utils/storeAdmin"
-import type { StoreResponseDto } from "@/services/dto/store-info.dto"
+import type { StoreResponseDto, GoodsType } from "@/services/dto/store-info.dto"
+import { Label } from "@/components/ui/label"
 
 type InitialUploadedFile = {
   id: string
@@ -32,6 +33,7 @@ export default function StoreLayoutPage() {
   const [storeFileMessage, setStoreFileMessage] = useState<string | null>(null)
   const [initialLayoutUploadedFiles, setInitialLayoutUploadedFiles] = useState<InitialUploadedFile[]>([])
   const [currentUserNisitId, setCurrentUserNisitId] = useState<string | null>(null)
+  const [goodType, setGoodType] = useState<GoodsType | null>(null)
 
   const router = useRouter()
 
@@ -45,6 +47,7 @@ export default function StoreLayoutPage() {
     try {
       const data = await getStoreStatus()
       setStore(data)
+      setGoodType(data.goodType ?? null)
       if (data.boothLayoutMediaId) {
         const mediaRes = await getMediaUrl(data.boothLayoutMediaId)
         setInitialLayoutUploadedFiles([
@@ -85,30 +88,36 @@ export default function StoreLayoutPage() {
       return
     }
 
-    if (storeFiles.length === 0) {
-      setStoreFileError("กรุณาอัปโหลดไฟล์ก่อนบันทึก")
-      return
-    }
-
     setSavingStoreFiles(true)
     setStoreFileError(null)
     setStoreFileMessage(null)
 
     try {
-      const uploadRes = await uploadMediaViaPresign({
-        purpose: MediaPurpose.STORE_LAYOUT,
-        file: storeFiles[0],
-      })
+      const updatePayload: { boothMediaId?: string; goodType?: GoodsType } = {}
+      
+      if (storeFiles.length > 0) {
+        const uploadRes = await uploadMediaViaPresign({
+          purpose: MediaPurpose.STORE_LAYOUT,
+          file: storeFiles[0],
+        })
 
-      if (!uploadRes?.mediaId) {
-        throw new Error("อัปโหลดไฟล์ไม่สำเร็จ")
+        if (!uploadRes?.mediaId) {
+          throw new Error("อัปโหลดไฟล์ไม่สำเร็จ")
+        }
+        updatePayload.boothMediaId = uploadRes.mediaId
       }
 
-      await updateStore({
-        boothMediaId: uploadRes.mediaId,
-      })
+      if (goodType !== null && goodType !== store.goodType) {
+        updatePayload.goodType = goodType
+      }
 
-      setStoreFileMessage("บันทึกการเปลี่ยนแปลงแล้ว")
+      if (Object.keys(updatePayload).length > 0) {
+        await updateStore(updatePayload)
+        setStoreFileMessage("บันทึกการเปลี่ยนแปลงแล้ว")
+        await fetchStore() // Reload to get updated data
+      } else {
+        setStoreFileMessage("ไม่มีการเปลี่ยนแปลง")
+      }
     } catch (error) {
       setStoreFileError(extractErrorMessage(error, "บันทึกการเปลี่ยนแปลงไม่สำเร็จ"))
     } finally {
@@ -175,12 +184,62 @@ export default function StoreLayoutPage() {
             />
             {storeFileError && <p className="mt-2 text-sm text-red-600">{storeFileError}</p>}
             {storeFileMessage && <p className="mt-2 text-sm text-emerald-700">{storeFileMessage}</p>}
+            
+            <div className="mt-6 space-y-2">
+              <Label htmlFor="goodType" className="text-sm font-medium text-emerald-900">
+                ประเภทสินค้า
+              </Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="goodType-Food"
+                    name="goodType"
+                    value="Food"
+                    checked={goodType === "Food"}
+                    onChange={() => setGoodType("Food")}
+                    disabled={!canEditStore || savingStoreFiles}
+                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                  />
+                  <Label
+                    htmlFor="goodType-Food"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    อาหารและเครื่องดื่ม
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="goodType-NonFood"
+                    name="goodType"
+                    value="NonFood"
+                    checked={goodType === "NonFood"}
+                    onChange={() => setGoodType("NonFood")}
+                    disabled={!canEditStore || savingStoreFiles}
+                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                  />
+                  <Label
+                    htmlFor="goodType-NonFood"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    สินค้าอื่นๆ
+                  </Label>
+                </div>
+              </div>
+              {!canEditStore && (
+                <p className="text-xs text-amber-600">
+                  มีเพียงผู้ดูแลร้านเท่านั้นที่สามารถแก้ไขได้
+                </p>
+              )}
+            </div>
+            
             <div className="mt-4 flex justify-end">
               <Button
                 type="button"
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
                 onClick={handleSaveStoreFiles}
-                disabled={!canEditStore || savingStoreFiles}
+                disabled={(!canEditStore || savingStoreFiles) && storeFiles.length === 0 && goodType === store?.goodType}
               >
                 {savingStoreFiles ? (
                   <>

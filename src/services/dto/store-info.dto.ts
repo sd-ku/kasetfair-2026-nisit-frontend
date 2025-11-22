@@ -2,6 +2,8 @@ export type StoreType = "Nisit" | "Club"
 
 export type StoreState = "CreateStore" | "ClubInfo" | "StoreDetails" | "ProductDetails" | "Submitted" | "Pending"
 
+export type GoodsType = "Food" | "NonFood"
+
 export type CreateStoreRequestDto = {
   storeName: string
   type: StoreType
@@ -23,6 +25,7 @@ export type UpdateStoreRequestDto = {
   storeName?: string;
   memberEmails?: string[];
   boothMediaId?: string | null;
+  goodType?: GoodsType;
 }
 
 export type StoreStatusRequestDto = {
@@ -68,6 +71,7 @@ export type StoreResponseDto = {
   storeAdminNisitId: string;
   members: StoreMemberDto[];
   boothLayoutMediaId: string | null;
+  goodType: GoodsType | null;
   createdAt: Date;
   updatedAt: Date;
 }

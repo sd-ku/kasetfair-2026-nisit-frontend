@@ -6,14 +6,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { UploadCloud } from "lucide-react"
 import Image from "next/image"
+import type { GoodsType } from "@/services/dto/store-info.dto"
 
 type StepTwoFormProps = {
   layoutDescription: string
   layoutFileName: string | null
+  goodType: GoodsType | null
   isStoreAdmin: boolean
   storeAdminNisitId?: string | null
   onDescriptionChange: (value: string) => void
   onFileChange: (file: File | null) => void
+  onGoodTypeChange: (value: GoodsType | null) => void
   onBack: () => void
   onNext: () => void
   saving: boolean
@@ -22,10 +25,12 @@ type StepTwoFormProps = {
 export function StepTwoForm({
   layoutDescription,
   layoutFileName,
+  goodType,
   isStoreAdmin,
   storeAdminNisitId,
   onDescriptionChange,
   onFileChange,
+  onGoodTypeChange,
   onBack,
   onNext,
   saving,
@@ -103,6 +108,55 @@ export function StepTwoForm({
             <p id="layoutFileHelp" className="text-xs text-emerald-600">
               รองรับไฟล์ .png, .jpg, .jpeg และ .pdf ขนาดไม่เกิน 10 MB
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="goodType" className="text-sm font-medium text-emerald-900">
+              ประเภทสินค้า <span className="text-red-500">*</span>
+            </Label>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="goodType-Food"
+                  name="goodType"
+                  value="Food"
+                  checked={goodType === "Food"}
+                  onChange={() => onGoodTypeChange("Food")}
+                  disabled={!isStoreAdmin || saving}
+                  className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                />
+                <Label
+                  htmlFor="goodType-Food"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  อาหารและเครื่องดื่ม
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="goodType-NonFood"
+                  name="goodType"
+                  value="NonFood"
+                  checked={goodType === "NonFood"}
+                  onChange={() => onGoodTypeChange("NonFood")}
+                  disabled={!isStoreAdmin || saving}
+                  className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                />
+                <Label
+                  htmlFor="goodType-NonFood"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  สินค้าอื่นๆ
+                </Label>
+              </div>
+            </div>
+            {!isStoreAdmin && (
+              <p className="text-xs text-amber-600">
+                มีเพียงผู้ดูแลร้านเท่านั้นที่สามารถแก้ไขได้
+              </p>
+            )}
           </div>
         </CardContent>
 

@@ -6,14 +6,17 @@ import { uploadMedia } from "@/services/mediaService"
 import { extractErrorMessage } from "@/services/storeServices"
 import { updateDraftStore } from "@/services/storeDraftService"
 import type { StoreWizardCore, StoreProgress } from "./store-wizard.core"
+import type { GoodsType } from "@/services/dto/store-info.dto"
 
 export type UseStoreDetailsStepResult = {
   layoutDescription: string
   layoutFile: File | null
   layoutFileName: string | null
+  goodType: GoodsType | null
   isSaving: boolean
   setLayoutDescription: (value: string) => void
   setLayoutFile: (file: File | null) => void
+  setGoodType: (value: GoodsType | null) => void
   saveAndContinue: () => Promise<void>
 }
 
@@ -25,6 +28,7 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
   const [layoutFile, setLayoutFileState] = useState<File | null>(null)
   const [storedLayoutFileName, setStoredLayoutFileName] = useState<string | null>(null)
   const [layoutMediaId, setLayoutMediaId] = useState<string | null>(null)
+  const [goodType, setGoodType] = useState<GoodsType | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   const setLayoutFile = useCallback((file: File | null) => {
@@ -38,6 +42,7 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
     setLayoutFileState(null)
     setStoredLayoutFileName(null)
     setLayoutMediaId(null)
+    setGoodType(null)
     setIsSaving(false)
   }, [])
 
@@ -64,6 +69,15 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
     }
 
     setLayoutMediaId(snapshot.boothMediaId ?? null)
+    
+    // Load goodType from storeStatus if available
+    // StoreResponseDto includes goodType, but StoreProgress type may not explicitly include it
+    if (storeStatus) {
+      const storeWithGoodType = storeStatus as StoreProgress & { goodType?: GoodsType | null }
+      if ('goodType' in storeWithGoodType) {
+        setGoodType(storeWithGoodType.goodType ?? null)
+      }
+    }
   }, [storeStatus])
 
   const saveAndContinue = useCallback(async () => {
@@ -117,6 +131,7 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
       await updateDraftStore({
         // storeId: String(storeId),
         boothMediaId: nextMediaId,
+        ...(goodType !== null ? { goodType } : {}),
       })
 
       await reloadStatus()
@@ -132,6 +147,7 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
     isStoreAdmin,
     layoutFile,
     layoutMediaId,
+    goodType,
     reloadStatus,
     setStepError,
     storeStatus,
@@ -141,9 +157,11 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
     layoutDescription,
     layoutFile,
     layoutFileName,
+    goodType,
     isSaving,
     setLayoutDescription,
     setLayoutFile,
+    setGoodType,
     saveAndContinue,
   }
 }
