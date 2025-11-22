@@ -20,27 +20,31 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { toast } from "@/lib/toast"
 import { http } from "@/lib/http"
 import {
   Building2,
   GraduationCap,
   Loader2,
   LogOut,
-  Mail,
   Plus,
   Store,
-  Users2,
   CheckCircle2,
   AlertCircle,
   XCircle,
   ChevronDown,
   ChevronUp,
-  ArrowRight
+  ArrowRight,
+  UserCog
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { getStoreValidate, leaveStore } from "@/services/storeServices"
+import { getStoreValidate, leaveStore, transferStoreAdmin } from "@/services/storeServices"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { getNisitInfo } from "@/services/nisitService"
+import { NisitInfo } from "@/services/dto/nisit-info.dto"
 
 // --- Types ---
 type Invitation = {
@@ -53,7 +57,6 @@ type Invitation = {
   message?: string | null
 }
 
-// CHANGED: Full Validation DTO
 type StoreValidateResponseDto = {
   store: {
     id: number;
@@ -77,8 +80,6 @@ type StoreValidateResponseDto = {
   }[];
 };
 
-const draftStates = ["CreateStore", "ClubInfo", "StoreDetails", "ProductDetails"]
-
 export const convertStateToLabel = (state: string): string => {
   if (!state) return "ไม่ระบุ"
   switch (state) {
@@ -93,22 +94,30 @@ export const convertStateToLabel = (state: string): string => {
 export default function HomePage() {
   const router = useRouter()
   const { data: session } = useSession()
+  // 2. เรียกใช้ hook toast
+  // const { toast } = useToast()
 
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [loadingInvites, setLoadingInvites] = useState(true)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [selectingStoreType, setSelectingStoreType] = useState(false)
 
-  // CHANGED: State to hold the full validation object
   const [validationData, setValidationData] = useState<StoreValidateResponseDto | null>(null)
+  const [userInfo, setUserInfo] = useState<NisitInfo | null>(null)
+
   const [loadingStore, setLoadingStore] = useState(true)
+  const [loadingUser, setLoadingUser] = useState(true)
   const [storeError, setStoreError] = useState<string | null>(null)
+  const [userError, setUserError] = useState<string | null>(null)
   
-  // UI State for expanding validation details
   const [showValidationDetails, setShowValidationDetails] = useState(true)
 
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
+
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
+  const [transferTargetId, setTransferTargetId] = useState("")
+  const [transferring, setTransferring] = useState(false)
 
   const displayName = useMemo(
     () => session?.user?.name || session?.user?.email || "Kaset Fair Member",
@@ -130,12 +139,17 @@ export default function HomePage() {
       console.error("Failed to load invitations", error)
       setInviteError("โหลดคำเชิญไม่สำเร็จ")
       setInvitations([])
+      // Toast Error
+      toast({
+        variant: "error",
+        title: "ผิดพลาด",
+        description: "ไม่สามารถโหลดข้อมูลคำเชิญได้",
+      })
     } finally {
       setLoadingInvites(false)
     }
-  }, [])
+  }, [toast])
 
-  // CHANGED: Fetch Validation Data
   const fetchStoreData = useCallback(async () => {
     setLoadingStore(true)
     setStoreError(null)
@@ -150,17 +164,55 @@ export default function HomePage() {
       } else {
         console.error("Failed to load store status", err)
         setValidationData(null)
-        setStoreError("โหลดข้อมูลร้านไม่สำเร็จ")
+        const errorMessage = "โหลดข้อมูลร้านไม่สำเร็จ"
+        setStoreError(errorMessage)
+        
+        // Toast Error (Ignore 404)
+        toast({
+          variant: "error",
+          title: "เกิดข้อผิดพลาด",
+          description: errorMessage,
+        })
       }
     } finally {
       setLoadingStore(false)
     }
-  }, [])
+  }, [toast])
+
+  const fetchUserData = useCallback(async () => {
+    setLoadingUser(true)
+    setUserError(null)
+    try {
+      const res = await getNisitInfo()
+      setUserInfo(res || null)
+    } catch (err: any) {
+      const status = err?.response?.status ?? err?.status
+      if (status === 404) {
+        setUserInfo(null)
+        setUserError(null)
+      } else {
+        console.error("Failed to load user information", err)
+        setUserInfo(null)
+        const errorMessage = "โหลดข้อมูลนิสิตไม่สำเร็จ"
+        setUserError(errorMessage)
+
+        // Toast Error
+        toast({
+          variant: "error",
+          title: "เกิดข้อผิดพลาด",
+          description: errorMessage,
+        })
+      }
+    } finally {
+      setLoadingUser(false)
+    }
+  }, [toast])
 
   useEffect(() => {
-    fetchInvitations()
+    fetchUserData()
     fetchStoreData()
-  }, [fetchInvitations, fetchStoreData])
+    // fetchInvitations() // Uncomment if needed
+  }, [fetchUserData, fetchStoreData])
 
   useEffect(() => {    
     const onFocus = () => fetchStoreData()
@@ -173,20 +225,74 @@ export default function HomePage() {
   }, [])
 
   const handleLeaveStore = useCallback(async () => {
-    setLoadingStore(true)
+    setLeaving(true) // แก้จาก setLoadingStore เป็น setLeaving เพื่อให้ตรง logic ปุ่ม
     setStoreError(null)
     try {
       await leaveStore()
       setValidationData(null)
       setLeaveDialogOpen(false)
+      
+      // Toast Success
+      toast({
+        variant: "success",
+        title: "สำเร็จ",
+        description: "คุณออกจากร้านค้าเรียบร้อยแล้ว",
+      })
+
+      // Refresh data to ensure UI updates (e.g. show create store button)
+      fetchStoreData()
+
     } catch (err: any) {
       console.error("Failed to leave store", err)
-      setStoreError("ไม่สามารถออกจากร้านได้ กรุณาลองใหม่")
+      const msg = err?.response?.data?.message || "ไม่สามารถออกจากร้านได้ กรุณาลองใหม่"
+      setStoreError(msg)
+      
+      // Toast Error
+      toast({
+        variant: "error",
+        title: "ไม่สามารถออกจากร้านได้",
+        description: msg,
+      })
     } finally {
       setLeaving(false)
-      setLoadingStore(false)
     }
-  }, [])
+  }, [fetchStoreData, toast])
+
+  // --- Handle Transfer ---
+  const handleTransferAdmin = async () => {
+    if (!transferTargetId) return
+    setTransferring(true)
+    try {
+      await transferStoreAdmin(transferTargetId)
+      
+      // Mock success delay (optional)
+      await new Promise(r => setTimeout(r, 1000))
+      
+      setTransferDialogOpen(false)
+      setTransferTargetId("") // Reset input
+      
+      // Toast Success
+      toast({
+        variant: "success",
+        title: "ดำเนินการสำเร็จ",
+        description: `โอนสิทธิ์การเป็น Admin ให้ ${transferTargetId} เรียบร้อยแล้ว`,
+      })
+
+      fetchStoreData() // Refresh data
+    } catch (error: any) {
+      console.error("Transfer failed", error)
+      const msg = error?.response?.data?.message || "เกิดข้อผิดพลาดในการโอนสิทธิ์"
+      
+      // Toast Error
+      toast({
+        variant: "error",
+        title: "โอนสิทธิ์ล้มเหลว",
+        description: msg,
+      })
+    } finally {
+      setTransferring(false)
+    }
+  }
 
   const selectorRef = useRef<HTMLDivElement>(null)
   const handleCreateStore = () => {
@@ -206,16 +312,15 @@ export default function HomePage() {
     }
   }
 
-  // --- Helper Logic for Validation UI ---
   const getRouteForSection = (sectionKey: string) => {
     switch (sectionKey) {
       case "members":
       case "clubInfo":
-        return "/store/info" // ข้อมูลร้านค้า
+        return "/store/info"
       case "storeDetail":
-        return "/store/layout" // ไฟล์ร้านค้า
+        return "/store/layout"
       case "goods":
-        return "/store/goods" // สินค้า
+        return "/store/goods"
       default:
         return "/store/info"
     }
@@ -231,10 +336,11 @@ export default function HomePage() {
     return totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100)
   }
 
-  // Extract store from validation data for easier access
   const store = validationData?.store
   const progress = calculateProgress()
   const isReady = validationData?.isValid
+
+  const isOwner = store?.storeAdminNisitId && userInfo?.nisitId === store.storeAdminNisitId
 
   return (
     <div className="min-h-screen bg-emerald-50 px-4 py-6">
@@ -361,7 +467,7 @@ export default function HomePage() {
                     />
                   </div>
 
-                  {/* Detail List (Collapsible) */}
+                  {/* Detail List */}
                   <AnimatePresence>
                     {showValidationDetails && (
                       <motion.div
@@ -392,7 +498,6 @@ export default function HomePage() {
                                 )}
                               </div>
                               
-                              {/* Updated: Show X icon before each error item */}
                               {!section.ok && (
                                 <div className="pl-5 space-y-1">
                                   {section.items.filter(i => !i.ok).map(item => (
@@ -412,22 +517,38 @@ export default function HomePage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className={cn(
+                  "grid gap-2 pt-2",
+                  isOwner ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2"
+                )}>
+                   {/* Transfer Button (Only for Admin) */}
+                   {isOwner && (
+                    <Button
+                      variant="outline"
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                      onClick={() => setTransferDialogOpen(true)}
+                      disabled={leaving}
+                    >
+                      <UserCog className="mr-2 h-4 w-4" />
+                      ถ่ายโอนสิทธิ์
+                    </Button>
+                   )}
+
                    <Button
                     variant="outline"
                     className="border-red-200 text-red-600 hover:bg-red-50"
                     onClick={handleLeaveStoreClick}
                     disabled={leaving}
                   >
-                     ออกจากร้าน
+                      ออกจากร้าน
                   </Button>
+
                   <Button
-                    className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
-                    onClick={() => {
-                      // If valid, go to info, otherwise go to first invalid section? 
-                      // Or just default to dashboard hub
-                      router.push("/store") 
-                    }}
+                    className={cn(
+                      "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm",
+                      isOwner && "sm:col-span-2"
+                    )}
+                    onClick={() => router.push("/store")}
                   >
                     จัดการร้าน
                   </Button>
@@ -447,7 +568,7 @@ export default function HomePage() {
                   onClick={handleCreateStore}
                 >
                   {selectingStoreType ? (
-                     <>ยกเลิก</> 
+                      <>ยกเลิก</> 
                   ) : (
                     <>
                       <Plus className="mr-2 h-5 w-5" /> สร้างร้านค้าใหม่
@@ -520,11 +641,44 @@ export default function HomePage() {
               </DialogContent>
             </Dialog>
 
+            {/* Transfer Admin Dialog */}
+            <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>ถ่ายโอนสิทธิ์เจ้าของร้าน</DialogTitle>
+                  <DialogDescription>
+                    กรุณาระบุรหัสนิสิตหรืออีเมลของผู้ที่คุณต้องการมอบสิทธิ์ Admin ให้
+                    <span className="block mt-2 text-red-500 font-medium text-xs">
+                      คำเตือน: หลังจากโอนสิทธิ์แล้ว คุณจะเสียสถานะ Admin ทันที
+                    </span>
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2 py-2">
+                  <Label htmlFor="newAdmin">รหัสนิสิต / อีเมลผู้รับช่วงต่อ</Label>
+                  <Input 
+                    id="newAdmin" 
+                    placeholder="ระบุรหัสนิสิต หรือ อีเมล" 
+                    value={transferTargetId}
+                    onChange={(e) => setTransferTargetId(e.target.value)}
+                  />
+                </div>
+                <DialogFooter className="mt-2 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setTransferDialogOpen(false)} disabled={transferring}>
+                    ยกเลิก
+                  </Button>
+                  <Button 
+                    className="bg-emerald-600 hover:bg-emerald-700" 
+                    onClick={handleTransferAdmin} 
+                    disabled={transferring || !transferTargetId}
+                  >
+                    {transferring ? <Loader2 className="h-4 w-4 animate-spin" /> : "ยืนยันถ่ายโอน"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
           </CardContent>
         </Card>
-
-        {/* Invitations Column (Currently Commented Out in your original code, kept as placeholder or uncomment if needed) */}
-        {/* <Card className="border-emerald-100">...</Card> */}
       </main>
     </div>
   )

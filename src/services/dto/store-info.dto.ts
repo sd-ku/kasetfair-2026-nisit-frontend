@@ -25,6 +25,7 @@ export type UpdateStoreRequestDto = {
   storeName?: string;
   memberEmails?: string[];
   boothMediaId?: string | null;
+  storeAdminNisitId?: string | null;
   goodType?: GoodsType;
 }
 

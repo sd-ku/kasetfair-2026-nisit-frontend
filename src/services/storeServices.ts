@@ -66,6 +66,13 @@ export async function leaveStore() {
   return res.data
 }
 
+export async function transferStoreAdmin(transferId: string) {
+  const res = await http.patch(`${STORE_SERVICE_API}/mine/transfer-admin`, {
+    transferId: transferId
+  })
+  return res.data
+}
+
 // ---------- Goods ----------
 
 export async function listGoods(): Promise<GoodsResponseDto[]> {
