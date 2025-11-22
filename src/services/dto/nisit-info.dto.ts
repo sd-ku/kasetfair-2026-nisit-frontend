@@ -3,6 +3,7 @@ export type NisitInfo = {
   lastName: string
   nisitId: string
   phone: string
+  dormitoryTypeId: number
   nisitCardMediaId: string | null
   consentTextId: string;
   consentAccepted: boolean;

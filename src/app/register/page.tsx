@@ -14,6 +14,7 @@ import { GoogleFileUpload } from "@/components/uploadFile"
 import { getMediaUrl, uploadMediaViaPresign } from "@/services/mediaService"
 import { MediaPurpose } from "@/services/dto/media.dto"
 import { getNisitInfo } from "@/services/nisitService"
+import { getDormitories, type Dormitory } from "@/services/dormitoryService"
 
 // ⬇️ เพิ่ม dialog ของ shadcn
 import {
@@ -31,6 +32,7 @@ type FormState = {
   lastName: string
   nisitId: string
   phone: string
+  dormitoryTypeId: number | null
 }
 
 type FormErrors = {
@@ -39,6 +41,7 @@ type FormErrors = {
   nisitId?: string
   phone?: string
   nisitCard?: string
+  dormitoryTypeId?: string
 }
 
 type ConsentText = {
@@ -65,7 +68,11 @@ export default function RegisterPage() {
     lastName: "",
     nisitId: "",
     phone: "",
+    dormitoryTypeId: null,
   })
+
+  const [dormitories, setDormitories] = useState<Dormitory[]>([])
+  const [loadingDormitories, setLoadingDormitories] = useState(false)
 
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [initialCardUploadedFiles, setInitialCardUploadedFiles] = useState<InitialUploadedFile[]>([])
@@ -93,7 +100,36 @@ export default function RegisterPage() {
     nisitId: false,
     phone: false,
     nisitCard: false, // true = ไม่ให้เปลี่ยนไฟล์
+    dormitoryTypeId: false,
   })
+
+  // Fetch dormitories on mount
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoadingDormitories(true)
+      try {
+        const data = await getDormitories()
+        if (!cancelled) {
+          // Sort by order, then filter active ones
+          const sorted = data
+            .filter((d) => d.isActive)
+            .sort((a, b) => a.order - b.order)
+          setDormitories(sorted)
+        }
+      } catch (err) {
+        console.error("Failed to load dormitories:", err)
+      } finally {
+        if (!cancelled) {
+          setLoadingDormitories(false)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     // if (status !== "authenticated") return
@@ -119,6 +155,7 @@ export default function RegisterPage() {
           lastName:  existing?.lastName  ?? fromToken.lastName  ?? formData.lastName,
           nisitId:   existing?.nisitId   ?? fromToken.nisitId   ?? formData.nisitId,
           phone:     existing?.phone     ?? fromToken.phone     ?? formData.phone,
+          dormitoryTypeId: existing?.dormitoryTypeId ?? formData.dormitoryTypeId,
         }
 
         const mediaId = existing?.nisitCardMediaId ?? null
@@ -152,6 +189,7 @@ export default function RegisterPage() {
             nisitId:   !!merged.nisitId,
             phone:     !!merged.phone,
             nisitCard: !!mediaId, // ถ้ามีไฟล์แล้ว → ล็อกอัปโหลด
+            dormitoryTypeId: !!merged.dormitoryTypeId,
           })
         }
       } catch {
@@ -228,6 +266,10 @@ export default function RegisterPage() {
 
     if (!locked.nisitCard && uploadedFiles.length === 0) {
       errors.nisitCard = "กรุณาอัปโหลดรูปบัตรนิสิต"
+    }
+
+    if (!locked.dormitoryTypeId && (formData.dormitoryTypeId === null || formData.dormitoryTypeId === undefined)) {
+      errors.dormitoryTypeId = "กรุณาเลือกประเภทหอพัก"
     }
 
     setFieldErrors(errors)
@@ -316,6 +358,7 @@ export default function RegisterPage() {
         lastName: formData.lastName.trim(),
         nisitId: formData.nisitId.trim(),
         phone: formData.phone.trim(),
+        dormitoryTypeId: formData.dormitoryTypeId!,
         nisitCardMediaId: mediaId,
         consentTextId: consentText.id,
         consentAccepted: true,
@@ -440,6 +483,50 @@ export default function RegisterPage() {
                   error={fieldErrors.phone}
                   required
                 />
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="dormitoryTypeId"
+                    className={fieldErrors.dormitoryTypeId ? "text-red-600" : ""}
+                  >
+                    ประเภทหอพัก <span className="text-red-500">*</span>
+                  </Label>
+                  {loadingDormitories ? (
+                    <p className="text-sm text-gray-500">กำลังโหลดข้อมูลหอพัก...</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {dormitories.map((dormitory) => (
+                        <div key={dormitory.id} className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            id={`dormitory-${dormitory.id}`}
+                            name="dormitoryTypeId"
+                            value={dormitory.id}
+                            checked={formData.dormitoryTypeId === dormitory.id}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value, 10)
+                              setFormData((prev) => ({ ...prev, dormitoryTypeId: value }))
+                              if (fieldErrors.dormitoryTypeId) {
+                                setFieldErrors((prev) => ({ ...prev, dormitoryTypeId: undefined }))
+                              }
+                            }}
+                            disabled={isLoading || uploadingCard || locked.dormitoryTypeId}
+                            className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                          />
+                          <Label
+                            htmlFor={`dormitory-${dormitory.id}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {dormitory.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {fieldErrors.dormitoryTypeId && (
+                    <p className="text-xs text-red-600">{fieldErrors.dormitoryTypeId}</p>
+                  )}
+                </div>
 
                 <div className="space-y-2">
                   <Label
