@@ -260,6 +260,7 @@ export default function StoreCreatePage() {
           <StepTwoForm
             layoutDescription={storeDetailsStep.layoutDescription}
             layoutFileName={storeDetailsStep.layoutFileName}
+            initialLayoutUploadedFiles={storeDetailsStep.initialLayoutUploadedFiles}
             goodType={storeDetailsStep.goodType}
             isStoreAdmin={isStoreAdmin}
             storeAdminNisitId={storeStatus?.storeAdminNisitId ?? storeAdminNisitId}

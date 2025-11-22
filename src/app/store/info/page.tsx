@@ -175,7 +175,7 @@ export default function StoreInfoPage() {
                 type="button"
                 variant="outline"
                 className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                onClick={() => router.push("/home")}
+                onClick={() => router.push("/store")}
             >
                 <ArrowLeft />
             </Button>

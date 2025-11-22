@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { MediaPurpose } from "@/services/dto/media.dto"
-import { uploadMedia } from "@/services/mediaService"
+import { getMediaUrl, uploadMediaViaPresign } from "@/services/mediaService"
 import { extractErrorMessage } from "@/services/storeServices"
 import { updateDraftStore } from "@/services/storeDraftService"
 import type { StoreWizardCore, StoreProgress } from "./store-wizard.core"
@@ -12,6 +12,13 @@ export type UseStoreDetailsStepResult = {
   layoutDescription: string
   layoutFile: File | null
   layoutFileName: string | null
+  initialLayoutUploadedFiles: Array<{
+    id: string
+    name: string
+    url: string
+    size?: number
+    type?: string
+  }>
   goodType: GoodsType | null
   isSaving: boolean
   setLayoutDescription: (value: string) => void
@@ -28,6 +35,9 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
   const [layoutFile, setLayoutFileState] = useState<File | null>(null)
   const [storedLayoutFileName, setStoredLayoutFileName] = useState<string | null>(null)
   const [layoutMediaId, setLayoutMediaId] = useState<string | null>(null)
+  const [initialLayoutUploadedFiles, setInitialLayoutUploadedFiles] = useState<
+    Array<{ id: string; name: string; url: string; size?: number; type?: string }>
+  >([])
   const [goodType, setGoodType] = useState<GoodsType | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -42,6 +52,7 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
     setLayoutFileState(null)
     setStoredLayoutFileName(null)
     setLayoutMediaId(null)
+    setInitialLayoutUploadedFiles([])
     setGoodType(null)
     setIsSaving(false)
   }, [])
@@ -51,6 +62,7 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
   }, [reset, resetSignal])
 
   useEffect(() => {
+    let isActive = true
     const snapshot = storeStatus as StoreProgress | null
     if (!snapshot) return
 
@@ -68,8 +80,34 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
       setLayoutFileState(null)
     }
 
-    setLayoutMediaId(snapshot.boothMediaId ?? null)
-    
+    const boothId = snapshot.boothMediaId ?? null
+    setLayoutMediaId(boothId)
+    setInitialLayoutUploadedFiles([])
+
+    if (boothId) {
+      ;(async () => {
+        try {
+          const mediaRes = await getMediaUrl(boothId)
+          if (!isActive) return
+          setInitialLayoutUploadedFiles([
+            {
+              id: mediaRes.id,
+              name: mediaRes.originalName ?? serverFileName ?? "layout",
+              url: mediaRes.link ?? "",
+              size: mediaRes.size,
+              type: mediaRes.mimeType,
+            },
+          ])
+
+          if (!serverFileName && mediaRes.originalName) {
+            setStoredLayoutFileName(mediaRes.originalName)
+          }
+        } catch (error) {
+          console.error("Failed to load layout media", error)
+        }
+      })()
+    }
+
     // Load goodType from storeStatus if available
     // StoreResponseDto includes goodType, but StoreProgress type may not explicitly include it
     if (storeStatus) {
@@ -77,6 +115,10 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
       if ('goodType' in storeWithGoodType) {
         setGoodType(storeWithGoodType.goodType ?? null)
       }
+    }
+
+    return () => {
+      isActive = false
     }
   }, [storeStatus])
 
@@ -113,12 +155,12 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
 
       if (layoutFile) {
         const fileToUpload = layoutFile
-        const media = await uploadMedia({
-          purpose: MediaPurpose.STORE_BOOTH_LAYOUT,
+        const media = await uploadMediaViaPresign({
+          purpose: MediaPurpose.STORE_LAYOUT,
           file: fileToUpload,
         })
-        nextMediaId = media.id
-        setLayoutMediaId(media.id)
+        nextMediaId = media.mediaId
+        setLayoutMediaId(media.mediaId)
         setStoredLayoutFileName(fileToUpload.name)
         setLayoutFileState(null)
       }
@@ -157,6 +199,7 @@ export function useStoreDetailsStep(core: StoreWizardCore): UseStoreDetailsStepR
     layoutDescription,
     layoutFile,
     layoutFileName,
+    initialLayoutUploadedFiles,
     goodType,
     isSaving,
     setLayoutDescription,

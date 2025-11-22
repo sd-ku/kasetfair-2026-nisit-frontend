@@ -2,15 +2,21 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { UploadCloud } from "lucide-react"
 import Image from "next/image"
+import { GoogleFileUpload } from "@/components/uploadFile"
 import type { GoodsType } from "@/services/dto/store-info.dto"
 
 type StepTwoFormProps = {
   layoutDescription: string
   layoutFileName: string | null
+  initialLayoutUploadedFiles?: Array<{
+    id: string
+    name: string
+    url: string
+    size?: number
+    type?: string
+  }>
   goodType: GoodsType | null
   isStoreAdmin: boolean
   storeAdminNisitId?: string | null
@@ -25,6 +31,7 @@ type StepTwoFormProps = {
 export function StepTwoForm({
   layoutDescription,
   layoutFileName,
+  initialLayoutUploadedFiles,
   goodType,
   isStoreAdmin,
   storeAdminNisitId,
@@ -86,24 +93,25 @@ export function StepTwoForm({
 
           <div className="space-y-2">
             <Label htmlFor="layoutFile">อัปโหลดผังร้านของคุณ</Label>
-            <label
-              htmlFor="layoutFile"
-              className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-dashed border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-700 hover:bg-emerald-100"
-              aria-disabled={!isStoreAdmin}
-            >
-              <span>{layoutFileName ?? "เลือกไฟล์ .pdf หรือ .png"}</span>
-              <UploadCloud className="h-4 w-4" />
-            </label>
-            <Input
-              id="layoutFile"
-              type="file"
-              accept=".png,.jpg,.jpeg,.pdf"
-              className="hidden"
-              disabled={!isStoreAdmin}
-              onChange={(event) => {
-                const file = event.target.files?.[0] ?? null
-                onFileChange(file)
-              }}
+            <GoogleFileUpload
+              maxFiles={1}
+              accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
+              maxSize={10 * 1024 * 1024}
+              onFilesChange={(files) => onFileChange(files[0] ?? null)}
+              disabled={!isStoreAdmin || saving}
+              initialFiles={
+                initialLayoutUploadedFiles?.length
+                  ? initialLayoutUploadedFiles
+                  : layoutFileName
+                    ? [
+                        {
+                          id: "existing-layout-file",
+                          name: layoutFileName,
+                          url: "",
+                        },
+                      ]
+                    : []
+              }
             />
             <p id="layoutFileHelp" className="text-xs text-emerald-600">
               รองรับไฟล์ .png, .jpg, .jpeg และ .pdf ขนาดไม่เกิน 10 MB
