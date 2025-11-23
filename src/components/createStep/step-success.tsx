@@ -119,7 +119,7 @@ export function StepSuccess({
             className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
             onClick={onReviewProducts}
           >
-            ดูรายการสินค้า
+            แก้ไขข้อมูลร้านค้า
           </Button>
         </div>
       </div>

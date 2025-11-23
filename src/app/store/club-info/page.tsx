@@ -366,7 +366,7 @@ export default function ClubInfoPage() {
   )
 
   const handleCancel = useCallback(() => {
-    router.push("/home")
+    router.push("/store")
   }, [router])
 
   const goToWizard = useCallback(() => {

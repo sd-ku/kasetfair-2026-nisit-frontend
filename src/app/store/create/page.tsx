@@ -90,7 +90,7 @@ export default function StoreCreatePage() {
         storeStatus={storeStatus}
         pendingValidation={null}
         failedChecklistItems={[]}
-        onReviewProducts={() => router.push("/store/goods")}
+        onReviewProducts={() => router.push("/store")}
         onGoHome={() => router.push("/home")}
       />
     )

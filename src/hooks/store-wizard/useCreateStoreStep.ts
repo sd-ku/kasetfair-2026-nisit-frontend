@@ -9,7 +9,6 @@ import {
   createStore,
   updateDraftStore
 } from "@/services/storeDraftService"
-import {  } from "@/services/storeDraftService"
 import type { StoreWizardCore } from "./store-wizard.core"
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -171,7 +170,6 @@ export function useCreateStoreStep(core: StoreWizardCore): UseCreateStoreStepRes
       try {
         const response = await updateDraftStore({
           storeName: trimmedName,
-          type: core.storeType,
           memberEmails,
         })
 

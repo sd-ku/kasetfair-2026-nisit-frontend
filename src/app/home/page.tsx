@@ -335,8 +335,9 @@ export default function HomePage() {
   const getRouteForSection = (sectionKey: string) => {
     switch (sectionKey) {
       case "members":
-      case "clubInfo":
         return "/store/info"
+      case "clubInfo":
+        return "/store/club-info"
       case "storeDetail":
         return "/store/layout"
       case "goods":

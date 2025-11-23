@@ -177,40 +177,6 @@ export async function getStoreDraft(): Promise<StoreDraftData | null> {
   }
 }
 
-const normalizeDraftUpdateResponse = (
-  body: unknown,
-  fallback: UpdateDraftStoreRequestDto
-): UpdateDraftStoreResponseDto => {
-  const response = (body ?? {}) as Partial<UpdateDraftStoreResponseDto> & {
-    type?: unknown
-    memberEmails?: unknown
-    missingProfileEmails?: unknown
-    boothMediaId?: unknown
-  }
-
-  const resolvedStoreName = normalizeString(response.storeName, fallback.storeName ?? "")
-
-  const resolvedType = isStoreType(response.type)
-    ? response.type
-    : isStoreType(fallback.type)
-      ? fallback.type
-      : (() => {
-          throw new Error("Store draft response is missing a valid store type.")
-        })()
-
-  const memberEmails = normalizeStringArray(response.memberEmails, fallback.memberEmails ?? [])
-  const missingProfileEmails = normalizeStringArray(response.missingProfileEmails, [])
-  const boothMediaId = normalizeNullableString(response.boothMediaId, fallback.boothMediaId ?? null)
-
-  return {
-    storeName: resolvedStoreName,
-    type: resolvedType,
-    memberEmails,
-    missingProfileEmails,
-    boothMediaId,
-  }
-}
-
 export const mapDraftErrors = (errors?: DraftFieldError[]): DraftErrorMap =>
   Array.isArray(errors)
     ? errors.reduce<DraftErrorMap>((acc, err) => {

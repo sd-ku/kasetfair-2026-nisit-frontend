@@ -33,7 +33,6 @@ export type StoreDarftResponseDto = {
 
 export type UpdateDraftStoreRequestDto = {
   storeName?: string
-  type?: StoreType
   memberEmails?: string[]
   boothMediaId?: string | null
   goodType?: GoodsType

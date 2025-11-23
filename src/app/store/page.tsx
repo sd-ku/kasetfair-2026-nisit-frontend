@@ -9,20 +9,15 @@ import {
   ArrowLeft, 
   ArrowRight, 
   Loader2,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
-  ChevronDown,
-  ChevronUp
+  Users // เพิ่ม Icon สำหรับชมรม
 } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { getStoreValidate } from "@/services/storeServices"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { getStoreValidate } from "@/services/storeServices"
 
-// --- Types based on your DTO ---
-type StoreType = string
+// --- Types ---
+type StoreType = "Nisit" | "Club"
 type StoreState = string
 
 type StoreValidateResponseDto = {
@@ -52,7 +47,6 @@ export default function StoreDashboardPage() {
   const router = useRouter()
   const [data, setData] = useState<StoreValidateResponseDto | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showDetails, setShowDetails] = useState(true)
 
   useEffect(() => {
     const fetchStore = async () => {
@@ -68,63 +62,20 @@ export default function StoreDashboardPage() {
     fetchStore()
   }, [])
 
-  // --- UPDATED LOGIC HERE ---
   const getRouteForSection = (sectionKey: string) => {
     switch (sectionKey) {
       case "members":
+        return "/store/info"
       case "clubInfo":
-        // Maps to "ข้อมูลร้านค้า"
-        return "/store/info"
-        
+        return "/store/club-info"
       case "storeDetail":
-        // Maps to "ไฟล์ร้านค้า" (Layout/Images)
         return "/store/layout"
-        
       case "goods":
-        // Maps to "จัดการสินค้า"
         return "/store/goods"
-        
       default:
-        return "/store/info"
+        return "/store"
     }
   }
-
-  const calculateProgress = () => {
-    if (!data) return 0
-    const totalItems = data.sections.reduce((acc, curr) => acc + curr.items.length, 0)
-    const completedItems = data.sections.reduce(
-      (acc, curr) => acc + curr.items.filter((i) => i.ok).length, 
-      0
-    )
-    return totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100)
-  }
-
-  const menuItems = [
-    {
-      title: "ข้อมูลร้านค้า",
-      description: "จัดการสมาชิก และข้อมูลพื้นฐาน", // Updated description
-      icon: Store,
-      href: "/store/info",
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-    },
-    {
-      title: "จัดการสินค้า",
-      description: "เพิ่ม ลบ แก้ไขรายการสินค้าและราคา",
-      icon: ShoppingBag,
-      href: "/store/goods",
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50",
-    },
-    {
-      title: "ไฟล์ร้านค้า",
-      description: "รายละเอียดร้านค้าและรูปโปรโมต", // Updated description
-      icon: FileImage,
-      href: "/store/layout",
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
-    },
-  ]
 
   if (loading) {
     return (
@@ -135,11 +86,48 @@ export default function StoreDashboardPage() {
   }
 
   const store = data?.store
-  const progress = calculateProgress()
-  const isReady = data?.isValid
+
+  // --- Menu Items Configuration ---
+  const menuItems = [
+    {
+      title: "ข้อมูลร้านค้า",
+      description: "จัดการสมาชิก และข้อมูลพื้นฐาน",
+      icon: Store,
+      href: "/store/info",
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
+    // --- ส่วนที่เพิ่ม: แสดงเฉพาะ Club ---
+    ...(store?.type === "Club" ? [{
+      title: "ข้อมูลชมรม",
+      description: "แก้ไขรายละเอียดและข้อมูลของชมรม",
+      icon: Users,
+      href: "/store/club-info",
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+    }] : []),
+    // --------------------------------
+    {
+      title: "จัดการสินค้า",
+      description: "เพิ่ม ลบ แก้ไขรายการสินค้าและราคา",
+      icon: ShoppingBag,
+      href: "/store/goods",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
+    },
+    {
+      title: "รายละเอียด",
+      description: "รายละเอียดร้านค้าและรูปการจัดการร้าน",
+      icon: FileImage,
+      href: "/store/layout",
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+  ]
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100 px-4 py-10">
+      {/* ใช้ max-w-5xl เท่าเดิม */}
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         
         {/* --- Header --- */}
@@ -163,27 +151,12 @@ export default function StoreDashboardPage() {
               </p>
             </div>
           </div>
-          {/* {store && (
-            <div className="flex items-center gap-3 rounded-xl bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
-              <div className="text-right">
-                <p className="text-sm font-medium text-emerald-900">
-                  {store.storeName}
-                </p>
-                <p className="text-xs text-emerald-600">
-                  สถานะ: {store.state} | บูธ: {store.boothNumber || "-"}
-                </p>
-              </div>
-              <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
-                {store.type}
-              </Badge>
-            </div>
-          )} */}
         </header>
 
         {/* --- Menu Grid --- */}
+        {/* ใช้ Layout เดิม: grid-cols-2 lg:grid-cols-3 */}
         <div className="grid gap-6 grid-cols-2 lg:grid-cols-3">
           {menuItems.map((item) => {
-            // Check if this card requires attention based on the mapped sections
             const requiresAttention = !data?.isValid && data?.sections.some(s => 
               !s.ok && getRouteForSection(s.key) === item.href
             );
@@ -230,7 +203,7 @@ export default function StoreDashboardPage() {
                   </div>
                 </CardContent>
               </Card>
-          )})}
+            )})}
         </div>
       </div>
     </div>
