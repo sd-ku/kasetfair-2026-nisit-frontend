@@ -3,17 +3,17 @@
 import type React from "react"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
-import { 
-  Loader2, 
-  Plus, 
-  Save, 
-  Trash2, 
-  ArrowLeft, 
-  Utensils, 
-  ImageIcon, 
-  Pencil, 
-  X, 
-  UploadCloud 
+import {
+  Loader2,
+  Plus,
+  Save,
+  Trash2,
+  ArrowLeft,
+  Utensils,
+  ImageIcon,
+  Pencil,
+  X,
+  UploadCloud
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -47,7 +47,7 @@ export default function StoreGoodsPage() {
   const [goods, setGoods] = useState<GoodsResponseDto[]>([])
   const [goodDrafts, setGoodDrafts] = useState<Record<string, GoodDraft>>({})
   const [goodImageUrls, setGoodImageUrls] = useState<Record<string, string>>({})
-  
+
   // State สำหรับเก็บไฟล์ที่รออัปโหลด (ยังไม่อัปโหลดจนกว่าจะกดบันทึก)
   const [pendingUploads, setPendingUploads] = useState<Record<string, File>>({})
 
@@ -135,20 +135,20 @@ export default function StoreGoodsPage() {
 
   // --- Modified: Handle File Selection (Preview Only) ---
   const handleGoodFileChange = useCallback((goodId: string, files: File[]) => {
-      if (!files || files.length === 0) return
+    if (!files || files.length === 0) return
 
-      const file = files[0]
-      
-      // 1. เก็บไฟล์ไว้ใน state รอการอัปโหลด
-      setPendingUploads((prev) => ({ ...prev, [goodId]: file }))
+    const file = files[0]
 
-      // 2. สร้าง Preview URL เพื่อแสดงผลทันที
-      const previewUrl = URL.createObjectURL(file)
-      setGoodImageUrls((prev) => ({ ...prev, [goodId]: previewUrl }))
+    // 1. เก็บไฟล์ไว้ใน state รอการอัปโหลด
+    setPendingUploads((prev) => ({ ...prev, [goodId]: file }))
 
-      // 3. เคลียร์ error เก่า (ถ้ามี)
-      setGoodUploadErrors((prev) => ({ ...prev, [goodId]: null }))
-    },
+    // 2. สร้าง Preview URL เพื่อแสดงผลทันที
+    const previewUrl = URL.createObjectURL(file)
+    setGoodImageUrls((prev) => ({ ...prev, [goodId]: previewUrl }))
+
+    // 3. เคลียร์ error เก่า (ถ้ามี)
+    setGoodUploadErrors((prev) => ({ ...prev, [goodId]: null }))
+  },
     [],
   )
 
@@ -193,12 +193,12 @@ export default function StoreGoodsPage() {
 
   const handleCancelEdit = (id: string) => {
     setEditingId(null)
-    
+
     // ล้างไฟล์ที่รออัปโหลดออก
     setPendingUploads((prev) => {
-        const next = { ...prev }
-        delete next[id]
-        return next
+      const next = { ...prev }
+      delete next[id]
+      return next
     })
 
     const original = goods.find((g) => g.id === id)
@@ -258,18 +258,18 @@ export default function StoreGoodsPage() {
       // ตรวจสอบว่ามีไฟล์รออัปโหลดหรือไม่
       const pendingFile = pendingUploads[goodId]
       if (pendingFile) {
-         try {
-            const uploadRes = await uploadMediaViaPresign({
-                purpose: MediaPurpose.STORE_GOODS,
-                file: pendingFile,
-            })
-            if (!uploadRes?.mediaId) {
-                throw new Error("อัปโหลดรูปไม่สำเร็จ (No Media ID)")
-            }
-            finalMediaId = uploadRes.mediaId
-         } catch (uploadErr) {
-             throw new Error(`อัปโหลดรูปภาพล้มเหลว: ${extractErrorMessage(uploadErr)}`)
-         }
+        try {
+          const uploadRes = await uploadMediaViaPresign({
+            purpose: MediaPurpose.STORE_GOODS,
+            file: pendingFile,
+          })
+          if (!uploadRes?.mediaId) {
+            throw new Error("อัปโหลดรูปไม่สำเร็จ (No Media ID)")
+          }
+          finalMediaId = uploadRes.mediaId
+        } catch (uploadErr) {
+          throw new Error(`อัปโหลดรูปภาพล้มเหลว: ${extractErrorMessage(uploadErr)}`)
+        }
       }
 
       const updated = await updateGood(goodId, {
@@ -301,12 +301,12 @@ export default function StoreGoodsPage() {
           goodMediaId: updated.goodMediaId,
         },
       }))
-      
+
       // ล้างไฟล์ที่รออัปโหลดออกเมื่อบันทึกสำเร็จ
       setPendingUploads((prev) => {
-          const next = { ...prev }
-          delete next[goodId]
-          return next
+        const next = { ...prev }
+        delete next[goodId]
+        return next
       })
 
     } catch (error) {
@@ -340,9 +340,9 @@ export default function StoreGoodsPage() {
         return next
       })
       setPendingUploads((prev) => {
-          const next = { ...prev }
-          delete next[goodId]
-          return next
+        const next = { ...prev }
+        delete next[goodId]
+        return next
       })
       setGoodsMessage("ลบสินค้าเรียบร้อยแล้ว")
     } catch (error) {
@@ -447,9 +447,9 @@ export default function StoreGoodsPage() {
       prev.map((draft) =>
         draft.tempId === tempId
           ? {
-              ...draft,
-              [key]: value,
-            }
+            ...draft,
+            [key]: value,
+          }
           : draft,
       ),
     )
@@ -513,19 +513,27 @@ export default function StoreGoodsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100 px-4 py-8 pb-24">
       <div className="mx-auto w-full max-w-6xl space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white/80 px-6 py-5 shadow-lg ring-1 ring-emerald-100 backdrop-blur">
+          <div className="flex items-center gap-3">
             <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full hover:bg-white/50"
+              type="button"
+              variant="outline"
+              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
               onClick={() => router.push("/store")}
             >
-              <ArrowLeft className="h-6 w-6 text-emerald-900" />
+              <ArrowLeft />
             </Button>
-            <h1 className="text-2xl font-bold text-emerald-900">รายการอาหาร</h1>
+
+            <div className="space-y-2">
+              <h1 className="mt-1 text-2xl font-semibold text-emerald-900">
+                จัดการรายการสินค้า
+              </h1>
+              <p className="mt-1 text-sm text-emerald-700">
+                เพิ่ม แก้ไข หรือลบรายการสินค้าของร้านคุณ
+              </p>
+            </div>
           </div>
-        </div>
+        </header>
 
         {goodsError && <div className="rounded-lg bg-red-50 p-4 text-red-600 border border-red-100">{goodsError}</div>}
         {goodsMessage && (
@@ -581,9 +589,8 @@ export default function StoreGoodsPage() {
                         value={draft.name}
                         onChange={(e) => handleDraftNewGoodChange(draft.tempId, "name", e.target.value)}
                         placeholder="ชื่อเมนูใหม่"
-                        className={`h-9 text-sm bg-emerald-50/50 ${
-                          fieldErrors?.name ? "border-red-500" : "border-emerald-100"
-                        }`}
+                        className={`h-9 text-sm bg-emerald-50/50 ${fieldErrors?.name ? "border-red-500" : "border-emerald-100"
+                          }`}
                         autoFocus
                       />
                       {fieldErrors?.name && <p className="text-xs text-red-500 px-1">{fieldErrors.name}</p>}
@@ -598,9 +605,8 @@ export default function StoreGoodsPage() {
                           onChange={(e) => handleDraftNewGoodChange(draft.tempId, "price", e.target.value)}
                           placeholder="0"
                           inputMode="decimal"
-                          className={`h-9 pl-7 text-sm font-semibold text-emerald-700 bg-emerald-50/50 ${
-                            fieldErrors?.price ? "border-red-500" : "border-emerald-100"
-                          }`}
+                          className={`h-9 pl-7 text-sm font-semibold text-emerald-700 bg-emerald-50/50 ${fieldErrors?.price ? "border-red-500" : "border-emerald-100"
+                            }`}
                         />
                       </div>
                     </div>
@@ -645,45 +651,44 @@ export default function StoreGoodsPage() {
               const saving = savingGoodsMap[good.id]
               const isEditing = editingId === good.id
               const imageUrl = goodImageUrls[good.id]
-              
+
               return (
                 <Card
                   key={good.id}
-                  className={`group relative overflow-hidden border-0 bg-white rounded-xl flex flex-col transition-all duration-200 ${
-                    isEditing ? "ring-2 ring-emerald-500 shadow-lg z-10" : "shadow-md hover:shadow-xl"
-                  }`}
+                  className={`group relative overflow-hidden border-0 bg-white rounded-xl flex flex-col transition-all duration-200 ${isEditing ? "ring-2 ring-emerald-500 shadow-lg z-10" : "shadow-md hover:shadow-xl"
+                    }`}
                 >
                   {/* Image Area */}
                   <div className="relative aspect-[4/3] w-full bg-gray-100 flex items-center justify-center overflow-hidden">
                     {/* Background Image */}
                     {imageUrl ? (
-                        <img
-                            src={imageUrl}
-                            alt={draft.name || "Good image"}
-                            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${isEditing ? 'opacity-40' : 'opacity-100'}`}
-                        />
+                      <img
+                        src={imageUrl}
+                        alt={draft.name || "Good image"}
+                        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${isEditing ? 'opacity-40' : 'opacity-100'}`}
+                      />
                     ) : (
-                        !isEditing && <Utensils className="h-12 w-12 text-gray-300" />
+                      !isEditing && <Utensils className="h-12 w-12 text-gray-300" />
                     )}
-                    
+
                     <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none" />
 
                     {/* Upload Overlay Button (Visible only in Edit Mode) */}
                     {isEditing && (
                       <div className="absolute inset-0 flex items-center justify-center z-20">
-                         <div className="relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg hover:bg-emerald-700 transition-all cursor-pointer hover:scale-105 ring-2 ring-white">
-                            <span className="flex items-center gap-2 font-medium">
-                                <UploadCloud className="h-3 w-3"/>
-                                เปลี่ยนรูป
-                            </span>
-                            <GoogleFileUpload
-                                maxFiles={1}
-                                accept="image/png,image/jpeg,image/jpg,image/webp"
-                                onFilesChange={(files) => handleGoodFileChange(good.id, files)}
-                                disabled={saving} // ปิดการเลือกไฟล์ขณะกำลังบันทึก
-                                className="absolute inset-0 cursor-pointer opacity-0 w-full h-full"
-                            />
-                         </div>
+                        <div className="relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg hover:bg-emerald-700 transition-all cursor-pointer hover:scale-105 ring-2 ring-white">
+                          <span className="flex items-center gap-2 font-medium">
+                            <UploadCloud className="h-3 w-3" />
+                            เปลี่ยนรูป
+                          </span>
+                          <GoogleFileUpload
+                            maxFiles={1}
+                            accept="image/png,image/jpeg,image/jpg,image/webp"
+                            onFilesChange={(files) => handleGoodFileChange(good.id, files)}
+                            disabled={saving} // ปิดการเลือกไฟล์ขณะกำลังบันทึก
+                            className="absolute inset-0 cursor-pointer opacity-0 w-full h-full"
+                          />
+                        </div>
                       </div>
                     )}
 

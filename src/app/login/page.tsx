@@ -101,10 +101,10 @@ function LoginForm() {
     errMsg
       ? errMsg
       : error === "OAuthAccountNotLinked"
-      ? "อีเมลนี้เคยสมัครด้วยผู้ให้บริการอื่นไว้ กรุณาใช้วิธีเดิมที่เคยสมัคร"
-      : reason === "expired"
-      ? "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่"
-      : null
+        ? "อีเมลนี้เคยสมัครด้วยผู้ให้บริการอื่นไว้ กรุณาใช้วิธีเดิมที่เคยสมัคร"
+        : reason === "expired"
+          ? "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่"
+          : null
 
   return (
     <>
@@ -114,11 +114,43 @@ function LoginForm() {
         </div>
       )}
 
+      {/* KU All Login – ขึ้นมาเป็นปุ่มหลักแทน Google */}
+      <Button
+        type="button"
+        onClick={() => loginWithKU()}
+        disabled={isLoading || cleaning}
+        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+      >
+        {isLoading || cleaning ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            {cleaning ? "Clearing session..." : "Signing in with KU All Login..."}
+          </>
+        ) : (
+          <>
+            Continue with KU All Login
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </>
+        )}
+      </Button>
+
+      {/* <div className="mt-6 space-y-4">
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">or</span>
+          </div>
+        </div>
+      </div> */}
+
       <Button
         type="button"
         onClick={handleGoogle}
         disabled={isLoading || cleaning || (status === "authenticated" && !hasAppToken())}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+        variant="outline"
+        className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
       >
         {isLoading || cleaning ? (
           <>
@@ -128,30 +160,9 @@ function LoginForm() {
         ) : (
           <>
             Continue with Google
-            <ArrowRight className="w-4 h-4 ml-2" />
           </>
         )}
       </Button>
-
-      <div className="mt-6 space-y-4">
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300" />
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">or</span>
-          </div>
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => loginWithKU()}
-          className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
-        >
-          KU All Login
-        </Button>
-      </div>
     </>
   )
 }

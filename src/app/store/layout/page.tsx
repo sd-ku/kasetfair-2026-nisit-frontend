@@ -17,6 +17,7 @@ import { isStoreAdmin as isStoreAdminUtil } from "@/utils/storeAdmin"
 import { StoreQuestionsForm } from "@/components/store/StoreQuestionsForm"
 import type { StoreResponseDto, GoodsType } from "@/services/dto/store-info.dto"
 import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
 
 type InitialUploadedFile = {
   id: string
@@ -71,7 +72,7 @@ export default function StoreLayoutPage() {
   }, [fetchStore])
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const profile = await getNisitInfo()
         if (profile?.nisitId) {
@@ -95,7 +96,7 @@ export default function StoreLayoutPage() {
 
     try {
       const updatePayload: { boothMediaId?: string; goodType?: GoodsType } = {}
-      
+
       if (storeFiles.length > 0) {
         const uploadRes = await uploadMediaViaPresign({
           purpose: MediaPurpose.STORE_LAYOUT,
@@ -133,20 +134,20 @@ export default function StoreLayoutPage() {
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white/80 px-6 py-5 shadow-lg ring-1 ring-emerald-100 backdrop-blur">
           <div className="flex items-center gap-3">
             <Button
-                type="button"
-                variant="outline"
-                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                onClick={() => router.push("/store")}
+              type="button"
+              variant="outline"
+              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              onClick={() => router.push("/store")}
             >
-                <ArrowLeft />
+              <ArrowLeft />
             </Button>
 
             <div className="space-y-2">
               <h1 className="mt-1 text-2xl font-semibold text-emerald-900">
-                  อัปโหลดรูป/ไฟล์ร้านค้า
+                อัปโหลดรูป/ไฟล์ร้านค้า
               </h1>
               <p className="mt-1 text-sm text-emerald-700">
-                  ดูสถานะร้าน ปรับปรุงสมาชิก และอัปเดตรายการสินค้าได้จากหน้าเดียว
+                ดูสถานะร้าน ปรับปรุงสมาชิก และอัปเดตรายการสินค้าได้จากหน้าเดียว
               </p>
               {store?.storeAdminNisitId && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg bg-emerald-50/50 px-4 py-3 border border-emerald-100">
@@ -165,16 +166,40 @@ export default function StoreLayoutPage() {
           </div>
         </header>
 
-        <Card className="border-emerald-100 bg-white/90 shadow-md">
+        <Card
+          className={cn(
+            "relative overflow-visible border-emerald-100 bg-white/90 shadow-md",
+            !store?.boothLayoutMediaId && "ring-2 ring-amber-400 ring-offset-2"
+          )}
+        >
           <CardHeader>
             <CardTitle className="text-emerald-800">
-                อัปโหลดรูป/ไฟล์ร้านค้า
+              อัปโหลดรูป/ไฟล์ร้านค้า
             </CardTitle>
             <CardDescription className="text-sm">
               เพิ่มรูปโปรโมต เมนู หรือเอกสารที่เกี่ยวข้องกับร้านค้า (สูงสุด 5MB ต่อไฟล์)
             </CardDescription>
           </CardHeader>
+
+          {!store?.boothLayoutMediaId && (
+            <span className="absolute right-3 top-3 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500"></span>
+            </span>
+          )}
+
           <CardContent>
+            <div className="mb-6 rounded-lg border border-emerald-100 bg-emerald-50/50 p-4">
+              <h3 className="text-emerald-800">
+                ตัวอย่างรูปภาพร้านค้า
+              </h3>
+              <img
+                src="/layoutStore.png"
+                alt="ตัวอย่างรูปภาพร้านค้า"
+                className="w-full rounded-md object-cover shadow-sm"
+              />
+            </div>
+
             <GoogleFileUpload
               maxFiles={1}
               accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
@@ -186,56 +211,95 @@ export default function StoreLayoutPage() {
             />
             {storeFileError && <p className="mt-2 text-sm text-red-600">{storeFileError}</p>}
             {storeFileMessage && <p className="mt-2 text-sm text-emerald-700">{storeFileMessage}</p>}
-            
-            <div className="mt-6 space-y-2">
-              <Label htmlFor="goodType" className="text-sm font-medium text-emerald-900">
-                ประเภทสินค้า
-              </Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="goodType-Food"
-                    name="goodType"
-                    value="Food"
-                    checked={goodType === "Food"}
-                    onChange={() => setGoodType("Food")}
-                    disabled={!canEditStore || savingStoreFiles}
-                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
-                  />
-                  <Label
-                    htmlFor="goodType-Food"
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    อาหารและเครื่องดื่ม
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="goodType-NonFood"
-                    name="goodType"
-                    value="NonFood"
-                    checked={goodType === "NonFood"}
-                    onChange={() => setGoodType("NonFood")}
-                    disabled={!canEditStore || savingStoreFiles}
-                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
-                  />
-                  <Label
-                    htmlFor="goodType-NonFood"
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    สินค้าอื่นๆ
-                  </Label>
-                </div>
-              </div>
-              {!canEditStore && (
-                <p className="text-xs text-amber-600">
-                  มีเพียงผู้ดูแลร้านเท่านั้นที่สามารถแก้ไขได้
-                </p>
-              )}
+
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={handleSaveStoreFiles}
+                disabled={(!canEditStore || savingStoreFiles) && storeFiles.length === 0 && goodType === store?.goodType}
+              >
+                {savingStoreFiles ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="ml-2">กำลังบันทึก...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    บันทึกการเปลี่ยนแปลง
+                  </>
+                )}
+              </Button>
             </div>
-            
+          </CardContent>
+        </Card>
+
+        <Card
+          className={cn(
+            "relative overflow-visible border-emerald-100 bg-white/90 shadow-md",
+            !goodType && "ring-2 ring-amber-400 ring-offset-2"
+          )}
+        >
+          <CardHeader>
+            <CardTitle className="text-emerald-800">ประเภทสินค้า</CardTitle>
+            <CardDescription className="text-sm">
+              เลือกประเภทสินค้าหลักที่ร้านค้าของคุณจำหน่าย
+            </CardDescription>
+          </CardHeader>
+
+          {!goodType && (
+            <span className="absolute right-3 top-3 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500"></span>
+            </span>
+          )}
+
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="goodType-Food"
+                  name="goodType"
+                  value="Food"
+                  checked={goodType === "Food"}
+                  onChange={() => setGoodType("Food")}
+                  disabled={!canEditStore || savingStoreFiles}
+                  className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                />
+                <Label
+                  htmlFor="goodType-Food"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  อาหารและเครื่องดื่ม
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="goodType-NonFood"
+                  name="goodType"
+                  value="NonFood"
+                  checked={goodType === "NonFood"}
+                  onChange={() => setGoodType("NonFood")}
+                  disabled={!canEditStore || savingStoreFiles}
+                  className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                />
+                <Label
+                  htmlFor="goodType-NonFood"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  สินค้าอื่นๆ
+                </Label>
+              </div>
+            </div>
+            {!canEditStore && (
+              <p className="mt-2 text-xs text-amber-600">
+                มีเพียงผู้ดูแลร้านเท่านั้นที่สามารถแก้ไขได้
+              </p>
+            )}
+
             <div className="mt-4 flex justify-end">
               <Button
                 type="button"

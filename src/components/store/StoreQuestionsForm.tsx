@@ -1,9 +1,11 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { AlertCircle, CheckCircle2, Loader2, RefreshCcw, Save } from "lucide-react"
+
+import { toast } from "@/lib/toast"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,7 +26,15 @@ type StoreQuestionsFormProps = {
   canEdit?: boolean
 }
 
-export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) {
+export function StoreQuestionsForm(props: StoreQuestionsFormProps) {
+  return (
+    <Suspense fallback={<div className="p-4 text-center text-emerald-600">Loading form...</div>}>
+      <StoreQuestionsFormContent {...props} />
+    </Suspense>
+  )
+}
+
+function StoreQuestionsFormContent({ canEdit = true }: StoreQuestionsFormProps) {
   const searchParams = useSearchParams()
   const storeIdParam = searchParams.get("storeId")
   const storeId = useMemo(() => Number(storeIdParam), [storeIdParam])
@@ -33,7 +43,8 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
   const [questions, setQuestions] = useState<StoreQuestionAnswer[]>([])
   const [answers, setAnswers] = useState<AnswerState>({})
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  // const [saving, setSaving] = useState(false) // Removed global saving state
+  const [savingIds, setSavingIds] = useState<Set<number>>(new Set()) // Track saving state per question
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -51,7 +62,7 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
 
   const loadQuestions = useCallback(async () => {
     if (!hasValidStoreId) {
-      setError("Store id is missing. Please provide ?storeId=<id> in the URL.")
+      setError("ไม่พบ store id กรุณาตรวจสอบและลองใหม่อีกครั้ง")
       setLoading(false)
       return
     }
@@ -64,8 +75,8 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
       setQuestions(data)
       setAnswers(buildInitialAnswers(data))
     } catch (err) {
-      console.error("Failed to load store questions", err)
-      setError(err instanceof Error ? err.message : "Failed to load store questions")
+      console.error("ไม่สามารถโหลดคำถามได้ กรุณาลองใหม่อีกครั้ง", err)
+      setError(err instanceof Error ? err.message : "ไม่สามารถโหลดคำถามได้ กรุณาลองใหม่อีกครั้ง")
     } finally {
       setLoading(false)
     }
@@ -101,68 +112,109 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
     })
   }
 
-  const handleSaveAnswers = async () => {
+  const handleSaveSingleAnswer = async (questionId: number) => {
     if (!hasValidStoreId) return
 
-    setSaving(true)
+    setSavingIds((prev) => new Set(prev).add(questionId))
     setError(null)
     setSuccess(null)
 
     try {
+      const current = answers[questionId] ?? {}
+      const question = questions.find((q) => q.template.id === questionId)
+      if (!question) return
+
+      let answerPayload
+      if (question.template.type === "TEXT") {
+        answerPayload = { id: questionId, text: current.text ?? "" }
+      } else if (question.template.type === "SINGLE_SELECT") {
+        answerPayload = { id: questionId, value: current.value ?? "" }
+      } else {
+        answerPayload = { id: questionId, values: current.values ?? [] }
+      }
+
       const payload = {
-        answers: questions.map((q) => {
-          const current = answers[q.template.id] ?? {}
-          if (q.template.type === "TEXT") {
-            return { id: q.template.id, text: current.text ?? "" }
-          }
-          if (q.template.type === "SINGLE_SELECT") {
-            return { id: q.template.id, value: current.value ?? "" }
-          }
-          return { id: q.template.id, values: current.values ?? [] }
-        }),
+        answers: [answerPayload],
       }
 
       const updated = await upsertStoreAnswers(storeId, payload)
       setQuestions(updated)
       setAnswers(buildInitialAnswers(updated))
-      setSuccess("Answers saved successfully.")
+
+      const successMsg = "บันทึกคำตอบเรียบร้อยแล้ว"
+      setSuccess(successMsg)
+
+      toast({
+        variant: "success",
+        title: "บันทึกสำเร็จ",
+        description: successMsg,
+      })
     } catch (err) {
-      console.error("Failed to save store question answers", err)
-      setError(err instanceof Error ? err.message : "Failed to save answers")
+      console.error("ไม่สามารถบันทึกคำตอบได้ กรุณาลองใหม่อีกครั้ง", err)
+
+      let errorMsg = "ไม่สามารถบันทึกคำตอบได้ กรุณาลองใหม่อีกครั้ง"
+
+      if (err instanceof Error) {
+        // Try to extract meaningful error message
+        if (err.message.includes("network") || err.message.includes("fetch")) {
+          errorMsg = "เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาตรวจสอบอินเทอร์เน็ต"
+        } else if (err.message.includes("401") || err.message.includes("unauthorized")) {
+          errorMsg = "คุณไม่มีสิทธิ์ในการบันทึกคำตอบ กรุณาเข้าสู่ระบบใหม่"
+        } else if (err.message.includes("403") || err.message.includes("forbidden")) {
+          errorMsg = "คุณไม่มีสิทธิ์แก้ไขข้อมูลนี้"
+        } else if (err.message.includes("404")) {
+          errorMsg = "ไม่พบข้อมูลที่ต้องการบันทึก"
+        } else if (err.message.includes("500")) {
+          errorMsg = "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์ กรุณาลองใหม่ภายหลัง"
+        }
+      }
+
+      setError(errorMsg)
+
+      toast({
+        variant: "error",
+        title: "เกิดข้อผิดพลาด",
+        description: errorMsg,
+      })
     } finally {
-      setSaving(false)
+      setSavingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(questionId)
+        return next
+      })
     }
   }
 
   const renderQuestionInput = (question: StoreQuestionAnswer) => {
     const { template } = question
     const answer = answers[template.id] ?? question.answer
+    const isSaving = savingIds.has(template.id)
+
+    let inputElement = null
 
     if (template.type === "TEXT") {
       const isLong = (template.description || "").length > 80
-      return isLong ? (
+      inputElement = isLong ? (
         <Textarea
           value={answer?.text ?? ""}
           onChange={(event) => handleTextChange(template.id, event.target.value)}
           placeholder="Type your answer"
-          disabled={!canEdit || saving}
+          disabled={!canEdit || isSaving}
         />
       ) : (
         <Input
           value={answer?.text ?? ""}
           onChange={(event) => handleTextChange(template.id, event.target.value)}
           placeholder="Type your answer"
-          disabled={!canEdit || saving}
+          disabled={!canEdit || isSaving}
         />
       )
-    }
-
-    if (template.type === "SINGLE_SELECT") {
-      return (
+    } else if (template.type === "SINGLE_SELECT") {
+      inputElement = (
         <Select
           value={answer?.value ?? ""}
           onValueChange={(value) => handleSingleSelectChange(template.id, value)}
-          disabled={!canEdit || saving}
+          disabled={!canEdit || isSaving}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select an option" />
@@ -176,10 +228,8 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
           </SelectContent>
         </Select>
       )
-    }
-
-    if (template.type === "MULTI_SELECT") {
-      return (
+    } else if (template.type === "MULTI_SELECT") {
+      inputElement = (
         <div className="flex flex-col gap-2">
           {template.options?.map((option) => {
             const checked = answer?.values?.includes(option.value) ?? false
@@ -196,7 +246,7 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
                   className="h-4 w-4 accent-emerald-600"
                   checked={checked}
                   onChange={() => handleMultiSelectToggle(template.id, option.value)}
-                  disabled={!canEdit || saving}
+                  disabled={!canEdit || isSaving}
                 />
                 <span className="text-gray-800">{option.label}</span>
               </label>
@@ -206,39 +256,44 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
       )
     }
 
-    return null
+    return (
+      <div className="flex flex-col gap-3">
+        {inputElement}
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => handleSaveSingleAnswer(template.id)}
+            disabled={!canEdit || isSaving || !hasValidStoreId}
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                กำลังบันทึก...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-3 w-3" />
+                บันมึก
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <Card className="border-emerald-100 bg-white/90 shadow-md">
       <CardHeader className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <CardTitle className="text-emerald-800">Store Environment Questions</CardTitle>
+          <CardTitle className="text-emerald-800">
+            คำถามเกี่ยวกับสภาพแวดล้อมของร้านค้า
+          </CardTitle>
           <CardDescription>
-            Answer a few questions about your store setup. Changes are saved per store.
+            ตอบคำถามเพียงไม่กี่ข้อเกี่ยวกับสถานที่ตั้งของร้านค้า คำตอบจะถูกบันทึกตามร้านค้า
           </CardDescription>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={loadQuestions}
-            disabled={loading || saving}
-            className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-          >
-            <RefreshCcw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSaveAnswers}
-            disabled={!canEdit || saving || loading || !hasValidStoreId || questions.length === 0}
-            className="bg-emerald-600 text-white hover:bg-emerald-700"
-          >
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Save answers
-          </Button>
         </div>
       </CardHeader>
 
@@ -253,7 +308,7 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
         {loading && (
           <div className="flex items-center gap-2 text-emerald-700">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Loading questions...</span>
+            <span>กำลังโหลดคำถาม...</span>
           </div>
         )}
 
@@ -265,7 +320,7 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
         )}
 
         {!loading && !error && questions.length === 0 && (
-          <p className="text-sm text-gray-600">No questions available for this store.</p>
+          <p className="text-sm text-gray-600">ไม่พบคำถามสำหรับร้านค้านี้</p>
         )}
 
         {!loading &&
@@ -273,33 +328,44 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
           questions.map((question) => (
             <div
               key={question.template.id}
-              className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4"
+              className={cn(
+                "rounded-xl border border-emerald-100 bg-emerald-50/30 p-4",
+                !question.answer && "ring-2 ring-amber-400 ring-offset-2"
+              )}
             >
-              <div className="flex flex-col gap-1">
-                <div className="flex items-start justify-between gap-2">
-                  <Label className="text-base font-semibold text-emerald-900">
-                    {question.template.label}
-                  </Label>
-                  <Badge tone="muted">{question.template.type}</Badge>
+              <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-start gap-2">
+                    <Label className="text-base font-semibold text-emerald-900">
+                      {question.template.label}
+                    </Label>
+                  </div>
+                  {/* <Badge tone="muted" className="text-xs text-emerald-800">
+                    {question.template.type}
+                  </Badge> */}
+                  {question.template.description && (
+                    <p className="text-sm text-emerald-800/80">
+                      {question.template.description}
+                    </p>
+                  )}
                 </div>
-                {question.template.description && (
-                  <p className="text-sm text-emerald-800/80">{question.template.description}</p>
+
+                {!question.answer && (
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                  </span>
                 )}
               </div>
+
               <div className="mt-3">{renderQuestionInput(question)}</div>
             </div>
-          ))}
 
-        {success && (
-          <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-emerald-800">
-            <CheckCircle2 className="h-4 w-4" />
-            <span>{success}</span>
-          </div>
-        )}
+          ))}
 
         {!canEdit && (
           <p className="text-xs text-amber-700">
-            You do not have permission to edit these answers. Viewing only.
+            คุณไม่มีสิทธิ์ในการแก้ไขคำตอบนี้ กำลังดูเพียงอย่างเดียว
           </p>
         )}
       </CardContent>
@@ -310,9 +376,11 @@ export function StoreQuestionsForm({ canEdit = true }: StoreQuestionsFormProps) 
 const Badge = ({
   children,
   tone = "muted",
+  className,
 }: {
   children: ReactNode
   tone?: "muted" | "info"
+  className?: string
 }) => {
   const color =
     tone === "info"
@@ -322,7 +390,8 @@ const Badge = ({
     <span
       className={cn(
         "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide",
-        color
+        color,
+        className
       )}
     >
       {children}

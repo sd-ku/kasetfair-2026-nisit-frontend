@@ -95,8 +95,6 @@ export const convertStateToLabel = (state: string): string => {
 export default function HomePage() {
   const router = useRouter()
   const { data: session } = useSession()
-  // 2. เรียกใช้ hook toast
-  // const { toast } = useToast()
 
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [loadingInvites, setLoadingInvites] = useState(true)
@@ -110,7 +108,7 @@ export default function HomePage() {
   const [loadingUser, setLoadingUser] = useState(true)
   const [storeError, setStoreError] = useState<string | null>(null)
   const [userError, setUserError] = useState<string | null>(null)
-  
+
   const [showValidationDetails, setShowValidationDetails] = useState(true)
 
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
@@ -186,7 +184,7 @@ export default function HomePage() {
         setValidationData(null)
         const errorMessage = "โหลดข้อมูลร้านไม่สำเร็จ"
         setStoreError(errorMessage)
-        
+
         // Toast Error (Ignore 404)
         toast({
           variant: "error",
@@ -234,7 +232,7 @@ export default function HomePage() {
     // fetchInvitations() // Uncomment if needed
   }, [fetchUserData, fetchStoreData])
 
-  useEffect(() => {    
+  useEffect(() => {
     const onFocus = () => fetchStoreData()
     window.addEventListener("focus", onFocus)
     return () => window.removeEventListener("focus", onFocus)
@@ -251,7 +249,7 @@ export default function HomePage() {
       await leaveStore()
       setValidationData(null)
       setLeaveDialogOpen(false)
-      
+
       // Toast Success
       toast({
         variant: "success",
@@ -266,7 +264,7 @@ export default function HomePage() {
       console.error("Failed to leave store", err)
       const msg = err?.response?.data?.message || "ไม่สามารถออกจากร้านได้ กรุณาลองใหม่"
       setStoreError(msg)
-      
+
       // Toast Error
       toast({
         variant: "error",
@@ -284,13 +282,13 @@ export default function HomePage() {
     setTransferring(true)
     try {
       await transferStoreAdmin(transferTargetId)
-      
+
       // Mock success delay (optional)
       await new Promise(r => setTimeout(r, 1000))
-      
+
       setTransferDialogOpen(false)
       setTransferTargetId("") // Reset input
-      
+
       // Toast Success
       toast({
         variant: "success",
@@ -302,7 +300,7 @@ export default function HomePage() {
     } catch (error: any) {
       console.error("Transfer failed", error)
       const msg = error?.response?.data?.message || "เกิดข้อผิดพลาดในการโอนสิทธิ์"
-      
+
       // Toast Error
       toast({
         variant: "error",
@@ -351,7 +349,7 @@ export default function HomePage() {
     if (!validationData) return 0
     const totalItems = validationData.sections.reduce((acc, curr) => acc + curr.items.length, 0)
     const completedItems = validationData.sections.reduce(
-      (acc, curr) => acc + curr.items.filter((i) => i.ok).length, 
+      (acc, curr) => acc + curr.items.filter((i) => i.ok).length,
       0
     )
     return totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100)
@@ -365,44 +363,44 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-emerald-50 px-4 py-6">
-    <header className="mx-auto w-full max-w-3xl shadowmb-6 px-1 sm:px-0">
-      <div className="rounded-2xl bg-white border border-emerald-50 p-4 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] flex items-center justify-between gap-4">
-        
-        <div className="flex items-center gap-3.5 overflow-hidden">
-          <Link
-            href="/info"
-            // เพิ่ม ring ให้ดูมีมิติเมื่ออยู่บนการ์ดขาว
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold text-lg ring-4 ring-emerald-50 transition-all active:scale-95"
-          >
-            {displayInitial}
-          </Link>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-medium text-emerald-500">ยินดีต้อนรับ,</span>
-            <h1 className="text-lg font-bold text-slate-800 truncate leading-tight">
-              {displayName}
-            </h1>
+      <header className="mx-auto w-full max-w-3xl shadowmb-6 px-1 sm:px-0">
+        <div className="rounded-2xl bg-white border border-emerald-50 p-4 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] flex items-center justify-between gap-4">
+
+          <div className="flex items-center gap-3.5 overflow-hidden">
+            <Link
+              href="/info"
+              // เพิ่ม ring ให้ดูมีมิติเมื่ออยู่บนการ์ดขาว
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold text-lg ring-4 ring-emerald-50 transition-all active:scale-95"
+            >
+              {displayInitial}
+            </Link>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-medium text-emerald-500">ยินดีต้อนรับ,</span>
+              <h1 className="text-lg font-bold text-slate-800 truncate leading-tight">
+                {displayName}
+              </h1>
+            </div>
           </div>
-        </div>
 
-        <div>
+          <div>
             {/* ใช้ปุ่มสีเทาอ่อนๆ (slate-100) เพื่อให้ดูเป็น action รองลงมา */}
-          <Button
-            variant="secondary" 
-            size="sm"
-            className="h-9 w-9 p-0 rounded-xl bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors sm:w-auto sm:px-3"
-            onClick={() => handleLogout()}
-          >
-            <LogOut className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline text-xs">ออกระบบ</span>
-          </Button>
-        </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-9 w-9 p-0 rounded-xl bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors sm:w-auto sm:px-3"
+              onClick={() => handleLogout()}
+            >
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline text-xs">ออกระบบ</span>
+            </Button>
+          </div>
 
-      </div>
-    </header>
+        </div>
+      </header>
 
       {/* Main Content */}
       <main className="mx-auto mt-4 grid w-full max-w-3xl gap-4 md:mt-6 md:grid-cols-2">
-        
+
         {/* My Store Card */}
         <Card className="border-emerald-100 md:col-span-2 lg:col-span-1">
           <CardHeader className="pb-2">
@@ -415,7 +413,7 @@ export default function HomePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            
+
             {/* Loading State */}
             {loadingStore && (
               <div className="flex items-center justify-center py-8 text-emerald-700">
@@ -460,7 +458,7 @@ export default function HomePage() {
                   isReady ? "border-emerald-200 bg-emerald-50/30" : "border-amber-200 bg-amber-50/30"
                 )}>
                   {/* Progress Header */}
-                  <div 
+                  <div
                     className="flex items-center justify-between p-3 cursor-pointer hover:bg-black/5"
                     onClick={() => setShowValidationDetails(!showValidationDetails)}
                   >
@@ -469,7 +467,7 @@ export default function HomePage() {
                         <CheckCircle2 className="h-8 w-8 text-emerald-500" />
                       ) : (
                         <div className="relative">
-                           <AlertCircle className="h-8 w-8 text-amber-500" />
+                          <AlertCircle className="h-8 w-8 text-amber-500" />
                         </div>
                       )}
                       <div>
@@ -488,8 +486,8 @@ export default function HomePage() {
 
                   {/* Progress Line */}
                   <div className="h-1 w-full bg-white/50">
-                    <div 
-                      className={cn("h-full transition-all duration-1000", isReady ? "bg-emerald-500" : "bg-amber-500")} 
+                    <div
+                      className={cn("h-full transition-all duration-1000", isReady ? "bg-emerald-500" : "bg-amber-500")}
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -516,7 +514,7 @@ export default function HomePage() {
                                   {section.label}
                                 </span>
                                 {!section.ok && (
-                                  <Link 
+                                  <Link
                                     href={getRouteForSection(section.key)}
                                     className="text-[10px] bg-white border border-emerald-200 text-emerald-600 px-2 py-0.5 rounded-full hover:bg-emerald-50 flex items-center"
                                   >
@@ -524,7 +522,7 @@ export default function HomePage() {
                                   </Link>
                                 )}
                               </div>
-                              
+
                               {!section.ok && (
                                 <div className="pl-5 space-y-1">
                                   {section.items.filter(i => !i.ok).map(item => (
@@ -548,8 +546,8 @@ export default function HomePage() {
                   "grid gap-2 pt-2",
                   isOwner ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2"
                 )}>
-                   {/* Transfer Button (Only for Admin) */}
-                   {isOwner && (
+                  {/* Transfer Button (Only for Admin) */}
+                  {isOwner && (
                     <Button
                       variant="outline"
                       className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
@@ -559,15 +557,15 @@ export default function HomePage() {
                       <UserCog className="mr-2 h-4 w-4" />
                       ถ่ายโอนสิทธิ์
                     </Button>
-                   )}
+                  )}
 
-                   <Button
+                  <Button
                     variant="outline"
                     className="border-red-200 text-red-600 hover:bg-red-50"
                     onClick={handleLeaveStoreClick}
                     disabled={leaving}
                   >
-                      ออกจากร้าน
+                    ออกจากร้าน
                   </Button>
 
                   <Button
@@ -587,11 +585,10 @@ export default function HomePage() {
             {!loadingStore && !storeError && !store && (
               <div className="space-y-4">
                 <Button
-                  className={`w-full ${
-                    selectingStoreType
+                  className={`w-full ${selectingStoreType
                       ? "border border-emerald-600 text-emerald-600 bg-white hover:bg-emerald-50"
                       : "bg-emerald-600 text-white hover:bg-emerald-700"
-                  }`}
+                    }`}
                   onClick={handleCreateStore}
                 >
                   {selectingStoreType ? (
@@ -601,7 +598,7 @@ export default function HomePage() {
                       <Plus className="mr-2 h-5 w-5" /> สร้างร้านค้าใหม่
                     </>
                   )}
-                </Button> 
+                </Button>
                 {!selectingStoreType && (
                   <p className="text-center text-xs text-gray-400">
                     หรือรอรับคำเชิญจากเพื่อนของคุณ
@@ -681,9 +678,9 @@ export default function HomePage() {
                 </DialogHeader>
                 <div className="space-y-2 py-2">
                   <Label htmlFor="newAdmin">รหัสนิสิต / อีเมลผู้รับช่วงต่อ</Label>
-                  <Input 
-                    id="newAdmin" 
-                    placeholder="ระบุรหัสนิสิต หรือ อีเมล" 
+                  <Input
+                    id="newAdmin"
+                    placeholder="ระบุรหัสนิสิต หรือ อีเมล"
                     value={transferTargetId}
                     onChange={(e) => setTransferTargetId(e.target.value)}
                   />
@@ -692,9 +689,9 @@ export default function HomePage() {
                   <Button variant="outline" onClick={() => setTransferDialogOpen(false)} disabled={transferring}>
                     ยกเลิก
                   </Button>
-                  <Button 
-                    className="bg-emerald-600 hover:bg-emerald-700" 
-                    onClick={handleTransferAdmin} 
+                  <Button
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    onClick={handleTransferAdmin}
                     disabled={transferring || !transferTargetId}
                   >
                     {transferring ? <Loader2 className="h-4 w-4 animate-spin" /> : "ยืนยันถ่ายโอน"}
