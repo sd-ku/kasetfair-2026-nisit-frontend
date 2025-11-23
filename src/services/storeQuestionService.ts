@@ -10,7 +10,7 @@ export type StoreQuestionOption = {
 }
 
 export type StoreQuestionAnswer = {
-  template: { 
+  template: {
     id: number
     key: string
     label: string
@@ -19,14 +19,14 @@ export type StoreQuestionAnswer = {
     options?: StoreQuestionOption[] | null
   },
   answer:
-    | {
-        value: {
-          text?: string
-          value?: string
-          values?: string[]
-        }
-      }
-    | null
+  | {
+    value: {
+      text?: string
+      value?: string
+      values?: string[]
+    }
+  }
+  | null
 }
 
 export type UpsertStoreAnswersRequest = {
@@ -48,7 +48,7 @@ export async function upsertStoreAnswers(
   payload: UpsertStoreAnswersRequest
 ): Promise<StoreQuestionAnswer[]> {
   try {
-    const res = await http.put(`${STORE_SERVICE_API}/questions/mine`, payload)
+    const res = await http.patch(`${STORE_SERVICE_API}/questions/mine`, payload)
     return res.data
   } catch (err) {
     console.error(err)
