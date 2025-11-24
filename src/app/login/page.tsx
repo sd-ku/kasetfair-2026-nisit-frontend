@@ -145,7 +145,7 @@ function LoginForm() {
         </div>
       </div> */}
 
-      <Button
+      {/* <Button
         type="button"
         onClick={handleGoogle}
         disabled={isLoading || cleaning || (status === "authenticated" && !hasAppToken())}
@@ -162,7 +162,7 @@ function LoginForm() {
             Continue with Google
           </>
         )}
-      </Button>
+      </Button> */}
     </>
   )
 }
