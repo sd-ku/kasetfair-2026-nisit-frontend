@@ -270,9 +270,9 @@ export default function ClubInfoPage() {
           const newValues = result.clubInfo
             ? buildFormValues(result.clubInfo)
             : buildFormValues({
-                ...trimmed,
-                clubApplicationMediaId,
-              })
+              ...trimmed,
+              clubApplicationMediaId,
+            })
 
           setSavedValues(newValues)
           setValues(newValues)
@@ -397,191 +397,178 @@ export default function ClubInfoPage() {
               <ArrowLeft className="h-4 w-4" />
               Back to home
             </Button>
-            <Button
-              className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-emerald-300"
-              onClick={goToWizard}
-              disabled={!canContinue}
-              title={
-                canContinue
-                  ? undefined
-                  : "Fill in the club information before continuing."
-              }
-            >
-              Continue to store wizard
-              <ArrowRight className="h-4 w-4" />
-            </Button>
           </div>
         </section>
 
         {/* Body */}
-          <div className="space-y-4">
-            {successMessage && (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-emerald-800">
-                {successMessage}
-              </div>
-            )}
+        <div className="space-y-4">
+          {successMessage && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-emerald-800">
+              {successMessage}
+            </div>
+          )}
 
-            <Card className="border-emerald-100 bg-white/95 shadow-xl">
-              <CardHeader>
-                <CardTitle className="text-emerald-900">ข้อมูลองค์กรนิสิต</CardTitle>
-                <p className="text-sm text-emerald-700">
-                  กรอกข้อมูลขององค์กรและประธานสโมสรให้ครบถ้วน จากนั้นแนบไฟล์คำขอรับรองล่าสุด
-                </p>
-              </CardHeader>
+          <Card className="border-emerald-100 bg-white/95 shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-emerald-900">ข้อมูลองค์กรนิสิต</CardTitle>
+              <p className="text-sm text-emerald-700">
+                กรอกข้อมูลขององค์กรและประธานสโมสรให้ครบถ้วน จากนั้นแนบไฟล์คำขอรับรองล่าสุด
+              </p>
+            </CardHeader>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <CardContent className="space-y-6">
-                  {generalError && (
-                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                      {generalError}
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="clubName">ชื่อองค์กรกิจกรรมนิสิต (ชมรม/กลุ่ม/ชุมนุม)</Label>
-                    <Input
-                      id="clubName"
-                      value={values.clubName}
-                      onChange={(event) =>
-                        handleChange("clubName", event.target.value)
-                      }
-                      placeholder="ตัวอย่าง: สโมสรนิสิตคณะเกษตร"
-                      required
-                    />
-                    {resolveError("clubName") && (
-                      <p className="text-sm text-red-600">
-                        {resolveError("clubName")}
-                      </p>
-                    )}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <CardContent className="space-y-6">
+                {generalError && (
+                  <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {generalError}
                   </div>
+                )}
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="leaderFirstName">ชื่อประธาน</Label>
-                      <Input
-                        id="leaderFirstName"
-                        value={values.leaderFirstName}
-                        onChange={(event) =>
-                          handleChange("leaderFirstName", event.target.value)
-                        }
-                        placeholder="ชื่อ"
-                        required
-                      />
-                      {resolveError("leaderFirstName") && (
-                        <p className="text-sm text-red-600">
-                          {resolveError("leaderFirstName")}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="leaderLastName">นามสกุลประธาน</Label>
-                      <Input
-                        id="leaderLastName"
-                        value={values.leaderLastName}
-                        onChange={(event) =>
-                          handleChange("leaderLastName", event.target.value)
-                        }
-                        placeholder="นามสกุล"
-                        required
-                      />
-                      {resolveError("leaderLastName") && (
-                        <p className="text-sm text-red-600">
-                          {resolveError("leaderLastName")}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="leaderNisitId">รหัสนิสิตของประธาน</Label>
-                      <Input
-                        id="leaderNisitId"
-                        value={values.leaderNisitId}
-                        onChange={(event) =>
-                          handleChange("leaderNisitId", event.target.value)
-                        }
-                        placeholder="65XXXXXXXX"
-                        inputMode="numeric"
-                        required
-                      />
-                      {resolveError("leaderNisitId") && (
-                        <p className="text-sm text-red-600">
-                          {resolveError("leaderNisitId")}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="leaderEmail">อีเมลประธาน (KU Mail)</Label>
-                      <Input
-                        id="leaderEmail"
-                        type="email"
-                        value={values.leaderEmail}
-                        onChange={(event) =>
-                          handleChange("leaderEmail", event.target.value)
-                        }
-                        placeholder="president@ku.th"
-                        required
-                      />
-                      {resolveError("leaderEmail") && (
-                        <p className="text-sm text-red-600">
-                          {resolveError("leaderEmail")}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="leaderPhone">เบอร์โทรศัพท์ประธาน</Label>
-                    <Input
-                      id="leaderPhone"
-                      value={values.leaderPhone}
-                      onChange={(event) =>
-                        handleChange("leaderPhone", event.target.value)
-                      }
-                      placeholder="0812345678"
-                      inputMode="tel"
-                      required
-                    />
-                    {resolveError("leaderPhone") && (
-                      <p className="text-sm text-red-600">
-                        {resolveError("leaderPhone")}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>ไฟล์คำขอรับรององค์กร (PDF / PNG / JPG)</Label>
-                    <GoogleFileUpload
-                      maxFiles={1}
-                      accept="application/pdf,image/png,image/jpeg,image/jpg"
-                      maxSize={10 * 1024 * 1024}
-                      onFilesChange={handleFilesChange}
-                      initialFiles={initialUploadedFiles}
-                    />
-                    <p className="text-xs text-emerald-600">
-                      ใช้ไฟล์ที่ลงนามเรียบร้อยแล้ว เพื่อให้ทีมตรวจสอบได้โดยรวดเร็ว
+                <div className="space-y-2">
+                  <Label htmlFor="clubName">ชื่อองค์กรกิจกรรมนิสิต (ชมรม/กลุ่ม/ชุมนุม)</Label>
+                  <Input
+                    id="clubName"
+                    value={values.clubName}
+                    onChange={(event) =>
+                      handleChange("clubName", event.target.value)
+                    }
+                    placeholder="ตัวอย่าง: สโมสรนิสิตคณะเกษตร"
+                    required
+                  />
+                  {resolveError("clubName") && (
+                    <p className="text-sm text-red-600">
+                      {resolveError("clubName")}
                     </p>
-                    {resolveError("clubApplicationMediaId") && (
+                  )}
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="leaderFirstName">ชื่อประธาน</Label>
+                    <Input
+                      id="leaderFirstName"
+                      value={values.leaderFirstName}
+                      onChange={(event) =>
+                        handleChange("leaderFirstName", event.target.value)
+                      }
+                      placeholder="ชื่อ"
+                      required
+                    />
+                    {resolveError("leaderFirstName") && (
                       <p className="text-sm text-red-600">
-                        {resolveError("clubApplicationMediaId")}
+                        {resolveError("leaderFirstName")}
                       </p>
                     )}
                   </div>
-                </CardContent>
+                  <div className="space-y-2">
+                    <Label htmlFor="leaderLastName">นามสกุลประธาน</Label>
+                    <Input
+                      id="leaderLastName"
+                      value={values.leaderLastName}
+                      onChange={(event) =>
+                        handleChange("leaderLastName", event.target.value)
+                      }
+                      placeholder="นามสกุล"
+                      required
+                    />
+                    {resolveError("leaderLastName") && (
+                      <p className="text-sm text-red-600">
+                        {resolveError("leaderLastName")}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
-                <CardFooter className="flex justify-end gap-3 border-t border-emerald-100 bg-emerald-50/40 px-6 py-4">
-                  <Button
-                    type="submit"
-                    className="min-w-[180px] bg-emerald-600 text-white hover:bg-emerald-700"
-                    disabled={isSubmitDisabled}
-                  >
-                    {submitting ? "กำลังบันทึก..." : "บันทึกและไปขั้นถัดไป"}
-                  </Button>
-                </CardFooter>
-              </form>
-            </Card>
-          </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="leaderNisitId">รหัสนิสิตของประธาน</Label>
+                    <Input
+                      id="leaderNisitId"
+                      value={values.leaderNisitId}
+                      onChange={(event) =>
+                        handleChange("leaderNisitId", event.target.value)
+                      }
+                      placeholder="65XXXXXXXX"
+                      inputMode="numeric"
+                      required
+                    />
+                    {resolveError("leaderNisitId") && (
+                      <p className="text-sm text-red-600">
+                        {resolveError("leaderNisitId")}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="leaderEmail">อีเมลประธาน (KU Mail)</Label>
+                    <Input
+                      id="leaderEmail"
+                      type="email"
+                      value={values.leaderEmail}
+                      onChange={(event) =>
+                        handleChange("leaderEmail", event.target.value)
+                      }
+                      placeholder="president@ku.th"
+                      required
+                    />
+                    {resolveError("leaderEmail") && (
+                      <p className="text-sm text-red-600">
+                        {resolveError("leaderEmail")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="leaderPhone">เบอร์โทรศัพท์ประธาน</Label>
+                  <Input
+                    id="leaderPhone"
+                    value={values.leaderPhone}
+                    onChange={(event) =>
+                      handleChange("leaderPhone", event.target.value)
+                    }
+                    placeholder="0812345678"
+                    inputMode="tel"
+                    required
+                  />
+                  {resolveError("leaderPhone") && (
+                    <p className="text-sm text-red-600">
+                      {resolveError("leaderPhone")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>ไฟล์คำขอรับรององค์กร (PDF / PNG / JPG)</Label>
+                  <GoogleFileUpload
+                    maxFiles={1}
+                    accept="application/pdf,image/png,image/jpeg,image/jpg"
+                    maxSize={10 * 1024 * 1024}
+                    onFilesChange={handleFilesChange}
+                    initialFiles={initialUploadedFiles}
+                  />
+                  <p className="text-xs text-emerald-600">
+                    ใช้ไฟล์ที่ลงนามเรียบร้อยแล้ว เพื่อให้ทีมตรวจสอบได้โดยรวดเร็ว
+                  </p>
+                  {resolveError("clubApplicationMediaId") && (
+                    <p className="text-sm text-red-600">
+                      {resolveError("clubApplicationMediaId")}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+
+              <CardFooter className="flex justify-end gap-3 border-t border-emerald-100 bg-emerald-50/40 px-6 py-4">
+                <Button
+                  type="submit"
+                  className="min-w-[180px] bg-emerald-600 text-white hover:bg-emerald-700"
+                  disabled={isSubmitDisabled}
+                >
+                  {submitting ? "กำลังบันทึก..." : "บันทึกและไปขั้นถัดไป"}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        </div>
       </div>
     </div>
   )
