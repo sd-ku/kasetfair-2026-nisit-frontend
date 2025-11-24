@@ -13,7 +13,11 @@ import { Label } from "@/components/ui/label"
 import { StepSuccess } from "@/components/createStep/step-success"
 import { useCreateStoreStep, useStoreWizardCore } from "@/hooks/store-wizard"
 
-export default function StoreCreatePage() {
+export const dynamic = 'force-dynamic'
+
+import { Suspense } from "react"
+
+function StoreCreateContent() {
   const router = useRouter()
   const core = useStoreWizardCore()
   const createStep = useCreateStoreStep(core)
@@ -284,5 +288,13 @@ export default function StoreCreatePage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function StoreCreatePage() {
+  return (
+    <Suspense fallback={<div className="p-4 text-center text-emerald-600">Loading...</div>}>
+      <StoreCreateContent />
+    </Suspense>
   )
 }
