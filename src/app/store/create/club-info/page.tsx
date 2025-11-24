@@ -376,29 +376,27 @@ export default function ClubInfoPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100 px-4 py-10 text-emerald-900">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-        {/* Header + action หลัก */}
-        <section className="rounded-3xl bg-white/80 p-6 shadow-xl ring-1 ring-emerald-100">
-          <p className="text-sm uppercase tracking-wide text-emerald-600">
-            Club store onboarding
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-emerald-900">
-            Provide organization information
-          </h1>
-          <p className="mt-2 text-sm text-emerald-700">
-            Complete this step so we know who represents your student club. You can
-            return and edit the details before submitting your store.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
+        <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white/80 px-6 py-5 shadow-lg ring-1 ring-emerald-100 backdrop-blur">
+          <div className="flex items-center gap-3">
             <Button
+              type="button"
               variant="outline"
-              className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
               onClick={handleCancel}
             >
-              <ArrowLeft className="h-4 w-4" />
-              Back to home
+              <ArrowLeft />
             </Button>
+
+            <div className="space-y-2">
+              <h1 className="mt-1 text-2xl font-semibold text-emerald-900">
+                ระบุข้อมูลองค์กร
+              </h1>
+              <p className="mt-1 text-sm text-emerald-700">
+                กรุณากรอกข้อมูลในขั้นตอนนี้เพื่อให้เราทราบว่าใครเป็นตัวแทนชมรมนักศึกษาของคุณ คุณสามารถกลับมาแก้ไขรายละเอียดได้ก่อนที่จะส่งร้านค้าของคุณ
+              </p>
+            </div>
           </div>
-        </section>
+        </header>
 
         {/* Body */}
         <div className="space-y-4">
