@@ -46,6 +46,7 @@ import { Label } from "@/components/ui/label"
 import { getNisitInfo } from "@/services/nisitService"
 import { NisitInfo } from "@/services/dto/nisit-info.dto"
 import { logout } from "@/services/authService"
+import { convertStateToLabel, convertStoreTypeToLabel } from "@/utils/labelConverter"
 
 // --- Types ---
 type Invitation = {
@@ -81,16 +82,6 @@ type StoreValidateResponseDto = {
   }[];
 };
 
-export const convertStateToLabel = (state: string): string => {
-  if (!state) return "ไม่ระบุ"
-  switch (state) {
-    case "CreateStore": return "สร้างร้านค้า"
-    case "StoreDetails": return "รายละเอียดร้านค้า"
-    case "ProductDetails": return "รายละเอียดสินค้า"
-    case "Pending": return "รอการพิจารณา"
-    default: return "ไม่ระบุ"
-  }
-}
 
 export default function HomePage() {
   const router = useRouter()
@@ -399,7 +390,7 @@ export default function HomePage() {
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto mt-4 grid w-full max-w-3xl gap-4 md:mt-6 md:grid-cols-2">
+      <main className="mx-auto mt-4 grid w-full max-w-3xl gap-4 md:mt-6">
 
         {/* My Store Card */}
         <Card className="border-emerald-100 md:col-span-2 lg:col-span-1">
@@ -443,7 +434,7 @@ export default function HomePage() {
                         {store.storeName}
                       </h3>
                       <p className="text-xs text-emerald-600">
-                        {store.type} | บูธ: {store.boothNumber || "-"}
+                        {convertStoreTypeToLabel(store.type)} | บูธ: {store.boothNumber || "-"}
                       </p>
                     </div>
                     <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-700">
@@ -586,8 +577,8 @@ export default function HomePage() {
               <div className="space-y-4">
                 <Button
                   className={`w-full ${selectingStoreType
-                      ? "border border-emerald-600 text-emerald-600 bg-white hover:bg-emerald-50"
-                      : "bg-emerald-600 text-white hover:bg-emerald-700"
+                    ? "border border-emerald-600 text-emerald-600 bg-white hover:bg-emerald-50"
+                    : "bg-emerald-600 text-white hover:bg-emerald-700"
                     }`}
                   onClick={handleCreateStore}
                 >

@@ -20,6 +20,7 @@ type FormState = {
   lastName: string
   nisitId: string
   phone: string
+  email: string
   nisitCardMediaId: string
 }
 
@@ -33,12 +34,13 @@ type InitialUploadedFile = {
 
 export default function EditNisitPage() {
   const router = useRouter()
-    
+
   const [formData, setFormData] = useState<FormState>({
     firstName: "",
     lastName: "",
     nisitId: "",
     phone: "",
+    email: "",
     nisitCardMediaId: "",
   })
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
@@ -46,7 +48,7 @@ export default function EditNisitPage() {
   const [saving, setSaving] = useState(false)
   // ลบ error/success state แบบเก่าออก เพื่อใช้ toast แทน หรือเก็บ error ไว้เฉพาะตอนโหลดหน้าแรกไม่ผ่าน
   const [fetchError, setFetchError] = useState<string | null>(null)
-  
+
   const [initialCardUploadedFiles, setInitialCardUploadedFiles] = useState<InitialUploadedFile[]>([])
 
   const hasFetched = useRef(false)
@@ -74,6 +76,7 @@ export default function EditNisitPage() {
           lastName: result.lastName ?? "",
           nisitId: result.nisitId ?? "",
           phone: result.phone ?? "",
+          email: result.email ?? "",
           nisitCardMediaId: result.nisitCardMediaId ?? "",
         })
         if (result.nisitCardMediaId) {
@@ -81,7 +84,7 @@ export default function EditNisitPage() {
           setInitialCardUploadedFiles([
             {
               id: result.nisitCardMediaId,
-              name: mediaRes.originalName ?? "card_name", 
+              name: mediaRes.originalName ?? "card_name",
               url: mediaRes.link ?? "",
               size: mediaRes.size,
               type: mediaRes.mimeType,
@@ -93,9 +96,9 @@ export default function EditNisitPage() {
         console.error(err)
         setFetchError("เกิดข้อผิดพลาดระหว่างโหลดข้อมูล กรุณาลองใหม่")
         toast({
-            variant: "destructive",
-            title: "ผิดพลาด",
-            description: "เกิดข้อผิดพลาดระหว่างโหลดข้อมูล",
+          variant: "destructive",
+          title: "ผิดพลาด",
+          description: "เกิดข้อผิดพลาดระหว่างโหลดข้อมูล",
         })
       } finally {
         setLoading(false)
@@ -162,13 +165,13 @@ export default function EditNisitPage() {
       const result = await updateNisitInfo(payload)
       if (!result) {
         toast({
-            variant: "destructive",
-            title: "บันทึกไม่สำเร็จ",
-            description: "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่",
+          variant: "destructive",
+          title: "บันทึกไม่สำเร็จ",
+          description: "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่",
         })
         return
       }
-      
+
       // Success Toast
       toast({
         variant: "success", // ใช้ variant success ตามที่ร้องขอ
@@ -205,7 +208,7 @@ export default function EditNisitPage() {
       <div className="w-full max-w-xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-emerald-800 mb-2">แก้ไขข้อมูลนิสิต</h1>
-          <p className="text-emerald-600">ปรับปรุงข้อมูลส่วนตัวให้ถูกต้อง เพื่อการติดต่อจากทีมงาน Kaset Fair</p>
+          <p className="text-emerald-600">ปรับปรุงข้อมูลส่วนตัวให้ถูกต้อง</p>
         </div>
 
         <Card className="border-emerald-200 shadow-lg">
@@ -229,7 +232,25 @@ export default function EditNisitPage() {
                 disabled
               />
 
-              <Field id="nisitId" name="nisitId" label="รหัสนิสิต" value={formData.nisitId} disabled />
+              <Field
+                id="nisitId"
+                name="nisitId"
+                label="รหัสนิสิต"
+                value={formData.nisitId}
+                disabled
+              />
+
+              <Field
+                id="email"
+                name="email"
+                label="อีเมล"
+                value={formData.email}
+                onChange={handleChange}
+                type="email"
+                pattern="^[a-zA-Z0-9._%+-]+@ku\.th$"
+                placeholder="your.email@ku.th"
+                disabled
+              />
 
               <Field
                 id="phone"
@@ -244,6 +265,7 @@ export default function EditNisitPage() {
                 placeholder="08xxxxxxxx"
                 required
               />
+
 
               <div className="space-y-2">
                 <Label htmlFor="nisitCard">บัตรนิสิต</Label>

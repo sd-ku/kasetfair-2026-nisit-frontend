@@ -242,7 +242,9 @@ export default function StoreLayoutPage() {
           )}
         >
           <CardHeader>
-            <CardTitle className="text-emerald-800">ประเภทสินค้า</CardTitle>
+            <CardTitle className="text-emerald-800">
+              ประเภทสินค้า
+            </CardTitle>
             <CardDescription className="text-sm">
               เลือกประเภทสินค้าหลักที่ร้านค้าของคุณจำหน่าย
             </CardDescription>

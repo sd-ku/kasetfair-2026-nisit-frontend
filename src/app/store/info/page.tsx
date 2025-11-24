@@ -16,6 +16,7 @@ import type { StoreResponseDto } from "@/services/dto/store-info.dto"
 import { getStoreStatus, updateStore, extractErrorMessage } from "@/services/storeServices"
 import { getNisitInfo } from "@/services/nisitService"
 import { isStoreAdmin as isStoreAdminUtil } from "@/utils/storeAdmin"
+import { convertStateToLabel, convertStoreTypeToLabel } from "@/utils/labelConverter"
 
 const ensureMemberFields = (emails: string[]): string[] => (emails.length ? emails : [""])
 
@@ -85,7 +86,7 @@ export default function StoreInfoPage() {
   }, [fetchStore])
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const profile = await getNisitInfo()
         if (profile?.nisitId) {
@@ -172,20 +173,20 @@ export default function StoreInfoPage() {
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white/80 px-6 py-5 shadow-lg ring-1 ring-emerald-100 backdrop-blur">
           <div className="flex items-center gap-3">
             <Button
-                type="button"
-                variant="outline"
-                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                onClick={() => router.push("/store")}
+              type="button"
+              variant="outline"
+              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              onClick={() => router.push("/store")}
             >
-                <ArrowLeft />
+              <ArrowLeft />
             </Button>
 
             <div className="space-y-1">
               <h1 className="mt-1 text-2xl font-semibold text-emerald-900">
-                  แก้ไขข้อมูลร้านค้า
+                แก้ไขข้อมูลร้านค้า
               </h1>
               <p className="mt-1 text-sm text-emerald-700">
-                  ดูสถานะร้าน ปรับปรุงสมาชิก
+                ดูสถานะร้าน ปรับปรุงสมาชิก
               </p>
               {store?.storeAdminNisitId && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg bg-emerald-50/50 px-4 py-3 border border-emerald-100">
@@ -213,7 +214,7 @@ export default function StoreInfoPage() {
 
             {store && (
               <div className="text-right text-sm text-emerald-700">
-                สถานะ: {store.state} | ประเภท: {store.type}
+                สถานะ: {convertStateToLabel(store.state)} | ประเภท: {convertStoreTypeToLabel(store.type)}
                 {store.boothNumber && <p>บูธ: {store.boothNumber}</p>}
               </div>
             )}

@@ -31,6 +31,7 @@ type FormState = {
   firstName: string
   lastName: string
   nisitId: string
+  email: string
   phone: string
   dormitoryTypeId: number | null
 }
@@ -39,6 +40,7 @@ type FormErrors = {
   firstName?: string
   lastName?: string
   nisitId?: string
+  email?: string
   phone?: string
   nisitCard?: string
   dormitoryTypeId?: string
@@ -67,6 +69,7 @@ export default function RegisterPage() {
     firstName: "",
     lastName: "",
     nisitId: "",
+    email: "",
     phone: "",
     dormitoryTypeId: null,
   })
@@ -98,6 +101,7 @@ export default function RegisterPage() {
     firstName: false,
     lastName: false,
     nisitId: false,
+    email: false,
     phone: false,
     nisitCard: false, // true = ไม่ให้เปลี่ยนไฟล์
     dormitoryTypeId: false,
@@ -106,25 +110,25 @@ export default function RegisterPage() {
   // Fetch dormitories on mount
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      setLoadingDormitories(true)
-      try {
-        const data = await getDormitories()
-        if (!cancelled) {
-          // Sort by order, then filter active ones
-          const sorted = data
-            .filter((d) => d.isActive)
-            .sort((a, b) => a.order - b.order)
-          setDormitories(sorted)
+      ; (async () => {
+        setLoadingDormitories(true)
+        try {
+          const data = await getDormitories()
+          if (!cancelled) {
+            // Sort by order, then filter active ones
+            const sorted = data
+              .filter((d) => d.isActive)
+              .sort((a, b) => a.order - b.order)
+            setDormitories(sorted)
+          }
+        } catch (err) {
+          console.error("Failed to load dormitories:", err)
+        } finally {
+          if (!cancelled) {
+            setLoadingDormitories(false)
+          }
         }
-      } catch (err) {
-        console.error("Failed to load dormitories:", err)
-      } finally {
-        if (!cancelled) {
-          setLoadingDormitories(false)
-        }
-      }
-    })()
+      })()
 
     return () => {
       cancelled = true
@@ -135,67 +139,70 @@ export default function RegisterPage() {
     // if (status !== "authenticated") return
 
     let cancelled = false
-    ;(async () => {
-      try {
-        // 1) ดึงจาก API เป็นหลัก
-        const existing = await getNisitInfo().catch(() => null)
+      ; (async () => {
+        try {
+          // 1) ดึงจาก API เป็นหลัก
+          const existing = await getNisitInfo().catch(() => null)
 
-        // 2) fallback จาก session payload (กรณี backend เคยยัดมาให้ใน token)
-        const tokenAny = (data as any) ?? {}
-        const fromToken = {
-          firstName: tokenAny.firstName ?? null,
-          lastName: tokenAny.lastName ?? null,
-          nisitId: tokenAny.nisitId ?? null,
-          phone: tokenAny.phone ?? null,
-        }
-
-        // merge priority: API > token > current state
-        const merged = {
-          firstName: existing?.firstName ?? fromToken.firstName ?? formData.firstName,
-          lastName:  existing?.lastName  ?? fromToken.lastName  ?? formData.lastName,
-          nisitId:   existing?.nisitId   ?? fromToken.nisitId   ?? formData.nisitId,
-          phone:     existing?.phone     ?? fromToken.phone     ?? formData.phone,
-          dormitoryTypeId: existing?.dormitoryTypeId ?? formData.dormitoryTypeId,
-        }
-
-        const mediaId = existing?.nisitCardMediaId ?? null
-        let initialFiles: InitialUploadedFile[] = []
-
-        if (mediaId) {
-          try {
-            const mediaRes = await getMediaUrl(mediaId)
-            initialFiles = [
-              {
-                id: mediaId,
-                name: mediaRes.originalName ?? "card_name",
-                url: mediaRes.link ?? "",
-                size: mediaRes.size,
-                type: mediaRes.mimeType,
-              },
-            ]
-          } catch (err) {
-            console.error(err)
+          // 2) fallback จาก session payload (กรณี backend เคยยัดมาให้ใน token)
+          const tokenAny = (data as any) ?? {}
+          const fromToken = {
+            firstName: tokenAny.firstName ?? null,
+            lastName: tokenAny.lastName ?? null,
+            nisitId: tokenAny.nisitId ?? null,
+            email: tokenAny.email ?? null,
+            phone: tokenAny.phone ?? null,
           }
-        }
 
-        if (!cancelled) {
-          setFormData(merged)
-          setNisitCardMediaId(mediaId)
-          setInitialCardUploadedFiles(initialFiles)
+          // merge priority: API > token > current state
+          const merged = {
+            firstName: existing?.firstName ?? fromToken.firstName ?? formData.firstName,
+            lastName: existing?.lastName ?? fromToken.lastName ?? formData.lastName,
+            nisitId: existing?.nisitId ?? fromToken.nisitId ?? formData.nisitId,
+            email: existing?.email ?? fromToken.email ?? formData.email,
+            phone: existing?.phone ?? fromToken.phone ?? formData.phone,
+            dormitoryTypeId: existing?.dormitoryTypeId ?? formData.dormitoryTypeId,
+          }
 
-          setLocked({
-            firstName: !!merged.firstName,
-            lastName:  !!merged.lastName,
-            nisitId:   !!merged.nisitId,
-            phone:     !!merged.phone,
-            nisitCard: !!mediaId, // ถ้ามีไฟล์แล้ว → ล็อกอัปโหลด
-            dormitoryTypeId: !!merged.dormitoryTypeId,
-          })
+          const mediaId = existing?.nisitCardMediaId ?? null
+          let initialFiles: InitialUploadedFile[] = []
+
+          if (mediaId) {
+            try {
+              const mediaRes = await getMediaUrl(mediaId)
+              initialFiles = [
+                {
+                  id: mediaId,
+                  name: mediaRes.originalName ?? "card_name",
+                  url: mediaRes.link ?? "",
+                  size: mediaRes.size,
+                  type: mediaRes.mimeType,
+                },
+              ]
+            } catch (err) {
+              console.error(err)
+            }
+          }
+
+          if (!cancelled) {
+            setFormData(merged)
+            setNisitCardMediaId(mediaId)
+            setInitialCardUploadedFiles(initialFiles)
+
+            setLocked({
+              firstName: !!merged.firstName,
+              lastName: !!merged.lastName,
+              nisitId: !!merged.nisitId,
+              email: !!merged.email,
+              phone: !!merged.phone,
+              nisitCard: !!mediaId, // ถ้ามีไฟล์แล้ว → ล็อกอัปโหลด
+              dormitoryTypeId: !!merged.dormitoryTypeId,
+            })
+          }
+        } catch {
+          // เงียบ ๆ ไป ไม่บล็อกการลงทะเบียนใหม่
         }
-      } catch {
-        // เงียบ ๆ ไป ไม่บล็อกการลงทะเบียนใหม่
-      }
-    })()
+      })()
 
     return () => {
       cancelled = true
@@ -237,7 +244,7 @@ export default function RegisterPage() {
     const errors: FormErrors = {}
 
     const need = (key: keyof FormState) =>
-      !(locked[key] && formData[key]) // ถ้าล็อกและมีค่าแล้ว → ไม่ต้องเช็ค
+      !(locked[key] && formData[key])
 
     if (need("firstName") && !formData.firstName.trim()) {
       errors.firstName = "กรุณากรอกชื่อ"
@@ -357,6 +364,7 @@ export default function RegisterPage() {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         nisitId: formData.nisitId.trim(),
+        email: formData.email.trim(),
         phone: formData.phone.trim(),
         dormitoryTypeId: formData.dormitoryTypeId!,
         nisitCardMediaId: mediaId,
@@ -436,7 +444,7 @@ export default function RegisterPage() {
                   label="ชื่อ"
                   value={formData.firstName}
                   onChange={handleInputChange}
-                  disabled={isLoading || uploadingCard}
+                  disabled={locked.firstName || isLoading || uploadingCard}
                   readOnly={locked.firstName}
                   autoComplete="given-name"
                   error={fieldErrors.firstName}
@@ -449,7 +457,7 @@ export default function RegisterPage() {
                   label="นามสกุล"
                   value={formData.lastName}
                   onChange={handleInputChange}
-                  disabled={isLoading || uploadingCard}
+                  disabled={locked.lastName || isLoading || uploadingCard}
                   readOnly={locked.lastName}
                   autoComplete="family-name"
                   error={fieldErrors.lastName}
@@ -462,7 +470,7 @@ export default function RegisterPage() {
                   label="รหัสนิสิต"
                   value={formData.nisitId}
                   onChange={handleInputChange}
-                  disabled={isLoading || uploadingCard}
+                  disabled={locked.nisitId || isLoading || uploadingCard}
                   readOnly={locked.nisitId}
                   autoComplete="student-id"
                   error={fieldErrors.nisitId}
@@ -470,12 +478,29 @@ export default function RegisterPage() {
                 />
 
                 <Field
+                  id="email"
+                  name="email"
+                  label="อีเมล"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  disabled={locked.email || isLoading || uploadingCard}
+                  readOnly={locked.email}
+                  autoComplete="email"
+                  error={fieldErrors.email}
+                  required
+                />
+
+                <Field
                   id="phone"
                   name="phone"
-                  label="เบอร์โทร"
+                  label={
+                    <>
+                      เบอร์โทร<span className="text-red-500">*</span>
+                    </>
+                  }
                   value={formData.phone}
                   onChange={handleInputChange}
-                  disabled={isLoading || uploadingCard}
+                  disabled={locked.phone || isLoading || uploadingCard}
                   readOnly={locked.phone}
                   type="tel"
                   inputMode="numeric"
@@ -489,7 +514,7 @@ export default function RegisterPage() {
                     htmlFor="dormitoryTypeId"
                     className={fieldErrors.dormitoryTypeId ? "text-red-600" : ""}
                   >
-                    ประเภทหอพัก <span className="text-red-500">*</span>
+                    ประเภทหอพัก<span className="text-red-500">*</span>
                   </Label>
                   {loadingDormitories ? (
                     <p className="text-sm text-gray-500">กำลังโหลดข้อมูลหอพัก...</p>
@@ -510,7 +535,7 @@ export default function RegisterPage() {
                                 setFieldErrors((prev) => ({ ...prev, dormitoryTypeId: undefined }))
                               }
                             }}
-                            disabled={isLoading || uploadingCard || locked.dormitoryTypeId}
+                            disabled={isLoading || uploadingCard}
                             className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300"
                           />
                           <Label
@@ -533,7 +558,7 @@ export default function RegisterPage() {
                     htmlFor="nisitCard"
                     className={fieldErrors.nisitCard ? "text-red-600" : ""}
                   >
-                    Upload student card
+                    อัปโหลดบัตรนิสิต
                   </Label>
 
                   <GoogleFileUpload
@@ -567,8 +592,8 @@ export default function RegisterPage() {
                   {uploadingCard
                     ? "กำลังอัปโหลดรูป..."
                     : submitting
-                    ? "กำลังสร้างบัญชี..."
-                    : "Create account"}
+                      ? "กำลังสร้างบัญชี..."
+                      : "Create account"}
                 </Button>
               </CardFooter>
             </form>
@@ -588,7 +613,7 @@ export default function RegisterPage() {
                 {consentLoading
                   ? "กำลังโหลดข้อความยินยอม..."
                   : consentText?.consent ||
-                    "ไม่สามารถโหลดข้อความยินยอมได้ กรุณาลองใหม่อีกครั้ง"}
+                  "ไม่สามารถโหลดข้อความยินยอมได้ กรุณาลองใหม่อีกครั้ง"}
               </div>
             </DialogDescription>
           </DialogHeader>
@@ -640,7 +665,7 @@ export default function RegisterPage() {
 function Field(props: {
   id: string
   name: string
-  label: string
+  label: React.ReactNode
   value: string
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   disabled?: boolean

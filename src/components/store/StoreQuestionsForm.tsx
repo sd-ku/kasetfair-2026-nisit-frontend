@@ -285,16 +285,14 @@ function StoreQuestionsFormContent({ canEdit = true }: StoreQuestionsFormProps) 
   }
 
   return (
-    <Card className="border-emerald-100 bg-white/90 shadow-md">
-      <CardHeader className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <CardTitle className="text-emerald-800">
-            คำถามเกี่ยวกับสภาพแวดล้อมของร้านค้า
-          </CardTitle>
-          <CardDescription>
-            ตอบคำถามเพียงไม่กี่ข้อเกี่ยวกับสถานที่ตั้งของร้านค้า คำตอบจะถูกบันทึกตามร้านค้า
-          </CardDescription>
-        </div>
+    <Card className="relative overflow-visible border-emerald-100 bg-white/90 shadow-md">
+      <CardHeader>
+        <CardTitle className="text-emerald-800">
+          คำถามเกี่ยวกับสภาพแวดล้อมของร้านค้า
+        </CardTitle>
+        <CardDescription className="text-sm">
+          ตอบคำถามเพียงไม่กี่ข้อเกี่ยวกับสถานที่ตั้งของร้านค้า คำตอบจะถูกบันทึกตามร้านค้า
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -365,7 +363,7 @@ function StoreQuestionsFormContent({ canEdit = true }: StoreQuestionsFormProps) 
 
         {!canEdit && (
           <p className="text-xs text-amber-700">
-            คุณไม่มีสิทธิ์ในการแก้ไขคำตอบนี้ กำลังดูเพียงอย่างเดียว
+            มีเพียงผู้ดูแลร้านเท่านั้นที่สามารถแก้ไขได้
           </p>
         )}
       </CardContent>
