@@ -134,7 +134,7 @@ function LoginForm() {
         )}
       </Button>
 
-      {/* <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-4">
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-300" />
@@ -143,9 +143,9 @@ function LoginForm() {
             <span className="px-2 bg-white text-gray-500">or</span>
           </div>
         </div>
-      </div> */}
+      </div>
 
-      {/* <Button
+      <Button
         type="button"
         onClick={handleGoogle}
         disabled={isLoading || cleaning || (status === "authenticated" && !hasAppToken())}
@@ -162,7 +162,7 @@ function LoginForm() {
             Continue with Google
           </>
         )}
-      </Button> */}
+      </Button>
     </>
   )
 }

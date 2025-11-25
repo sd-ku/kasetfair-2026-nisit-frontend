@@ -275,7 +275,7 @@ function StoreQuestionsFormContent({ canEdit = true }: StoreQuestionsFormProps) 
             ) : (
               <>
                 <Save className="mr-2 h-3 w-3" />
-                บันมึก
+                บันทึก
               </>
             )}
           </Button>

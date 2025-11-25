@@ -661,17 +661,17 @@ export default function HomePage() {
                 <DialogHeader>
                   <DialogTitle>ถ่ายโอนสิทธิ์เจ้าของร้าน</DialogTitle>
                   <DialogDescription>
-                    กรุณาระบุรหัสนิสิตหรืออีเมลของผู้ที่คุณต้องการมอบสิทธิ์ Admin ให้
+                    กรุณาระบุรหัสนิสิตของผู้ที่คุณต้องการมอบสิทธิ์ Admin ให้
                     <span className="block mt-2 text-red-500 font-medium text-xs">
                       คำเตือน: หลังจากโอนสิทธิ์แล้ว คุณจะเสียสถานะ Admin ทันที
                     </span>
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2 py-2">
-                  <Label htmlFor="newAdmin">รหัสนิสิต / อีเมลผู้รับช่วงต่อ</Label>
+                  <Label htmlFor="newAdmin">รหัสนิสิตผู้รับสิทธิ์</Label>
                   <Input
                     id="newAdmin"
-                    placeholder="ระบุรหัสนิสิต หรือ อีเมล"
+                    placeholder="ระบุรหัสนิสิต"
                     value={transferTargetId}
                     onChange={(e) => setTransferTargetId(e.target.value)}
                   />
