@@ -9,7 +9,7 @@ services:
         NEXT_PUBLIC_MEDIA_BASE_URL: ${NEXT_PUBLIC_MEDIA_BASE_URL}
         NEXTAUTH_URL: ${NEXTAUTH_URL}
     env_file:
-      - .env
+      - .env.production
     environment:
       NODE_ENV: production
       PORT: 3000
