@@ -36,9 +36,13 @@ export async function exchangeWithGoogleIdToken(idToken: string) {
   return data;
 }
 
-export function loginWithKU() {
+export function loginWithKU(callbackUrl?: string) {
   // ฝั่ง Next.js ให้ browser เด้งไปที่ backend ทันที
-  window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/ku/login`;
+  const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/auth/ku/login`);
+  if (callbackUrl) {
+    url.searchParams.set('callbackUrl', callbackUrl);
+  }
+  window.location.href = url.toString();
 }
 
 export async function logout() {

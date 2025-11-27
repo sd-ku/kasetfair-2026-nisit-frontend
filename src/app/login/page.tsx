@@ -125,7 +125,7 @@ function LoginForm() {
           type="button"
           onClick={() => {
             try {
-              loginWithKU()
+              loginWithKU(callbackUrl)
             } catch (e: any) {
               const errorMessage = typeof e?.response?.message === "string" ? e.response.message : "เข้าสู่ระบบด้วย KU All Login ล้มเหลว กรุณาลองใหม่อีกครั้ง"
               setErrMsg(errorMessage)
