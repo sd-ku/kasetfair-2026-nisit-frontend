@@ -1,7 +1,7 @@
 // page.tsx
 "use client"
 
-import { FormEvent } from "react"
+import { FormEvent, Suspense, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Plus, Trash2 } from "lucide-react"
 
@@ -14,8 +14,6 @@ import { StepSuccess } from "@/components/createStep/step-success"
 import { useCreateStoreStep, useStoreWizardCore } from "@/hooks/store-wizard"
 
 export const dynamic = 'force-dynamic'
-
-import { Suspense } from "react"
 
 function StoreCreateContent() {
   const router = useRouter()
@@ -46,46 +44,11 @@ function StoreCreateContent() {
     router.push("/store/layout")
   }
 
-  if (!storeType) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100 px-4 py-12">
-        <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 rounded-3xl bg-white/80 p-10 text-center shadow-xl ring-1 ring-emerald-100">
-          <h1 className="text-2xl font-semibold text-emerald-900">เลือกประเภทร้านค้าก่อนเริ่มลงทะเบียน</h1>
-          {loadingStatus ? (
-            <p className="text-sm text-emerald-700">กำลังโหลดสถานะการลงทะเบียนร้านล่าสุดของคุณ...</p>
-          ) : (
-            <>
-              <p className="text-sm text-emerald-700">
-                กรุณาเลือกประเภทร้านค้าเพื่อให้เราตั้งค่าขั้นตอนการลงทะเบียนให้เหมาะสม
-              </p>
-              <div className="grid w-full gap-3 sm:grid-cols-2">
-                <Button
-                  className="w-full justify-start gap-3 bg-emerald-600 text-white hover:bg-emerald-700"
-                  onClick={() => createStep.selectStoreType("Nisit")}
-                >
-                  ร้านนิสิต
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start gap-3 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                  onClick={() => createStep.selectStoreType("Club")}
-                >
-                  ร้านหน่วยงาน / ชมรม
-                </Button>
-              </div>
-              <Button
-                variant="ghost"
-                className="text-emerald-700 hover:bg-emerald-50"
-                onClick={() => router.push("/home")}
-              >
-                กลับหน้าแรก
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    )
-  }
+  useEffect(() => {
+    if (!storeType) {
+      router.push("/home")
+    }
+  }, [storeType])
 
   if (isPendingStore) {
     return (

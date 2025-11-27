@@ -19,9 +19,9 @@ export async function uploadMedia(
   formData.append("file", payload.file);
 
   const res = await http.post(`${MEDIA_SERVICE_API}/upload`, formData, {
-      headers: {
-          "Content-Type": "multipart/form-data",
-      },
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
   });
   return res.data
 }
@@ -116,7 +116,9 @@ export async function deleteMediaFromS3(mediaId: string) {
   return res.data
 }
 
-export async function getMediaUrl(mediaId: string): Promise<MediaInfoDto> {
-  const res = await http.get(`/api/media/s3/${mediaId}`)
+export async function getMediaUrl(mediaId: string, options?: { skipRedirect?: boolean }): Promise<MediaInfoDto> {
+  const res = await http.get(`/api/media/s3/${mediaId}`, {
+    skipRedirect: options?.skipRedirect
+  } as any)
   return res.data
 }

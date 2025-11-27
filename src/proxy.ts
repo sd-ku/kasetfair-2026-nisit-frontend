@@ -95,7 +95,7 @@ export default async function proxy(req: NextRequest) {
     if (target) return NextResponse.redirect(target)
     return NextResponse.next()
   }
-  
+
   // กัน loop: ถ้าหมดอายุชัด ๆ ให้ลบคุกกี้ก่อน แล้วค่อยส่งไป /login
   if (isExpiredFast(rawAuth)) {
     const target = buildLoginRedirectSafe(url)

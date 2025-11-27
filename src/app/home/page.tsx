@@ -163,8 +163,15 @@ export default function HomePage() {
     setLoadingStore(true)
     setStoreError(null)
     try {
-      const res = await getStoreValidate()
-      setValidationData(res || null)
+      const data = await getStoreValidate()
+      if (data.store.state.toLowerCase() === "createstore") {
+        if (data.store.type.toLowerCase() === "club") {
+          router.push("/store/create?type=Club")
+        } else {
+          router.push("/store/create?type=Nisit")
+        }
+      }
+      setValidationData(data || null)
     } catch (err: any) {
       const status = err?.response?.status ?? err?.status
       if (status === 404) {
@@ -192,8 +199,8 @@ export default function HomePage() {
     setLoadingUser(true)
     setUserError(null)
     try {
-      const res = await getNisitInfo()
-      setUserInfo(res || null)
+      const data = await getNisitInfo()
+      setUserInfo(data || null)
     } catch (err: any) {
       const status = err?.response?.status ?? err?.status
       if (status === 404) {
@@ -315,7 +322,7 @@ export default function HomePage() {
 
   const handleSelectStoreType = (type: "Nisit" | "Club") => {
     if (type === "Club") {
-      router.push(`/store/create/club-info`)
+      router.push(`/store/create?type=Club`)
     } else {
       router.push(`/store/create?type=Nisit`)
     }
