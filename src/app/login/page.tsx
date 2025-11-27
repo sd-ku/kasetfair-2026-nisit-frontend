@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, ArrowRight, Shield } from "lucide-react"
 import { exchangeWithGoogleIdToken } from "@/services/authService"
 import { loginWithKU } from "@/services/authService"
+import { toast } from "@/lib/toast"
 
 // --- utils ---
 const hasAppToken = () =>
@@ -48,8 +49,16 @@ function LoginForm() {
         if (cleaning) return
         setCleaning(true)
         setErrMsg(null)
-        await signOut({ redirect: false }) // ลบ next-auth.session-token
-        setCleaning(false)
+        try {
+          await signOut({ redirect: false }) // ลบ next-auth.session-token
+        } catch (e: any) {
+          toast({
+            variant: "error",
+            description: "เกิดข้อผิดพลาดในการล้างเซสชัน กรุณาลองใหม่อีกครั้ง"
+          })
+        } finally {
+          setCleaning(false)
+        }
       }
     }
     run()
@@ -76,8 +85,13 @@ function LoginForm() {
         }
       } catch (e: any) {
         // ล้มเหลว → กลับหน้า login พร้อมข้อความ และเคลียร์ session เผื่อ token ตกค้าง
+        const errorMessage = typeof e?.response?.message === "string" ? e.response.message : "เข้าสู่ระบบล้มเหลว กรุณาลองใหม่อีกครั้ง"
+        setErrMsg(errorMessage)
+        toast({
+          variant: "error",
+          description: errorMessage
+        })
         await signOut({ redirect: false })
-        setErrMsg(typeof e?.message === "string" ? e.message : "Sign-in failed, please try again.")
       } finally {
         exchangingRef.current = false
       }
@@ -91,50 +105,52 @@ function LoginForm() {
     try {
       // ให้ NextAuth redirect เอง → โค้ดหลังจากนี้ปกติจะไม่รันถ้า redirect
       await signIn("google", { callbackUrl: "/login" })
+    } catch (e: any) {
+      const errorMessage = typeof e?.response?.message === "string" ? e.response.message : "เข้าสู่ระบบด้วย Google ล้มเหลว กรุณาลองใหม่อีกครั้ง"
+      setErrMsg(errorMessage)
+      toast({
+        variant: "error",
+        description: errorMessage
+      })
     } finally {
       setIsLoading(false)
     }
   }
 
-  // 3) ปรับ UX: ถ้ามาจาก reason=expired ให้แจ้งชัด ๆ
-  const banner =
-    errMsg
-      ? errMsg
-      : error === "OAuthAccountNotLinked"
-        ? "อีเมลนี้เคยสมัครด้วยผู้ให้บริการอื่นไว้ กรุณาใช้วิธีเดิมที่เคยสมัคร"
-        : reason === "expired"
-          ? "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่"
-          : null
-
   return (
     <>
-      {banner && (
-        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-amber-800 text-sm">{banner}</p>
-        </div>
-      )}
-
       {/* KU All Login – ขึ้นมาเป็นปุ่มหลักแทน Google */}
-      <Button
-        type="button"
-        onClick={() => loginWithKU()}
-        disabled={isLoading || cleaning}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-      >
-        {isLoading || cleaning ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            {cleaning ? "Clearing session..." : "Signing in with KU All Login..."}
-          </>
-        ) : (
-          <>
-            Continue with KU All Login
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </>
-        )}
-      </Button>
+      <div className="space-y-6">
+        <Button
+          type="button"
+          onClick={() => {
+            try {
+              loginWithKU()
+            } catch (e: any) {
+              const errorMessage = typeof e?.response?.message === "string" ? e.response.message : "เข้าสู่ระบบด้วย KU All Login ล้มเหลว กรุณาลองใหม่อีกครั้ง"
+              setErrMsg(errorMessage)
+              toast({
+                variant: "error",
+                description: errorMessage
+              })
+            }
+          }}
+          disabled={isLoading || cleaning}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+        >
+          {isLoading || cleaning ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {cleaning ? "Clearing session..." : "Signing in with KU All Login..."}
+            </>
+          ) : (
+            <>
+              Continue with KU ALL-Login
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </>
+          )}
+        </Button>
 
-      <div className="mt-6 space-y-4">
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-300" />
@@ -143,26 +159,26 @@ function LoginForm() {
             <span className="px-2 bg-white text-gray-500">or</span>
           </div>
         </div>
-      </div>
 
-      <Button
-        type="button"
-        onClick={handleGoogle}
-        disabled={isLoading || cleaning || (status === "authenticated" && !hasAppToken())}
-        variant="outline"
-        className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
-      >
-        {isLoading || cleaning ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            {cleaning ? "Clearing session..." : "Signing in with Google..."}
-          </>
-        ) : (
-          <>
-            Continue with Google
-          </>
-        )}
-      </Button>
+        <Button
+          type="button"
+          onClick={handleGoogle}
+          disabled={isLoading || cleaning || (status === "authenticated" && !hasAppToken())}
+          variant="outline"
+          className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
+        >
+          {isLoading || cleaning ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {cleaning ? "Clearing session..." : "Signing in with Google..."}
+            </>
+          ) : (
+            <>
+              Admin Login
+            </>
+          )}
+        </Button>
+      </div>
     </>
   )
 }
