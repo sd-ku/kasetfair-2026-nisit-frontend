@@ -63,19 +63,19 @@ export async function updateClubInfo(payload: UpdateClubInfoRequestDto): Promise
 }
 
 export async function getClubInfo(): Promise<ClubInfoResponseDto | null> {
-  const res = await http.get(CLUB_INFO_ENDPOINT)
+  // const res = await http.get(CLUB_INFO_ENDPOINT)
 
-  return res.data ?? null
+  // return res.data ?? null
 
-  // try {
-  //   const res = await http.get(CLUB_INFO_ENDPOINT)
+  try {
+    const res = await http.get(CLUB_INFO_ENDPOINT)
 
-  //   return res.data ?? null
-  // } catch (error: any) {
-  //   const status = error?.response?.status ?? error?.status
-  //   if (status === 404) {
-  //     return null
-  //   }
-  //   throw new Error(extractErrorMessage(error, "Failed to load organization information"))
-  // }
+    return res.data ?? null
+  } catch (error: any) {
+    const status = error?.response?.status ?? error?.status
+    if (status === 404) {
+      return null
+    }
+    throw new Error(extractErrorMessage(error, "Failed to load organization information"))
+  }
 }

@@ -34,6 +34,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { ClubInfoResponseDto } from "@/services/dto/club-info.dto"
+import { toast } from "@/lib/toast"
 
 export type ClubInfoFormValues = {
   clubName: string
@@ -58,6 +59,8 @@ type InitialUploadedFile = {
   type?: string
 }
 
+const CLUB_INFO_STORAGE_KEY = "club_info_draft"
+
 const emptyValues: ClubInfoFormValues = {
   clubName: "",
   leaderFirstName: "",
@@ -67,6 +70,39 @@ const emptyValues: ClubInfoFormValues = {
   leaderPhone: "",
   clubApplicationMediaId: null,
   applicationFileName: null,
+}
+
+// Load from local storage
+const loadFromLocalStorage = (): Partial<ClubInfoFormValues> | null => {
+  if (typeof window === "undefined") return null
+  try {
+    const stored = localStorage.getItem(CLUB_INFO_STORAGE_KEY)
+    if (!stored) return null
+    return JSON.parse(stored)
+  } catch (error) {
+    console.error("Failed to load from local storage", error)
+    return null
+  }
+}
+
+// Save to local storage
+const saveToLocalStorage = (values: ClubInfoFormValues) => {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(CLUB_INFO_STORAGE_KEY, JSON.stringify(values))
+  } catch (error) {
+    console.error("Failed to save to local storage", error)
+  }
+}
+
+// Clear local storage
+const clearLocalStorage = () => {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.removeItem(CLUB_INFO_STORAGE_KEY)
+  } catch (error) {
+    console.error("Failed to clear local storage", error)
+  }
 }
 
 const translateFieldErrors = (
@@ -135,10 +171,19 @@ export default function ClubInfoPage() {
     setLoadError(null)
     try {
       const clubInfo = await getClubInfo()
+
+      // Load from local storage
+      const localData = loadFromLocalStorage()
+
       if (clubInfo) {
         const filled = buildFormValues(clubInfo)
         setSavedValues(filled)
-        setValues(filled)
+
+        // Merge with local storage data (prioritize local storage for unsaved changes)
+        const mergedValues = localData
+          ? { ...filled, ...localData }
+          : filled
+        setValues(mergedValues)
 
         if (clubInfo.clubApplicationMediaId) {
           try {
@@ -154,6 +199,10 @@ export default function ClubInfoPage() {
             ])
           } catch (err) {
             console.error("Failed to fetch club application file", err)
+            toast({
+              variant: "error",
+              description: "ไม่สามารถโหลดไฟล์ใบคำร้องได้",
+            })
           }
         } else {
           setInitialUploadedFiles([])
@@ -161,18 +210,31 @@ export default function ClubInfoPage() {
 
         setUploadedFiles([])
       } else {
+        // No server data, use local storage or empty values
         setSavedValues(null)
-        setValues(emptyValues)
+        const initialValues = localData
+          ? { ...emptyValues, ...localData }
+          : emptyValues
+        setValues(initialValues)
         setInitialUploadedFiles([])
         setUploadedFiles([])
       }
     } catch (error) {
       console.error("Failed to load club information", error)
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Unable to load organization information."
-      )
+      const msg = error instanceof Error
+        ? error?.message
+        : "ไม่สามารถโหลดข้อมูลองค์กรได้"
+      setLoadError(msg)
+      toast({
+        variant: "error",
+        description: msg,
+      })
+
+      // Even on error, try to load from local storage
+      const localData = loadFromLocalStorage()
+      if (localData) {
+        setValues({ ...emptyValues, ...localData })
+      }
     } finally {
       setLoading(false)
     }
@@ -192,10 +254,15 @@ export default function ClubInfoPage() {
     !values.leaderPhone.trim()
 
   const handleChange = (key: keyof ClubInfoFormValues, value: string) => {
-    setValues((prev) => ({
-      ...prev,
-      [key]: value,
-    }))
+    setValues((prev) => {
+      const updated = {
+        ...prev,
+        [key]: value,
+      }
+      // Save to local storage on every change
+      saveToLocalStorage(updated)
+      return updated
+    })
   }
 
   const handleFilesChange = (files: File[]) => {
@@ -263,7 +330,12 @@ export default function ClubInfoPage() {
           if (result.errors?.length) {
             const nextErrors = translateFieldErrors(result.errors)
             setFieldErrors(nextErrors)
-            setGeneralError("Please fix the highlighted fields and try again.")
+            const msg = "กรุณาตรวจสอบข้อมูลที่ไฮไลท์และลองใหม่อีกครั้ง"
+            setGeneralError(msg)
+            toast({
+              variant: "error",
+              description: msg,
+            })
             return
           }
 
@@ -282,7 +354,10 @@ export default function ClubInfoPage() {
               setInitialUploadedFiles([
                 {
                   id: clubApplicationMediaId,
-                  name: media.originalName ?? applicationFileName ?? "club_application",
+                  name:
+                    media.originalName ??
+                    applicationFileName ??
+                    "club_application",
                   url: media.link ?? "",
                   size: media.size,
                   type: media.mimeType,
@@ -298,6 +373,12 @@ export default function ClubInfoPage() {
 
           // ✅ ถ้า response ที่กลับมาครบแล้ว → ไปหน้า /store/create
           if (isClubInfoComplete(newValues)) {
+            // Clear local storage after successful save
+            clearLocalStorage()
+            toast({
+              variant: "success",
+              description: "บันทึกข้อมูลสำเร็จ กำลังดำเนินการต่อ...",
+            })
             router.push("/store/create")
             return
           }
@@ -326,7 +407,10 @@ export default function ClubInfoPage() {
               setInitialUploadedFiles([
                 {
                   id: clubApplicationMediaId,
-                  name: media.originalName ?? applicationFileName ?? "club_application",
+                  name:
+                    media.originalName ??
+                    applicationFileName ??
+                    "club_application",
                   url: media.link ?? "",
                   size: media.size,
                   type: media.mimeType,
@@ -342,22 +426,37 @@ export default function ClubInfoPage() {
 
           // ✅ ถ้า response ที่กลับมาครบแล้ว → ไปหน้า /store/create
           if (isClubInfoComplete(newValues)) {
+            // Clear local storage after successful save
+            clearLocalStorage()
+            toast({
+              variant: "success",
+              description: "บันทึกข้อมูลสำเร็จ กำลังดำเนินการต่อ...",
+            })
             router.push("/store/create")
             return
           }
         }
 
         // กรณีข้อมูลยังไม่ครบ / ไม่มีไฟล์แนบ → แค่แจ้งว่าบันทึกแล้ว แต่ไม่เด้งหน้า
-        setSuccessMessage(
-          "Organization information saved. You can continue to the store wizard."
-        )
+        // Clear local storage after successful save (even if incomplete)
+        clearLocalStorage()
+        const msg = "บันทึกข้อมูลองค์กรเรียบร้อยแล้ว"
+        setSuccessMessage(msg)
+        toast({
+          variant: "success",
+          description: msg,
+        })
       } catch (error) {
         console.error("Failed to save club information", error)
-        setGeneralError(
+        const msg =
           error instanceof Error
             ? error.message
-            : "Unable to save organization information."
-        )
+            : "ไม่สามารถบันทึกข้อมูลองค์กรได้"
+        setGeneralError(msg)
+        toast({
+          variant: "error",
+          description: msg,
+        })
       } finally {
         setSubmitting(false)
       }

@@ -322,7 +322,7 @@ export default function HomePage() {
 
   const handleSelectStoreType = (type: "Nisit" | "Club") => {
     if (type === "Club") {
-      router.push(`/store/create?type=Club`)
+      router.push(`/store/create/club-info`)
     } else {
       router.push(`/store/create?type=Nisit`)
     }
@@ -597,11 +597,11 @@ export default function HomePage() {
                     </>
                   )}
                 </Button>
-                {!selectingStoreType && (
+                {/* {!selectingStoreType && (
                   <p className="text-center text-xs text-gray-400">
                     หรือรอรับคำเชิญจากเพื่อนของคุณ
                   </p>
-                )}
+                )} */}
 
                 <AnimatePresence initial={false}>
                   {selectingStoreType && (

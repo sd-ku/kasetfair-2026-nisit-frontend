@@ -44,11 +44,11 @@ function StoreCreateContent() {
     router.push("/store/layout")
   }
 
-  useEffect(() => {
-    if (!storeType) {
-      router.push("/home")
-    }
-  }, [storeType])
+  // useEffect(() => {
+  //   if (!storeType) {
+  //     router.push("/home")
+  //   }
+  // }, [storeType])
 
   if (isPendingStore) {
     return (
