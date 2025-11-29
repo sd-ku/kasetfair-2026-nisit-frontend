@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { StepSuccess } from "@/components/createStep/step-success"
 import { useCreateStoreStep, useStoreWizardCore } from "@/hooks/store-wizard"
+import { getEmailStatusToText } from "@/utils/labelConverter"
 
 export const dynamic = 'force-dynamic'
 
@@ -183,8 +184,10 @@ function StoreCreateContent() {
                         {showWarning && (
                           <p className="text-xs text-red-600 ml-1">
                             สถานะอีเมลนี้ในระบบ:
-                            {" "}
-                            <strong>{emailStatus.status}</strong>
+                            {/* {" "} */}
+                            <strong>
+                              {getEmailStatusToText(emailStatus.status)}
+                            </strong>
                           </p>
                         )}
                         <div className="flex items-center gap-3">

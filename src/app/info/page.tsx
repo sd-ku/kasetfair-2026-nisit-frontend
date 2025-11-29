@@ -14,6 +14,7 @@ import type { NisitInfo } from "@/services/dto/nisit-info.dto"
 import { GoogleFileUpload } from "@/components/uploadFile"
 import { getMediaUrl, uploadMediaViaPresign } from "@/services/mediaService"
 import { MediaPurpose } from "@/services/dto/media.dto"
+import { extractErrorMessage } from "@/services/utils/extractErrorMsg"
 
 type FormState = {
   firstName: string
@@ -181,10 +182,11 @@ export default function EditNisitPage() {
 
     } catch (err) {
       console.error(err)
+      const msg = extractErrorMessage(err, "เกิดข้อผิดพลาดระหว่างบันทึกข้อมูล กรุณาลองใหม่")
       toast({
         variant: "destructive",
         title: "เกิดข้อผิดพลาด",
-        description: "เกิดข้อผิดพลาดระหว่างบันทึกข้อมูล กรุณาลองใหม่",
+        description: msg,
       })
     } finally {
       setSaving(false)

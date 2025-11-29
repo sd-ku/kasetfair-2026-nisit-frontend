@@ -17,3 +17,14 @@ export const convertStoreTypeToLabel = (type: string): string => {
         default: return "ไม่ระบุ"
     }
 }
+
+export const getEmailStatusToText = (status: string) => {
+    switch (status) {
+        case "NotFound":
+            return "ไม่พบ email นี้ในระบบ กรุณาลงทะเบียนก่อน"
+        case "Joined":
+            return "เข้าร่วมร้านค้าแล้ว"
+        default:
+            return status
+    }
+}

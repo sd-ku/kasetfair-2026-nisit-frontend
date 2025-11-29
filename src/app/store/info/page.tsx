@@ -18,6 +18,8 @@ import { getNisitInfo } from "@/services/nisitService"
 import { isStoreAdmin as isStoreAdminUtil } from "@/utils/storeAdmin"
 import { convertStateToLabel, convertStoreTypeToLabel } from "@/utils/labelConverter"
 
+import { getEmailStatusToText } from "@/utils/labelConverter"
+
 const ensureMemberFields = (emails: string[]): string[] => (emails.length ? emails : [""])
 
 export default function StoreInfoPage() {
@@ -93,7 +95,7 @@ export default function StoreInfoPage() {
           setCurrentUserNisitId(profile.nisitId)
         }
       } catch (error) {
-        console.error("Failed to load current user profile", error)
+        console.error("ไม่สามารถโหลดข้อมูลผู้ใช้ปัจจุบันได้", error)
       }
     })()
   }, [])
@@ -123,7 +125,7 @@ export default function StoreInfoPage() {
   const handleStoreSubmit = async (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
     if (!canEditStore) {
-      setStoreError("Only the store admin can update store information.")
+      setStoreError("มีเพียง admin ที่สามารถแก้ไขข้อมูลร้านได้")
       return
     }
     if (!store) return
@@ -273,8 +275,8 @@ export default function StoreInfoPage() {
                             <div key={`member-${index}`} className="space-y-1">
                               {status && (
                                 <p className={`ml-1 text-xs ${showWarn ? "text-red-600" : "text-emerald-700"}`}>
-                                  {showWarn ? "อีเมลนี้ยังไม่ยืนยัน: " : "สถานะสมาชิก: "}
-                                  <strong>{status}</strong>
+                                  {"สถานะ: "}
+                                  <strong>{getEmailStatusToText(status)}</strong>
                                 </p>
                               )}
 
