@@ -15,6 +15,7 @@ import {
   X,
   UploadCloud
 } from "lucide-react"
+import { toast } from "@/lib/toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -105,9 +106,13 @@ export default function StoreGoodsPage() {
     setGoodsMessage(null)
     try {
       const data = await listGoods()
-      setGoods(data)
+      // Sort by createdAt descending (newest first)
+      const sortedData = [...data].sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
+      setGoods(sortedData)
       setGoodDrafts(
-        data.reduce<Record<string, GoodDraft>>((acc, item) => {
+        sortedData.reduce<Record<string, GoodDraft>>((acc, item) => {
           acc[item.id] = {
             name: item.name ?? "",
             price: item.price?.toString() ?? "",
@@ -120,10 +125,14 @@ export default function StoreGoodsPage() {
       // Reset pending uploads เมื่อโหลดข้อมูลใหม่
       setPendingUploads({})
       setGoodImageUrls({}) // Clear old urls
-      await loadGoodImages(data)
+      await loadGoodImages(sortedData)
       setGoodFieldErrors({})
     } catch (error) {
       setGoodsError(extractErrorMessage(error, "ไม่สามารถโหลดสินค้าของร้านได้"))
+      toast({
+        variant: "error",
+        description: "ไม่สามารถโหลดสินค้าของร้านได้",
+      })
     } finally {
       setLoadingGoods(false)
     }
@@ -219,7 +228,7 @@ export default function StoreGoodsPage() {
   }
 
   // --- Modified: Handle Save (Upload + Update) ---
-  const handleSaveGood = async (goodId: string) => {
+  const handleSaveGood = async (goodId: string, showToast = true) => {
     const draft = goodDrafts[goodId]
     if (!draft) return
 
@@ -232,6 +241,12 @@ export default function StoreGoodsPage() {
         [goodId]: { ...(prev[goodId] ?? {}), name: "กรุณากรอกชื่อสินค้า" },
       }))
       setGoodsError(null)
+      if (showToast) {
+        toast({
+          variant: "error",
+          description: "กรุณากรอกชื่อสินค้า",
+        })
+      }
       return
     }
     if (typeof parsedPrice !== "number" || Number.isNaN(parsedPrice)) {
@@ -240,6 +255,12 @@ export default function StoreGoodsPage() {
         [goodId]: { ...(prev[goodId] ?? {}), price: "กรุณากรอกราคาสินค้าให้ถูกต้อง" },
       }))
       setGoodsError(null)
+      if (showToast) {
+        toast({
+          variant: "error",
+          description: "กรุณากรอกราคาสินค้าให้ถูกต้อง",
+        })
+      }
       return
     }
 
@@ -309,12 +330,25 @@ export default function StoreGoodsPage() {
         return next
       })
 
+      if (showToast) {
+        toast({
+          variant: "success",
+          description: "บันทึกสินค้าเรียบร้อยแล้ว",
+        })
+      }
+
     } catch (error) {
       const msg = extractErrorMessage(error, "ไม่สามารถบันทึกสินค้านี้ได้")
       setGoodRowErrors((prev) => ({
         ...prev,
         [goodId]: msg,
       }))
+      if (showToast) {
+        toast({
+          variant: "error",
+          description: msg,
+        })
+      }
       throw error
     } finally {
       setSavingGoodsMap((prev) => ({ ...prev, [goodId]: false }))
@@ -345,8 +379,16 @@ export default function StoreGoodsPage() {
         return next
       })
       setGoodsMessage("ลบสินค้าเรียบร้อยแล้ว")
+      toast({
+        variant: "success",
+        description: "ลบสินค้าเรียบร้อยแล้ว",
+      })
     } catch (error) {
       setGoodsError(extractErrorMessage(error, "ไม่สามารถลบสินค้าได้"))
+      toast({
+        variant: "error",
+        description: "ไม่สามารถลบสินค้าได้",
+      })
     } finally {
       setDeletingGoodsMap((prev) => ({ ...prev, [goodId]: false }))
     }
@@ -386,14 +428,34 @@ export default function StoreGoodsPage() {
     })
 
     try {
+      let finalMediaId = undefined
+
+      // ตรวจสอบว่ามีไฟล์รออัปโหลดหรือไม่
+      const pendingFile = pendingUploads[draft.tempId]
+      if (pendingFile) {
+        try {
+          const uploadRes = await uploadMediaViaPresign({
+            purpose: MediaPurpose.STORE_GOODS,
+            file: pendingFile,
+          })
+          if (!uploadRes?.mediaId) {
+            throw new Error("อัปโหลดรูปไม่สำเร็จ (No Media ID)")
+          }
+          finalMediaId = uploadRes.mediaId
+        } catch (uploadErr) {
+          throw new Error(`อัปโหลดรูปภาพล้มเหลว: ${extractErrorMessage(uploadErr)}`)
+        }
+      }
+
       const created = await createGood({
         name: trimmedName,
         price: parsedPrice,
         type: "Food",
+        goodMediaId: finalMediaId,
       })
 
       setGoods((prev) => {
-        const next = [...prev, created]
+        const next = [created, ...prev]
         loadGoodImages(next)
         return next
       })
@@ -421,6 +483,19 @@ export default function StoreGoodsPage() {
         delete next[draft.tempId]
         return next
       })
+
+      // Cleanup temp data
+      setPendingUploads((prev) => {
+        const next = { ...prev }
+        delete next[draft.tempId]
+        return next
+      })
+      setGoodImageUrls((prev) => {
+        const next = { ...prev }
+        delete next[draft.tempId]
+        return next
+      })
+
     } catch (error) {
       const msg = extractErrorMessage(error, "ไม่สามารถเพิ่มสินค้านี้ได้ กรุณาลองใหม่")
       setGoodRowErrors((prev) => ({
@@ -462,6 +537,16 @@ export default function StoreGoodsPage() {
       delete next[tempId]
       return next
     })
+    setPendingUploads((prev) => {
+      const next = { ...prev }
+      delete next[tempId]
+      return next
+    })
+    setGoodImageUrls((prev) => {
+      const next = { ...prev }
+      delete next[tempId]
+      return next
+    })
   }
 
   const handleSaveAllGoods = async (event?: React.FormEvent<HTMLFormElement>) => {
@@ -483,7 +568,7 @@ export default function StoreGoodsPage() {
 
       const validNewDrafts = draftNewGoods.filter((draft) => draft.name.trim() !== "" && draft.price.trim() !== "")
 
-      const updateResults = await Promise.allSettled(dirtyExistingGoods.map((good) => handleSaveGood(good.id)))
+      const updateResults = await Promise.allSettled(dirtyExistingGoods.map((good) => handleSaveGood(good.id, false)))
       const createResults = await Promise.allSettled(validNewDrafts.map((draft) => handleCreateDraftNewGood(draft)))
 
       const allResults = [...updateResults, ...createResults]
@@ -495,8 +580,16 @@ export default function StoreGoodsPage() {
         setGoodsError(
           `บันทึกสำเร็จ ${successCount} รายการ แต่มี ${failure.length} รายการบันทึกไม่สำเร็จ อาจถูกลบไปแล้วหรือเกิดข้อผิดพลาด กรุณารีหน้าเพื่อตรวจสอบอีกครั้ง`,
         )
+        toast({
+          variant: "warning",
+          description: `บันทึกสำเร็จ ${successCount} รายการ, ล้มเหลว ${failure.length} รายการ`,
+        })
       } else {
         setGoodsMessage(`บันทึกการเปลี่ยนแปลงสำเร็จ ${successCount} รายการ`)
+        toast({
+          variant: "success",
+          description: `บันทึกการเปลี่ยนแปลงสำเร็จ ${successCount} รายการ`,
+        })
       }
     } finally {
       setSavingAllGoods(false)
@@ -563,19 +656,47 @@ export default function StoreGoodsPage() {
             {draftNewGoods.map((draft) => {
               const fieldErrors = goodFieldErrors[draft.tempId]
               const rowError = goodRowErrors[draft.tempId]
+              const imageUrl = goodImageUrls[draft.tempId]
 
               return (
                 <Card
                   key={draft.tempId}
                   className="group relative overflow-hidden border-0 bg-white shadow-lg ring-2 ring-emerald-500/20 rounded-xl flex flex-col"
                 >
-                  <div className="relative aspect-[4/3] w-full bg-emerald-50 flex items-center justify-center overflow-hidden">
-                    <ImageIcon className="h-10 w-10 text-emerald-200" />
+                  <div className="relative aspect-[4/3] w-full bg-emerald-50 flex items-center justify-center overflow-hidden group/image">
+                    {/* Preview Image */}
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt="New good preview"
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="h-10 w-10 text-emerald-200" />
+                    )}
+
+                    {/* Upload Overlay */}
+                    <div className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity ${imageUrl ? "opacity-0 group-hover/image:opacity-100" : "opacity-0 hover:opacity-100"}`}>
+                      <div className="relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg hover:bg-emerald-700 transition-all cursor-pointer hover:scale-105 ring-2 ring-white">
+                        <span className="flex items-center gap-2 font-medium">
+                          <UploadCloud className="h-3 w-3" />
+                          {imageUrl ? "เปลี่ยนรูป" : "เพิ่มรูป"}
+                        </span>
+                        <GoogleFileUpload
+                          maxFiles={1}
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          onFilesChange={(files) => handleGoodFileChange(draft.tempId, files)}
+                          disabled={savingAllGoods}
+                          className="absolute inset-0 cursor-pointer opacity-0 w-full h-full"
+                        />
+                      </div>
+                    </div>
+
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute top-2 right-2 h-8 w-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-white/80"
+                      className="absolute top-2 right-2 h-8 w-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-white/80 z-10"
                       onClick={() => handleRemoveDraftNewGood(draft.tempId)}
                     >
                       <Trash2 className="h-4 w-4" />
