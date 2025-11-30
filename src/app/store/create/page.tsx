@@ -1,7 +1,7 @@
 // page.tsx
 "use client"
 
-import { FormEvent, Suspense, useEffect } from "react"
+import { FormEvent, Suspense, useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Plus, Trash2 } from "lucide-react"
 
@@ -11,45 +11,202 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { StepSuccess } from "@/components/createStep/step-success"
-import { useCreateStoreStep, useStoreWizardCore } from "@/hooks/store-wizard"
 import { getEmailStatusToText } from "@/utils/labelConverter"
+import { createStore } from "@/services/storeDraftService"
+import { toast } from "@/lib/toast"
+import { getStoreStatus } from "@/services/storeServices"
+import type { StoreResponseDto } from "@/services/dto/store-info.dto"
 
 export const dynamic = 'force-dynamic'
 
+type MemberStatus = {
+  email: string
+  status: string
+}
+
+const STORAGE_KEY_STORE_NAME = "kasetfair_draft_store_name"
+const STORAGE_KEY_MEMBERS = "kasetfair_draft_members"
+
 function StoreCreateContent() {
   const router = useRouter()
-  const core = useStoreWizardCore()
-  const createStep = useCreateStoreStep(core)
 
-  const { storeType, storeStatus, storeAdminNisitId, isStoreAdmin, loadingStatus, stepError } = core
+  // Local state management
+  const [storeName, setStoreName] = useState("")
+  const [members, setMembers] = useState<string[]>(["", "", ""])
+  const [memberStatuses, setMemberStatuses] = useState<MemberStatus[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [storeStatus, setStoreStatus] = useState<StoreResponseDto | null>(null)
+  const [loadingStatus, setLoadingStatus] = useState(true)
 
-  // ร้านที่มี status แล้วแต่ยังไม่มี admin -> ถือว่ายังไม่ถูก claim ให้แก้ไขได้
-  const isUnassignedStore = !!storeStatus && !storeStatus.storeAdminNisitId
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedStoreName = localStorage.getItem(STORAGE_KEY_STORE_NAME)
+    const savedMembers = localStorage.getItem(STORAGE_KEY_MEMBERS)
 
-  const canEditStore =
-    !storeStatus || // ยังไม่มีร้านในระบบ
-    isStoreAdmin || // เราเป็น admin ของร้านนี้
-    isUnassignedStore // ร้านนี้ยังไม่มี admin
+    if (savedStoreName) {
+      setStoreName(savedStoreName)
+    }
 
-  const allowCreateSubmit =
-    canEditStore &&
-    (!storeStatus || (storeStatus.state !== "Pending" && storeStatus.state !== "Submitted"))
-  const isPendingStore = storeStatus?.state === "Pending"
+    if (savedMembers) {
+      try {
+        const parsed = JSON.parse(savedMembers)
+        if (Array.isArray(parsed) && parsed.length >= 3) {
+          setMembers(parsed)
+        }
+      } catch (e) {
+        console.error("Failed to parse saved members", e)
+      }
+    }
+  }, [])
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  // Check store status
+  useEffect(() => {
+    (async () => {
+      setLoadingStatus(true)
+      try {
+        const data = await getStoreStatus()
+        setStoreStatus(data)
+
+        // If store is pending, clear localStorage
+        if (data.state === "Pending") {
+          localStorage.removeItem(STORAGE_KEY_STORE_NAME)
+          localStorage.removeItem(STORAGE_KEY_MEMBERS)
+        }
+      } catch (error: any) {
+        const status = error?.response?.status ?? null
+        if (status !== 404) {
+          console.error("Failed to load store status", error)
+        }
+        // 404 is expected if no store exists yet
+      } finally {
+        setLoadingStatus(false)
+      }
+    })()
+  }, [])
+
+  const handleMemberChange = useCallback((index: number, value: string) => {
+    setMembers(prev => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
+  }, [])
+
+  const addMember = useCallback(() => {
+    setMembers(prev => [...prev, ""])
+  }, [])
+
+  const removeMember = useCallback((index: number) => {
+    setMembers(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
+  const handleSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    await createStep.submitCreateStore()
+
+    if (isSubmitting) return
+
+    const trimmedName = storeName.trim()
+    const memberGmails = members.map(email => email.trim()).filter(Boolean)
+
+    // Validation
+    if (!trimmedName) {
+      const msg = "กรุณากรอกชื่อร้าน"
+      setError(msg)
+      toast({
+        variant: "error",
+        description: msg,
+      })
+      return
+    }
+
+    if (memberGmails.length < 3) {
+      const msg = "กรุณากรอกอีเมลสมาชิกอย่างน้อย 3 คน"
+      setError(msg)
+      toast({
+        variant: "error",
+        description: msg,
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+    setError(null)
+
+    // Save to localStorage before submitting
+    localStorage.setItem(STORAGE_KEY_STORE_NAME, trimmedName)
+    localStorage.setItem(STORAGE_KEY_MEMBERS, JSON.stringify(memberGmails))
+
+    try {
+      const payload = {
+        storeName: trimmedName,
+        type: "Nisit" as const,
+        memberGmails,
+      }
+
+      const response = await createStore(payload)
+
+      // Success - clear localStorage and redirect
+      localStorage.removeItem(STORAGE_KEY_STORE_NAME)
+      localStorage.removeItem(STORAGE_KEY_MEMBERS)
+
+      toast({
+        variant: "success",
+        description: "สร้างร้านค้าสำเร็จ",
+      })
+
+      // Reload store status
+      const updatedStatus = await getStoreStatus()
+      setStoreStatus(updatedStatus)
+
+      // If pending, show success page
+      if (updatedStatus.state === "Pending") {
+        // The component will re-render and show StepSuccess
+        return
+      }
+
+      // Otherwise redirect to next step
+      router.push("/store/layout")
+    } catch (err: any) {
+      console.error("Failed to create store", err)
+
+      // Check if error response has member statuses
+      const errorData = err?.response?.data
+
+      if (errorData?.members && Array.isArray(errorData.members)) {
+        // Update member statuses from error response
+        setMemberStatuses(errorData.members)
+
+        // Set error message
+        const msg = errorData.message || "ไม่สามารถสร้างร้านได้ โปรดตรวจสอบอีเมลของสมาชิก"
+        setError(msg)
+        toast({
+          variant: "error",
+          description: msg,
+        })
+      } else {
+        // Generic error
+        const message = errorData?.message || err?.message || "เกิดข้อผิดพลาดระหว่างบันทึกข้อมูล กรุณาลองใหม่"
+        setError(message)
+        toast({
+          variant: "error",
+          description: message,
+        })
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [storeName, members, isSubmitting, router])
+
+  if (loadingStatus) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100">
+        <p className="text-emerald-700">กำลังโหลดข้อมูล...</p>
+      </div>
+    )
   }
 
-  const handleViewOnlyNext = () => {
-    router.push("/store/layout")
-  }
-
-  // useEffect(() => {
-  //   if (!storeType) {
-  //     router.push("/home")
-  //   }
-  // }, [storeType])
+  const isPendingStore = storeStatus?.state === "Pending"
 
   if (isPendingStore) {
     return (
@@ -89,28 +246,6 @@ function StoreCreateContent() {
                 </CardDescription>
               </div>
             </div>
-
-            {storeStatus?.storeAdminNisitId && (
-              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg bg-emerald-50/50 px-4 py-3 border border-emerald-100">
-                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700 font-medium">
-                  Store Admin
-                </Badge>
-                <span className="text-sm font-medium text-emerald-800">
-                  {storeStatus.storeAdminNisitId}
-                </span>
-                {isStoreAdmin && (
-                  <Badge variant="secondary" className="bg-emerald-600 text-white hover:bg-emerald-700">
-                    คุณเป็นแอดมินร้านนี้
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            {stepError && (
-              <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
-                <p className="text-sm font-medium text-red-700">{stepError}</p>
-              </div>
-            )}
           </CardHeader>
         </Card>
 
@@ -119,29 +254,10 @@ function StoreCreateContent() {
             <CardTitle className="text-emerald-800 text-xl font-bold">
               ข้อมูลร้านค้าและสมาชิกทีม
             </CardTitle>
-            {!canEditStore && (
-              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                คุณกำลังดูข้อมูลร้านในโหมดอ่านอย่างเดียว
-                {" "}
-                เฉพาะ Store Admin เท่านั้นที่สามารถแก้ไขข้อมูลได้
-                {storeAdminNisitId ? (
-                  <span className="ml-2 inline-flex items-center gap-2 text-xs text-amber-900">
-                    <Badge variant="outline">Store Admin</Badge>
-                    <span>{storeAdminNisitId}</span>
-                  </span>
-                ) : null}
-              </div>
-            )}
           </CardHeader>
 
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
-              {stepError && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 whitespace-pre-line">
-                  {stepError}
-                </div>
-              )}
-
               {/* STORE NAME */}
               <div className="space-y-2">
                 <Label htmlFor="storeName" className="font-semibold text-[15px] text-emerald-900">
@@ -149,11 +265,11 @@ function StoreCreateContent() {
                 </Label>
                 <Input
                   id="storeName"
-                  value={createStep.storeName}
-                  onChange={(event) => createStep.setStoreName(event.target.value)}
+                  value={storeName}
+                  onChange={(event) => setStoreName(event.target.value)}
                   placeholder="เช่น Kaset Fair Drinks"
                   required
-                  disabled={!canEditStore}
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -167,27 +283,25 @@ function StoreCreateContent() {
                     กรุณากรอกอีเมล KU Gmail (xxx@ku.th) ของสมาชิกในร้านอย่างน้อย 3 คน
                     ระบบจะใช้ข้อมูลนี้เพื่อเชิญเพื่อนร่วมทีม
                     <br />
-                    คุณสามารถเพิ่มสมาชิกเพิ่มเติมได้มากกว่า 3 คนในภายหลัง
+                    คุณสามารถเพิ่มสมาชิกได้ภายหลัง
                   </p>
                 </div>
 
                 <div className="space-y-3">
-                  {createStep.members.map((member, index) => {
-                    const canRemove = createStep.members.length > 3 && index >= 3
-                    const emailStatus = createStep.memberEmailStatuses.find(
+                  {members.map((member, index) => {
+                    const canRemove = members.length > 3 && index >= 3
+                    const emailStatus = memberStatuses.find(
                       (m) => m.email.trim().toLowerCase() === member.trim().toLowerCase()
                     )
-                    const showWarning = emailStatus && emailStatus.status !== "Joined"
+                    const status = emailStatus?.status ?? null
+                    const showWarn = status && typeof status === "string" && status.toLowerCase() !== "joined"
 
                     return (
                       <div key={`member-${index}`} className="space-y-1">
-                        {showWarning && (
-                          <p className="text-xs text-red-600 ml-1">
-                            สถานะอีเมลนี้ในระบบ:
-                            {/* {" "} */}
-                            <strong>
-                              {getEmailStatusToText(emailStatus.status)}
-                            </strong>
+                        {status && (
+                          <p className={`ml-1 text-xs ${showWarn ? "text-red-600" : "text-emerald-700"}`}>
+                            {"สถานะ: "}
+                            <strong>{getEmailStatusToText(status)}</strong>
                           </p>
                         )}
                         <div className="flex items-center gap-3">
@@ -195,10 +309,10 @@ function StoreCreateContent() {
                             type="email"
                             placeholder={`อีเมลสมาชิกคนที่ ${index + 1}`}
                             value={member}
-                            onChange={(event) => createStep.handleMemberChange(index, event.target.value)}
+                            onChange={(event) => handleMemberChange(index, event.target.value)}
                             required={index < 3}
-                            className={showWarning ? "border-red-400 focus-visible:ring-red-400" : ""}
-                            disabled={!canEditStore}
+                            className={showWarn ? "border-red-400 focus-visible:ring-red-400" : ""}
+                            disabled={isSubmitting}
                           />
                           {canRemove && (
                             <Button
@@ -206,8 +320,8 @@ function StoreCreateContent() {
                               variant="outline"
                               size="icon"
                               className="border-red-200 text-red-500 hover:bg-red-50"
-                              onClick={() => createStep.removeMember(index)}
-                              disabled={!canEditStore}
+                              onClick={() => removeMember(index)}
+                              disabled={isSubmitting}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -222,8 +336,8 @@ function StoreCreateContent() {
                   type="button"
                   variant="outline"
                   className="w-full border-dashed border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                  onClick={createStep.addMember}
-                  disabled={!canEditStore}
+                  onClick={addMember}
+                  disabled={isSubmitting}
                 >
                   <Plus className="h-4 w-4" />
                   เพิ่มอีเมลสมาชิก
@@ -232,23 +346,13 @@ function StoreCreateContent() {
             </CardContent>
 
             <CardFooter className="flex justify-end mt-6">
-              {canEditStore ? (
-                <Button
-                  type="submit"
-                  className="bg-emerald-600 text-white hover:bg-emerald-700"
-                  disabled={createStep.isSubmitting || !allowCreateSubmit}
-                >
-                  {createStep.isSubmitting ? "กำลังบันทึกข้อมูล..." : "บันทึกและไปขั้นตอนถัดไป"}
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  className="bg-emerald-600 text-white hover:bg-emerald-700"
-                  onClick={handleViewOnlyNext}
-                >
-                  ไปขั้นตอนถัดไป
-                </Button>
-              )}
+              <Button
+                type="submit"
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "กำลังบันทึกข้อมูล..." : "บันทึกและไปขั้นตอนถัดไป"}
+              </Button>
             </CardFooter>
           </form>
         </Card>

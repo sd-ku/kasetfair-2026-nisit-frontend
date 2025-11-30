@@ -22,8 +22,12 @@ export const getEmailStatusToText = (status: string) => {
     switch (status) {
         case "NotFound":
             return "ไม่พบ email นี้ในระบบ กรุณาลงทะเบียนก่อน"
+        case "DuplicateStore":
+            return "email นี้ถูกใช้แล้ว"
         case "Joined":
             return "เข้าร่วมร้านค้าแล้ว"
+        case "ProfileNotCompleted":
+            return "ข้อมูลส่วนตัวไม่ครบ"
         default:
             return status
     }

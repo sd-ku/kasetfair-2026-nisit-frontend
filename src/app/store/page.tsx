@@ -131,29 +131,6 @@ export default function StoreDashboardPage() {
       {/* ใช้ max-w-5xl เท่าเดิม */}
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
 
-        {/* --- Header --- */}
-        {/* <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-4 mb-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full hover:bg-white/60 bg-white/40 shadow-sm backdrop-blur-sm"
-              onClick={() => router.push("/home")}
-            >
-              <ArrowLeft className="h-6 w-6 text-emerald-900" />
-            </Button>
-
-            <div>
-              <h1 className="text-3xl font-bold text-emerald-900 leading-tight">
-                จัดการร้านค้า
-              </h1>
-              <p className="mt-1 text-emerald-700 text-[15px]">
-                ยินดีต้อนรับสู่ระบบจัดการร้านค้าของคุณ
-              </p>
-            </div>
-          </div>
-        </header> */}
-
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white/80 px-6 py-5 shadow-lg ring-1 ring-emerald-100 backdrop-blur">
           <div className="flex items-center gap-3">
             <Button

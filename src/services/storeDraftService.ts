@@ -180,12 +180,12 @@ export async function getStoreDraft(): Promise<StoreDraftData | null> {
 export const mapDraftErrors = (errors?: DraftFieldError[]): DraftErrorMap =>
   Array.isArray(errors)
     ? errors.reduce<DraftErrorMap>((acc, err) => {
-        if (err?.field) acc[err.field] = err.message ?? "Invalid value"
-        return acc
-      }, {})
+      if (err?.field) acc[err.field] = err.message ?? "Invalid value"
+      return acc
+    }, {})
     : {}
-    
-export async function createStore(payload: CreateStoreRequestDto): Promise<CreateStoreResponseDto> {
+
+export async function createStore(payload: CreateStoreRequestDto) {
   try {
     const res = await http.post(`${STORE_DRAFT_ENDPOINT}`, payload)
 
@@ -195,13 +195,12 @@ export async function createStore(payload: CreateStoreRequestDto): Promise<Creat
 
     throw new Error(res.data?.error || `Unexpected status: ${res.status}`)
   } catch (error) {
-    const message = extractErrorMessage(error, "Failed to create store")
-    throw new Error(message)
+    throw error
   }
 }
 
 export async function updateDraftStore(payload: UpdateDraftStoreRequestDto) {
-    try {
+  try {
     const res = await http.patch(`${STORE_DRAFT_ENDPOINT}`, payload)
 
     if (res.status === 200 || res.status === 201) {
