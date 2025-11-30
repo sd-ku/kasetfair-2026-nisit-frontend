@@ -82,6 +82,8 @@ type StoreValidateResponseDto = {
   }[];
 };
 
+const STORAGE_KEY_STORE_NAME = "kasetfair_draft_store_name"
+const STORAGE_KEY_MEMBERS = "kasetfair_draft_members"
 
 export default function HomePage() {
   const router = useRouter()
@@ -170,7 +172,11 @@ export default function HomePage() {
         } else {
           router.push("/store/create?type=Nisit")
         }
+      } else {
+        localStorage.removeItem(STORAGE_KEY_STORE_NAME)
+        localStorage.removeItem(STORAGE_KEY_MEMBERS)
       }
+
       setValidationData(data || null)
     } catch (err: any) {
       const status = err?.response?.status ?? err?.status

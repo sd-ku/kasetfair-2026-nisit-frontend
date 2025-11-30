@@ -19,6 +19,7 @@ import { isStoreAdmin as isStoreAdminUtil } from "@/utils/storeAdmin"
 import { convertStateToLabel, convertStoreTypeToLabel } from "@/utils/labelConverter"
 
 import { getEmailStatusToText } from "@/utils/labelConverter"
+import { toast } from "@/lib/toast"
 
 const ensureMemberFields = (emails: string[]): string[] => (emails.length ? emails : [""])
 
@@ -125,7 +126,12 @@ export default function StoreInfoPage() {
   const handleStoreSubmit = async (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
     if (!canEditStore) {
-      setStoreError("มีเพียง admin ที่สามารถแก้ไขข้อมูลร้านได้")
+      const msg = "มีเพียง admin ที่สามารถแก้ไขข้อมูลร้านได้"
+      setStoreError(msg)
+      toast({
+        variant: "error",
+        description: msg,
+      })
       return
     }
     if (!store) return
@@ -134,12 +140,22 @@ export default function StoreInfoPage() {
     const memberEmails = storeMembers.map((email) => email.trim()).filter(Boolean)
 
     if (!trimmedName) {
-      setStoreError("กรุณากรอกชื่อร้าน")
+      const msg = "กรุณากรอกชื่อร้าน"
+      setStoreError(msg)
+      toast({
+        variant: "error",
+        description: msg,
+      })
       return
     }
 
     if (!memberEmails.length) {
-      setStoreError("กรุณาระบุอีเมลสมาชิกอย่างน้อย 1 คน")
+      const msg = "กรุณาระบุอีเมลสมาชิกอย่างน้อย 1 คน"
+      setStoreError(msg)
+      toast({
+        variant: "error",
+        description: msg,
+      })
       return
     }
 
@@ -154,9 +170,19 @@ export default function StoreInfoPage() {
       })
       setStore(updated)
       resetStoreForm(updated)
-      setStoreMessage("บันทึกข้อมูลร้านเรียบร้อยแล้ว")
+      const msg = "บันทึกข้อมูลร้านเรียบร้อยแล้ว"
+      setStoreMessage(msg)
+      toast({
+        variant: "success",
+        description: msg,
+      })
     } catch (error) {
-      setStoreError(extractErrorMessage(error, "ไม่สามารถบันทึกข้อมูลร้านได้"))
+      const msg = extractErrorMessage(error, "ไม่สามารถบันทึกข้อมูลร้านได้")
+      setStoreError(msg)
+      toast({
+        variant: "error",
+        description: msg,
+      })
     } finally {
       setSavingStore(false)
     }
@@ -232,9 +258,6 @@ export default function StoreInfoPage() {
                 </div>
               ) : (
                 <>
-                  {storeError && <p className="text-sm text-red-600">{storeError}</p>}
-                  {storeMessage && <p className="text-sm text-emerald-700">{storeMessage}</p>}
-
                   <div className="space-y-2">
                     <Label htmlFor="storeName">ชื่อร้าน</Label>
                     <Input
