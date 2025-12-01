@@ -443,11 +443,11 @@ export default function HomePage() {
                 <div className="rounded-xl bg-emerald-50/50 p-3 border border-emerald-100">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h3 className="truncate text-lg font-bold text-emerald-900">
-                        {store.storeName}
+                      <h3 className="text-lg font-bold text-emerald-900">
+                        <div style={{ wordBreak: 'break-all' }}>{store.storeName}</div>
                       </h3>
                       <p className="text-xs text-emerald-600">
-                        {convertStoreTypeToLabel(store.type)} | บูธ: {store.boothNumber || "-"}
+                        หมายเลขร้าน: {store.id} | {convertStoreTypeToLabel(store.type)} | บูธ: {store.boothNumber || "-"}
                       </p>
                     </div>
                     <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-700">
