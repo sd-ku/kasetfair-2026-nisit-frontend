@@ -513,7 +513,7 @@ export default function ClubInfoEditPage() {
                   <Label>ไฟล์คำขอรับรององค์กร (PDF / PNG / JPG)</Label>
                   <p className="text-xs text-emerald-600">
                     <a
-                      href="https://drive.google.com/file/d/10Slql_ZcsEDZ6Sf3zaVE2ap4R0-P6BDG/view?usp=sharing"
+                      href="https://drive.google.com/file/d/1XwckOFl9po4nY_0nORPHfZPjc9AK2Ous/view?usp=sharing"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="underline hover:text-emerald-800"
