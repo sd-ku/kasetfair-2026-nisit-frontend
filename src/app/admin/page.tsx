@@ -1,9 +1,5 @@
 import { redirect } from "next/navigation"
-// import { getServerSession } from "next-auth"
-// import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 
-export default async function AdminPage() {
-    // const session = await getServerSession(authOptions)
-
-    return <div>Admin</div>
+export default function AdminPage() {
+    redirect('/admin/dashboard')
 }
