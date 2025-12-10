@@ -16,18 +16,30 @@ import {
     Loader2,
     AlertCircle,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Store,
+    Package,
+    Utensils
 } from 'lucide-react';
-import { findAllStores, updateStoreStatus } from '@/services/admin/reviewStoreService';
+import { findAllStores, updateStoreStatus, getStats } from '@/services/admin/reviewStoreService';
+import { getMediaInfo } from '@/services/admin/mediaService';
 import { AdminStoreDto, PaginationMetaDto } from '@/services/admin/dto/review-store.dto';
-import { StoreState } from '@/services/dto/store-info.dto';
+import { StatsResponseDto } from '@/services/admin/dto/stats-store.dto';
+import { StoreState, StoreType } from '@/services/dto/store-info.dto';
 import { toast } from 'sonner';
 
 export default function AdminDashboardPage() {
     const [stores, setStores] = useState<AdminStoreDto[]>([]);
     const [expandedRow, setExpandedRow] = useState<number | null>(null);
+    const [expandedGoodsRow, setExpandedGoodsRow] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [stats, setStats] = useState<StatsResponseDto>({
+        total: 0,
+        validated: 0,
+        pending: 0,
+        rejected: 0
+    });
     const [pagination, setPagination] = useState<PaginationMetaDto>({
         total: 0,
         page: 1,
@@ -36,17 +48,20 @@ export default function AdminDashboardPage() {
     });
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<StoreState | undefined>(undefined);
+    const [typeFilter, setTypeFilter] = useState<StoreType | undefined>(undefined);
     const [updatingStoreId, setUpdatingStoreId] = useState<number | null>(null);
+    const [goodImageUrls, setGoodImageUrls] = useState<Record<string, string>>({});
 
     // Fetch stores from API
-    const fetchStores = async (page: number = 1, status?: StoreState) => {
+    const fetchStores = async (page: number = 1, status?: StoreState, type?: StoreType) => {
         try {
             setLoading(true);
             setError(null);
             const response = await findAllStores({
                 page,
                 limit: 10,
-                status
+                status,
+                type
             });
             setStores(response.data);
             setPagination(response.meta);
@@ -59,13 +74,72 @@ export default function AdminDashboardPage() {
         }
     };
 
+    // Fetch stats from API
+    const fetchStats = async () => {
+        try {
+            const statsData = await getStats();
+            setStats(statsData);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการโหลดสถิติ';
+            console.error(errorMessage);
+        }
+    };
+
     // Initial load
     useEffect(() => {
-        fetchStores(currentPage, statusFilter);
-    }, [currentPage, statusFilter]);
+        fetchStores(currentPage, statusFilter, typeFilter);
+        fetchStats();
+    }, [currentPage, statusFilter, typeFilter]);
 
     const toggleMembers = (id: number) => {
-        setExpandedRow(expandedRow === id ? null : id);
+        const newExpandedId = expandedRow === id ? null : id;
+        setExpandedRow(newExpandedId);
+        // Close goods section when opening members
+        if (newExpandedId !== null) {
+            setExpandedGoodsRow(null);
+        }
+    };
+
+    const toggleGoods = async (id: number) => {
+        const newExpandedId = expandedGoodsRow === id ? null : id;
+        setExpandedGoodsRow(newExpandedId);
+        // Close members section when opening goods
+        if (newExpandedId !== null) {
+            setExpandedRow(null);
+        }
+
+        // Load images when expanding
+        if (newExpandedId !== null) {
+            const store = stores.find(s => s.id === newExpandedId);
+            if (store && store.goods.length > 0) {
+                const goodsWithMedia = store.goods.filter(g => g.googleMedia?.id);
+                if (goodsWithMedia.length > 0) {
+                    try {
+                        const entries = await Promise.all(
+                            goodsWithMedia.map(async (good) => {
+                                try {
+                                    const media = await getMediaInfo(good.googleMedia.id);
+                                    return { id: good.id, url: media.link ?? "" };
+                                } catch (error) {
+                                    console.error(`Failed to load media for good ${good.googleMedia.id}`, error);
+                                    return { id: good.id, url: "" };
+                                }
+                            })
+                        );
+
+                        setGoodImageUrls(prev => {
+                            const next = { ...prev };
+                            entries.forEach(entry => {
+                                if (entry.url) next[entry.id] = entry.url;
+                            });
+                            return next;
+                        });
+                    } catch (error) {
+                        console.error("Failed to load goods media", error);
+                    }
+                }
+            }
+        }
     };
 
     const handleStatusChange = async (id: number, targetState: StoreState) => {
@@ -81,7 +155,8 @@ export default function AdminDashboardPage() {
             toast.success(`อัพเดทสถานะร้านค้าเรียบร้อยแล้ว`);
 
             // Refresh data to get updated stats
-            await fetchStores(currentPage, statusFilter);
+            await fetchStores(currentPage, statusFilter, typeFilter);
+            await fetchStats();
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัพเดทสถานะ';
             toast.error(errorMessage);
@@ -96,13 +171,26 @@ export default function AdminDashboardPage() {
         }
     };
 
-    // Calculate stats from current data
-    const stats = {
-        total: pagination.total,
-        validated: stores.filter(s => s.state === 'Validated').length,
-        pending: stores.filter(s => s.state === 'Pending').length,
-        rejected: stores.filter(s => s.state === 'Rejected').length,
+    const handleViewMedia = async (mediaId: string | null, documentType: string) => {
+        if (!mediaId) {
+            toast.error(`ไม่พบ${documentType}`);
+            return;
+        }
+
+        try {
+            const mediaInfo = await getMediaInfo(mediaId);
+            if (mediaInfo.link) {
+                window.open(mediaInfo.link, '_blank');
+            } else {
+                toast.error(`ไม่สามารถเปิด${documentType}ได้`);
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : `เกิดข้อผิดพลาดในการเปิด${documentType}`;
+            toast.error(errorMessage);
+        }
     };
+
+
 
     // Map StoreState to display status
     const getStatusDisplay = (state: StoreState) => {
@@ -145,10 +233,10 @@ export default function AdminDashboardPage() {
                 {/* Stats Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <StatCard
-                        title="คำขอทั้งหมด"
+                        title="ร้านค้าทั้งหมด"
                         value={stats.total.toString()}
                         change={`${pagination.totalPages} หน้า`}
-                        icon={<FileText className="h-5 w-5 text-blue-600" />}
+                        icon={<Store className="h-5 w-5 text-blue-600" />}
                         bgIcon="bg-blue-100"
                     />
                     <StatCard
@@ -194,10 +282,22 @@ export default function AdminDashboardPage() {
                 <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col">
                     <div className="p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <h2 className="text-lg font-semibold text-card-foreground">รายการคำขอเข้าร่วมร้านค้า</h2>
+                            <h2 className="text-lg font-semibold text-card-foreground">รายการคำขอสร้างร้านค้าทั้งหมด</h2>
                             <p className="text-sm text-muted-foreground">จัดการและตรวจสอบสถานะร้านค้า</p>
                         </div>
                         <div className="flex gap-2">
+                            <select
+                                value={typeFilter || ''}
+                                onChange={(e) => {
+                                    setTypeFilter(e.target.value as StoreType || undefined);
+                                    setCurrentPage(1);
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors border border-border"
+                            >
+                                <option value="">ประเภททั้งหมด</option>
+                                <option value="Club">องค์กรนิสิต</option>
+                                <option value="Nisit">ร้านค้านิสิต</option>
+                            </select>
                             <select
                                 value={statusFilter || ''}
                                 onChange={(e) => {
@@ -206,13 +306,13 @@ export default function AdminDashboardPage() {
                                 }}
                                 className="px-4 py-2 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors border border-border"
                             >
-                                <option value="">ทั้งหมด</option>
+                                <option value="">สถานะทั้งหมด</option>
                                 <option value="Pending">รอดำเนินการ</option>
                                 <option value="Approved">อนุมัติแล้ว</option>
                                 <option value="Rejected">ปฏิเสธ</option>
                             </select>
                             <button
-                                onClick={() => fetchStores(currentPage, statusFilter)}
+                                onClick={() => fetchStores(currentPage, statusFilter, typeFilter)}
                                 className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors"
                             >
                                 <RotateCcw size={16} className="inline mr-1" />
@@ -236,10 +336,14 @@ export default function AdminDashboardPage() {
                             <table className="w-full text-left border-collapse">
                                 <thead className="bg-muted/50 text-muted-foreground text-xs uppercase font-medium">
                                     <tr>
-                                        <th className="p-4 pl-6">ID & Booth</th>
+                                        <th className="p-4 pl-6">ID</th>
+                                        <th className="p-4">Booth</th>
                                         <th className="p-4">ชื่อร้านค้า</th>
                                         <th className="p-4 text-center">ทีมงาน</th>
+                                        <th className="p-4 text-center">สินค้า</th>
                                         <th className="p-4 text-center">ประเภท</th>
+                                        <th className="p-4 text-center">แผนผังบูธ</th>
+                                        <th className="p-4 text-center">ฟอร์มสมัคร</th>
                                         <th className="p-4 text-center">สถานะ</th>
                                         <th className="p-4 pr-6 text-right">Actions</th>
                                     </tr>
@@ -247,17 +351,20 @@ export default function AdminDashboardPage() {
                                 <tbody className="divide-y divide-border">
                                     {stores.map((store) => {
                                         const statusDisplay = getStatusDisplay(store.state);
-                                        const totalMembers = store.members.length + store.memberAttemptEmails.length;
+                                        // Filter out members who have the same nisitId as the admin
+                                        const uniqueMembers = store.members.filter(member => member.nisitId !== store.storeAdmin.nisitId);
+                                        // Count: 1 (admin) + unique members + pending members
+                                        const totalMembers = 1 + uniqueMembers.length + store.memberAttemptEmails.length;
                                         const isUpdating = updatingStoreId === store.id;
 
                                         return (
                                             <React.Fragment key={store.id}>
                                                 <tr className={`group transition-colors hover:bg-muted/30 ${expandedRow === store.id ? 'bg-muted/30' : ''}`}>
                                                     <td className="p-4 pl-6">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-mono text-xs text-muted-foreground">#{store.id}</span>
-                                                            <span className="font-medium text-sm">{store.boothNumber || 'ไม่มีบูธ'}</span>
-                                                        </div>
+                                                        <span className="font-mono text-xs text-muted-foreground">#{store.id}</span>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className="font-medium text-sm">{store.boothNumber || '-'}</span>
                                                     </td>
                                                     <td className="p-4">
                                                         <div className="flex items-center gap-3">
@@ -288,9 +395,45 @@ export default function AdminDashboardPage() {
                                                     </td>
 
                                                     <td className="p-4 text-center">
+                                                        <button
+                                                            onClick={() => toggleGoods(store.id)}
+                                                            className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all
+                                                                ${expandedGoodsRow === store.id
+                                                                    ? 'bg-primary/10 text-primary'
+                                                                    : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+                                                        >
+                                                            <Package size={14} />
+                                                            {store.goods.length}
+                                                            {expandedGoodsRow === store.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                                        </button>
+                                                    </td>
+
+                                                    <td className="p-4 text-center">
                                                         <span className="text-xs text-muted-foreground">
-                                                            {store.type === 'Club' ? 'ชุมนุม' : 'ทั่วไป'}
+                                                            {store.type === 'Club' ? 'องค์กรนิสิต' : 'ร้านค้านิสิต'}
                                                         </span>
+                                                    </td>
+
+                                                    <td className="p-4 text-center">
+                                                        <button
+                                                            onClick={() => handleViewMedia(store.boothMediaId, 'แผนผังบูธ')}
+                                                            disabled={!store.boothMediaId}
+                                                            className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                                            title={store.boothMediaId ? "ดูแผนผังบูธ" : "ไม่มีแผนผังบูธ"}
+                                                        >
+                                                            <Map size={18} />
+                                                        </button>
+                                                    </td>
+
+                                                    <td className="p-4 text-center">
+                                                        <button
+                                                            onClick={() => handleViewMedia(store.clubInfo?.clubApplicationMedia?.id || null, 'ฟอร์มสมัครร้านค้า')}
+                                                            disabled={!store.clubInfo?.clubApplicationMedia?.id}
+                                                            className="p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                                            title={store.clubInfo?.clubApplicationMedia?.id ? "ดูฟอร์มสมัครร้านค้า" : "ไม่มีฟอร์มสมัคร"}
+                                                        >
+                                                            <FileText size={18} />
+                                                        </button>
                                                     </td>
 
                                                     <td className="p-4 text-center">
@@ -343,9 +486,64 @@ export default function AdminDashboardPage() {
                                                     </td>
                                                 </tr>
 
+                                                {expandedGoodsRow === store.id && (
+                                                    <tr>
+                                                        <td colSpan={10} className="p-0 border-b border-border bg-muted/20">
+                                                            <div className="p-6 pl-12">
+                                                                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                                                                    <Package size={16} />
+                                                                    รายการสินค้า ({store.goods.length} รายการ)
+                                                                </h4>
+                                                                {store.goods.length === 0 ? (
+                                                                    <p className="text-sm text-muted-foreground">ไม่มีสินค้า</p>
+                                                                ) : (
+                                                                    <div className="max-h-96 overflow-y-auto pr-2">
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                                                            {store.goods.map((good, idx) => (
+                                                                                <div key={idx} className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm">
+                                                                                    {good.googleMedia ? (
+                                                                                        <div className="w-full h-32 mb-3 rounded-md overflow-hidden bg-muted">
+                                                                                            {goodImageUrls[good.id] ? (
+                                                                                                <img
+                                                                                                    src={goodImageUrls[good.id]}
+                                                                                                    alt={good.name}
+                                                                                                    className="w-full h-full object-cover"
+                                                                                                />
+                                                                                            ) : (
+                                                                                                <div className="w-full h-full flex items-center justify-center">
+                                                                                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <div className="w-full h-32 mb-3 rounded-md overflow-hidden bg-muted flex items-center justify-center">
+                                                                                            <Utensils className="h-12 w-12 text-gray-300" />
+                                                                                        </div>
+                                                                                    )}
+                                                                                    <div className="flex-1">
+                                                                                        <div className="text-sm font-medium text-foreground mb-1">{good.name}</div>
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <span className="text-xs text-muted-foreground">
+                                                                                                {good.type === 'Food' ? 'อาหาร' : 'สินค้าอื่นๆ'}
+                                                                                            </span>
+                                                                                            <span className="text-sm font-semibold text-primary">
+                                                                                                ฿{parseFloat(good.price).toFixed(2)}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+
                                                 {expandedRow === store.id && (
                                                     <tr>
-                                                        <td colSpan={6} className="p-0 border-b border-border bg-muted/20">
+                                                        <td colSpan={10} className="p-0 border-b border-border bg-muted/20">
                                                             <div className="p-6 pl-12">
                                                                 <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                                                                     <Users size={16} />
@@ -353,32 +551,62 @@ export default function AdminDashboardPage() {
                                                                 </h4>
                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                                                     {/* Store Admin */}
-                                                                    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background shadow-sm">
-                                                                        <div className="flex items-center gap-3">
+                                                                    <div className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm">
+                                                                        <div className="flex items-center gap-3 mb-0">
                                                                             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary">
                                                                                 {store.storeAdmin.firstName.substring(0, 1)}{store.storeAdmin.lastName.substring(0, 1)}
                                                                             </div>
-                                                                            <div>
-                                                                                <div className="text-sm font-medium text-foreground">
-                                                                                    {store.storeAdmin.firstName} {store.storeAdmin.lastName}
+                                                                            <div className="flex-1">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-sm font-medium text-foreground">
+                                                                                        {store.storeAdmin.firstName} {store.storeAdmin.lastName}
+                                                                                    </span>
+                                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                                                        Admin
+                                                                                    </span>
                                                                                 </div>
-                                                                                <div className="text-xs text-muted-foreground">Admin • {store.storeAdmin.nisitId}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="pl-11 space-y-0.5">
+                                                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                <span className="font-medium">ID:</span> {store.storeAdmin.nisitId}
+                                                                            </div>
+                                                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                <span className="font-medium">Email:</span> {store.storeAdmin.email}
+                                                                            </div>
+                                                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                <span className="font-medium">Tel:</span> {store.storeAdmin.phone}
                                                                             </div>
                                                                         </div>
                                                                     </div>
 
-                                                                    {/* Members */}
-                                                                    {store.members.map((member, idx) => (
-                                                                        <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background shadow-sm">
-                                                                            <div className="flex items-center gap-3">
+                                                                    {/* Members - filtered to exclude duplicates */}
+                                                                    {uniqueMembers.map((member, idx) => (
+                                                                        <div key={idx} className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm">
+                                                                            <div className="flex items-center gap-3 mb-0">
                                                                                 <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
                                                                                     {member.firstName.substring(0, 1)}{member.lastName.substring(0, 1)}
                                                                                 </div>
-                                                                                <div>
-                                                                                    <div className="text-sm font-medium text-foreground">
-                                                                                        {member.firstName} {member.lastName}
+                                                                                <div className="flex-1">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="text-sm font-medium text-foreground">
+                                                                                            {member.firstName} {member.lastName}
+                                                                                        </span>
+                                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                                                            สมาชิก
+                                                                                        </span>
                                                                                     </div>
-                                                                                    <div className="text-xs text-muted-foreground">สมาชิก • {member.nisitId}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="pl-11 space-y-0.5">
+                                                                                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                    <span className="font-medium">ID:</span> {member.nisitId}
+                                                                                </div>
+                                                                                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                    <span className="font-medium">Email:</span> {member.email}
+                                                                                </div>
+                                                                                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                    <span className="font-medium">Tel:</span> {member.phone}
                                                                                 </div>
                                                                             </div>
                                                                         </div>
@@ -413,8 +641,8 @@ export default function AdminDashboardPage() {
                                                                                 <span className="ml-2 text-foreground">{store.clubInfo.clubName}</span>
                                                                             </div>
                                                                             <div>
-                                                                                <span className="text-muted-foreground">อาจารย์ที่ปรึกษา:</span>
-                                                                                <span className="ml-2 text-foreground">{store.clubInfo.clubAdvisorName}</span>
+                                                                                <span className="text-muted-foreground">ประธานชุมนุม:</span>
+                                                                                <span className="ml-2 text-foreground">{store.clubInfo.leaderNisitId} {store.clubInfo.leaderFirstName} {store.clubInfo.leaderLastName}</span>
                                                                             </div>
                                                                         </div>
                                                                     </div>

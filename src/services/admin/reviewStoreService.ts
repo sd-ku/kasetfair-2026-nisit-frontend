@@ -6,6 +6,7 @@ import {
     UpdateStoreStatusResponse,
 } from "./dto/review-store.dto";
 import { extractErrorMessage } from "../utils/extractErrorMsg";
+import { StatsResponseDto } from "./dto/stats-store.dto";
 
 const ADMIN_STORE_API = `/api/admin/store`;
 
@@ -101,6 +102,24 @@ export async function getStoreById(
         const message = extractErrorMessage(
             error,
             "Failed to fetch store"
+        );
+        throw new Error(message);
+    }
+}
+
+export async function getStats(): Promise<StatsResponseDto> {
+    try {
+        const res = await http.get(`${ADMIN_STORE_API}/stats`);
+
+        if (res.status === 200 || res.status === 201) {
+            return res.data;
+        }
+
+        throw new Error("Failed to fetch stats");
+    } catch (error) {
+        const message = extractErrorMessage(
+            error,
+            "Failed to fetch stats"
         );
         throw new Error(message);
     }
