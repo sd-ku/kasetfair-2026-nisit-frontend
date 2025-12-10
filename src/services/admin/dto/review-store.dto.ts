@@ -11,10 +11,14 @@ export type NisitMemberDto = {
 
 // Club information
 export type ClubInfoDto = {
+    id: string;
     clubName: string;
-    clubAdvisorName: string;
-    clubAdvisorPhone: string;
-    clubAdvisorEmail: string;
+    leaderFirstName: string;
+    leaderLastName: string;
+    leaderEmail: string;
+    leaderPhone: string;
+    leaderNisitId: string;
+    clubApplicationMedia: MediaDto;
 };
 
 // Media information

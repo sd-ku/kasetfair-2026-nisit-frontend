@@ -44,16 +44,16 @@ export default function AdminSidebar() {
             label: 'Dashboard',
             href: '/admin/dashboard',
         },
-        {
-            icon: <Store size={18} />,
-            label: 'ร้านค้าทั้งหมด',
-            href: '/admin/stores',
-        },
-        {
-            icon: <Users size={18} />,
-            label: 'จัดการนิสิต',
-            href: '/admin/nisits',
-        },
+        // {
+        //     icon: <Store size={18} />,
+        //     label: 'ร้านค้าทั้งหมด',
+        //     href: '/admin/stores',
+        // },
+        // {
+        //     icon: <Users size={18} />,
+        //     label: 'จัดการนิสิต',
+        //     href: '/admin/nisits',
+        // },
         {
             icon: <GraduationCap size={18} />,
             label: 'ผู้เข้าร่วมอบรม',
