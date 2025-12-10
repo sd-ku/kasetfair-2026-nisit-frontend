@@ -19,6 +19,7 @@ import {
     removeParticipant,
     upsertBulk,
     parseBulkNisitIds,
+    deleteAll,
 } from '@/services/admin/nisit-training-participant';
 import type { NisitTrainingParticipant } from '@/services/admin/dto/nisit-training-participant.dto';
 import { toast } from '@/lib/toast';
@@ -158,6 +159,34 @@ export default function NisitTrainingParticipantPage() {
         }
     };
 
+    const handleDeleteAll = async () => {
+        if (!confirm('คุณแน่ใจว่าต้องการลบข้อมูลทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
+            return;
+        }
+
+        if (!confirm('ยืนยันอีกครั้ง! ข้อมูลผู้เข้าร่วมอบรมทั้งหมดจะถูกลบ')) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await deleteAll();
+            toast({
+                title: 'ลบข้อมูลทั้งหมดเรียบร้อยแล้ว',
+                variant: 'success'
+            });
+            setCurrentPage(1);
+            fetchParticipants(1, '');
+        } catch (error) {
+            toast({
+                title: error instanceof Error ? error.message : 'Failed to delete all participants',
+                variant: 'error'
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <>
             {/* Header */}
@@ -170,13 +199,23 @@ export default function NisitTrainingParticipantPage() {
                         จัดการผู้เข้าร่วมอบรม
                     </h1>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors shadow-sm font-medium"
-                >
-                    <Plus size={20} />
-                    เพิ่มผู้เข้าร่วม
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleDeleteAll}
+                        disabled={participants.length === 0 || loading}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Trash2 size={20} />
+                        ลบทั้งหมด
+                    </button>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors shadow-sm font-medium"
+                    >
+                        <Plus size={20} />
+                        เพิ่มผู้เข้าร่วม
+                    </button>
+                </div>
             </header>
 
             {/* Main Content */}
