@@ -15,6 +15,7 @@ type AppJWTPayload = JWTPayload & {
   profileComplete?: boolean
   email?: string
   sub?: string
+  adminRole?: string
 }
 
 async function verifyAppToken(token: string): Promise<AppJWTPayload> {
@@ -115,7 +116,17 @@ export default async function proxy(req: NextRequest) {
     return res
   }
 
-  // console.log(payload)
+  if (payload.adminRole === "SUPER_ADMIN") {
+    // Force SUPER_ADMIN to stay in /admin or use APIs
+    if (!isApi && !path.startsWith("/admin")) {
+      const target = url.clone()
+      target.pathname = "/admin"
+      target.search = ""
+      if (target.href !== url.href) return NextResponse.redirect(target)
+    }
+
+    return NextResponse.next()
+  }
 
   // ถ้า profile ยังไม่ complete
   const requiredFields = ["firstName", "lastName", "email", "nisitId", "phone"];

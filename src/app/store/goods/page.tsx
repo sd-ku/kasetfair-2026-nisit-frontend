@@ -676,31 +676,41 @@ export default function StoreGoodsPage() {
                     )}
 
                     {/* Upload Overlay */}
-                    <div className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity ${imageUrl ? "opacity-0 group-hover/image:opacity-100" : "opacity-0 hover:opacity-100"}`}>
-                      <div className="relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg hover:bg-emerald-700 transition-all cursor-pointer hover:scale-105 ring-2 ring-white">
+                    <label
+                      htmlFor={`file-upload-new-${draft.tempId}`}
+                      className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity z-10 cursor-pointer ${imageUrl ? "opacity-0 group-hover/image:opacity-100" : "opacity-0 hover:opacity-100"}`}
+                    >
+                      <div className="pointer-events-none relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg ring-2 ring-white">
                         <span className="flex items-center gap-2 font-medium">
                           <UploadCloud className="h-3 w-3" />
                           {imageUrl ? "เปลี่ยนรูป" : "เพิ่มรูป"}
                         </span>
-                        <GoogleFileUpload
-                          maxFiles={1}
-                          accept="image/png,image/jpeg,image/jpg,image/webp"
-                          onFilesChange={(files) => handleGoodFileChange(draft.tempId, files)}
-                          disabled={savingAllGoods}
-                          className="absolute inset-0 cursor-pointer opacity-0 w-full h-full"
-                        />
                       </div>
-                    </div>
+                    </label>
+                    <input
+                      id={`file-upload-new-${draft.tempId}`}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = e.target.files
+                        if (files && files.length > 0) {
+                          handleGoodFileChange(draft.tempId, Array.from(files))
+                        }
+                        e.target.value = ""
+                      }}
+                      disabled={savingAllGoods}
+                    />
 
-                    <Button
+                    {/* <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute top-2 right-2 h-8 w-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-white/80 z-10"
+                      className="absolute top-2 right-2 h-8 w-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-white/80 z-30"
                       onClick={() => handleRemoveDraftNewGood(draft.tempId)}
                     >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </Button> */}
                   </div>
 
                   <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
@@ -732,7 +742,7 @@ export default function StoreGoodsPage() {
                       </div>
                     </div>
 
-                    <div className="flex gap-1 pt-1 mt-auto">
+                    <div className="flex flex-col gap-2 pt-1 mt-auto">
                       <Button
                         onClick={(e) => handleSaveAllGoods(e as any)}
                         className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-md rounded-full px-6 w-full"
@@ -749,6 +759,15 @@ export default function StoreGoodsPage() {
                             บันทึก
                           </>
                         )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 w-full rounded-full h-8 text-xs"
+                        onClick={() => handleRemoveDraftNewGood(draft.tempId)}
+                        disabled={savingAllGoods}
+                      >
+                        ยกเลิก
                       </Button>
                     </div>
                     {fieldErrors?.price && <p className="text-xs text-red-500 px-1">{fieldErrors.price}</p>}
@@ -796,21 +815,33 @@ export default function StoreGoodsPage() {
 
                     {/* Upload Overlay Button (Visible only in Edit Mode) */}
                     {isEditing && (
-                      <div className="absolute inset-0 flex items-center justify-center z-20">
-                        <div className="relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg hover:bg-emerald-700 transition-all cursor-pointer hover:scale-105 ring-2 ring-white">
-                          <span className="flex items-center gap-2 font-medium">
-                            <UploadCloud className="h-3 w-3" />
-                            เปลี่ยนรูป
-                          </span>
-                          <GoogleFileUpload
-                            maxFiles={1}
-                            accept="image/png,image/jpeg,image/jpg,image/webp"
-                            onFilesChange={(files) => handleGoodFileChange(good.id, files)}
-                            disabled={saving} // ปิดการเลือกไฟล์ขณะกำลังบันทึก
-                            className="absolute inset-0 cursor-pointer opacity-0 w-full h-full"
-                          />
-                        </div>
-                      </div>
+                      <>
+                        <label
+                          htmlFor={`file-upload-edit-${good.id}`}
+                          className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
+                        >
+                          <div className="pointer-events-none relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg ring-2 ring-white">
+                            <span className="flex items-center gap-2 font-medium">
+                              <UploadCloud className="h-3 w-3" />
+                              เปลี่ยนรูป
+                            </span>
+                          </div>
+                        </label>
+                        <input
+                          id={`file-upload-edit-${good.id}`}
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = e.target.files
+                            if (files && files.length > 0) {
+                              handleGoodFileChange(good.id, Array.from(files))
+                            }
+                            e.target.value = ""
+                          }}
+                          disabled={saving}
+                        />
+                      </>
                     )}
 
                     {!isEditing && (
