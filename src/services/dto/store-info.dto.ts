@@ -1,6 +1,6 @@
 export type StoreType = "Nisit" | "Club"
 
-export type StoreState = "CreateStore" | "ClubInfo" | "StoreDetails" | "ProductDetails" | "Submitted" | "Pending"
+export type StoreState = "CreateStore" | "ClubInfo" | "StoreDetails" | "ProductDetails" | "Submitted" | "Pending" | "Validated" | "Rejected"
 
 export type GoodsType = "Food" | "NonFood"
 
