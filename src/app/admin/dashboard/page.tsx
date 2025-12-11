@@ -308,7 +308,7 @@ export default function AdminDashboardPage() {
                             >
                                 <option value="">สถานะทั้งหมด</option>
                                 <option value="Pending">รอดำเนินการ</option>
-                                <option value="Approved">อนุมัติแล้ว</option>
+                                <option value="Validated">อนุมัติแล้ว</option>
                                 <option value="Rejected">ปฏิเสธ</option>
                             </select>
                             <button
@@ -351,10 +351,13 @@ export default function AdminDashboardPage() {
                                 <tbody className="divide-y divide-border">
                                     {stores.map((store) => {
                                         const statusDisplay = getStatusDisplay(store.state);
+                                        const storeAdmin = store.storeAdmin;
                                         // Filter out members who have the same nisitId as the admin
-                                        const uniqueMembers = store.members.filter(member => member.nisitId !== store.storeAdmin.nisitId);
+                                        const uniqueMembers = storeAdmin
+                                            ? store.members.filter(member => member.nisitId !== storeAdmin.nisitId)
+                                            : store.members;
                                         // Count: 1 (admin) + unique members + pending members
-                                        const totalMembers = 1 + uniqueMembers.length + store.memberAttemptEmails.length;
+                                        const totalMembers = (storeAdmin ? 1 : 0) + uniqueMembers.length + store.memberAttemptEmails.length;
                                         const isUpdating = updatingStoreId === store.id;
 
                                         return (
@@ -374,7 +377,7 @@ export default function AdminDashboardPage() {
                                                             <div>
                                                                 <div className="font-medium text-foreground">{store.storeName}</div>
                                                                 <div className="text-xs text-muted-foreground">
-                                                                    Admin: {store.storeAdmin.firstName} {store.storeAdmin.lastName}
+                                                                    Admin: {storeAdmin ? `${storeAdmin.firstName} ${storeAdmin.lastName}` : 'ไม่ระบุ'}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -486,171 +489,182 @@ export default function AdminDashboardPage() {
                                                     </td>
                                                 </tr>
 
-                                                {expandedGoodsRow === store.id && (
-                                                    <tr>
-                                                        <td colSpan={10} className="p-0 border-b border-border bg-muted/20">
-                                                            <div className="p-6 pl-12">
-                                                                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                                                                    <Package size={16} />
-                                                                    รายการสินค้า ({store.goods.length} รายการ)
-                                                                </h4>
-                                                                {store.goods.length === 0 ? (
-                                                                    <p className="text-sm text-muted-foreground">ไม่มีสินค้า</p>
-                                                                ) : (
-                                                                    <div className="max-h-96 overflow-y-auto pr-2">
-                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                                                            {store.goods.map((good, idx) => (
-                                                                                <div key={idx} className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm">
-                                                                                    {good.googleMedia ? (
-                                                                                        <div className="w-full h-32 mb-3 rounded-md overflow-hidden bg-muted">
-                                                                                            {goodImageUrls[good.id] ? (
-                                                                                                <img
-                                                                                                    src={goodImageUrls[good.id]}
-                                                                                                    alt={good.name}
-                                                                                                    className="w-full h-full object-cover"
-                                                                                                />
-                                                                                            ) : (
-                                                                                                <div className="w-full h-full flex items-center justify-center">
-                                                                                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                                                                                </div>
-                                                                                            )}
+                                                {
+                                                    expandedGoodsRow === store.id && (
+                                                        <tr>
+                                                            <td colSpan={10} className="p-0 border-b border-border bg-muted/20">
+                                                                <div className="p-6 pl-12">
+                                                                    <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                                                                        <Package size={16} />
+                                                                        รายการสินค้า ({store.goods.length} รายการ)
+                                                                    </h4>
+                                                                    {store.goods.length === 0 ? (
+                                                                        <p className="text-sm text-muted-foreground">ไม่มีสินค้า</p>
+                                                                    ) : (
+                                                                        <div className="max-h-96 overflow-y-auto pr-2">
+                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                                                                {store.goods.map((good, idx) => (
+                                                                                    <div key={idx} className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm">
+                                                                                        {good.googleMedia ? (
+                                                                                            <div className="w-full h-32 mb-3 rounded-md overflow-hidden bg-muted">
+                                                                                                {goodImageUrls[good.id] ? (
+                                                                                                    <img
+                                                                                                        src={goodImageUrls[good.id]}
+                                                                                                        alt={good.name}
+                                                                                                        className="w-full h-full object-cover"
+                                                                                                    />
+                                                                                                ) : (
+                                                                                                    <div className="w-full h-full flex items-center justify-center">
+                                                                                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <div className="w-full h-32 mb-3 rounded-md overflow-hidden bg-muted flex items-center justify-center">
+                                                                                                <Utensils className="h-12 w-12 text-gray-300" />
+                                                                                            </div>
+                                                                                        )}
+                                                                                        <div className="flex-1">
+                                                                                            <div className="text-sm font-medium text-foreground mb-1">{good.name}</div>
+                                                                                            <div className="flex items-center justify-between">
+                                                                                                <span className="text-xs text-muted-foreground">
+                                                                                                    {good.type === 'Food' ? 'อาหาร' : 'สินค้าอื่นๆ'}
+                                                                                                </span>
+                                                                                                <span className="text-sm font-semibold text-primary">
+                                                                                                    ฿{parseFloat(good.price).toFixed(2)}
+                                                                                                </span>
+                                                                                            </div>
                                                                                         </div>
-                                                                                    ) : (
-                                                                                        <div className="w-full h-32 mb-3 rounded-md overflow-hidden bg-muted flex items-center justify-center">
-                                                                                            <Utensils className="h-12 w-12 text-gray-300" />
-                                                                                        </div>
-                                                                                    )}
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                }
+
+                                                {
+                                                    expandedRow === store.id && (
+                                                        <tr>
+                                                            <td colSpan={10} className="p-0 border-b border-border bg-muted/20">
+                                                                <div className="p-6 pl-12">
+                                                                    <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                                                                        <Users size={16} />
+                                                                        รายชื่อสมาชิกในทีม ({totalMembers} คน)
+                                                                    </h4>
+                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                                        {/* Store Admin */}
+                                                                        {/* Store Admin */}
+                                                                        {storeAdmin ? (
+                                                                            <div className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm">
+                                                                                <div className="flex items-center gap-3 mb-0">
+                                                                                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary">
+                                                                                        {storeAdmin.firstName?.substring(0, 1) || '?'}{storeAdmin.lastName?.substring(0, 1) || '?'}
+                                                                                    </div>
                                                                                     <div className="flex-1">
-                                                                                        <div className="text-sm font-medium text-foreground mb-1">{good.name}</div>
-                                                                                        <div className="flex items-center justify-between">
-                                                                                            <span className="text-xs text-muted-foreground">
-                                                                                                {good.type === 'Food' ? 'อาหาร' : 'สินค้าอื่นๆ'}
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="text-sm font-medium text-foreground">
+                                                                                                {storeAdmin.firstName} {storeAdmin.lastName}
                                                                                             </span>
-                                                                                            <span className="text-sm font-semibold text-primary">
-                                                                                                ฿{parseFloat(good.price).toFixed(2)}
+                                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                                                                Admin
                                                                                             </span>
                                                                                         </div>
                                                                                     </div>
                                                                                 </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-
-                                                {expandedRow === store.id && (
-                                                    <tr>
-                                                        <td colSpan={10} className="p-0 border-b border-border bg-muted/20">
-                                                            <div className="p-6 pl-12">
-                                                                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                                                                    <Users size={16} />
-                                                                    รายชื่อสมาชิกในทีม ({totalMembers} คน)
-                                                                </h4>
-                                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                                                    {/* Store Admin */}
-                                                                    <div className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm">
-                                                                        <div className="flex items-center gap-3 mb-0">
-                                                                            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary">
-                                                                                {store.storeAdmin.firstName.substring(0, 1)}{store.storeAdmin.lastName.substring(0, 1)}
-                                                                            </div>
-                                                                            <div className="flex-1">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="text-sm font-medium text-foreground">
-                                                                                        {store.storeAdmin.firstName} {store.storeAdmin.lastName}
-                                                                                    </span>
-                                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                                                                        Admin
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="pl-11 space-y-0.5">
-                                                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                                                <span className="font-medium">ID:</span> {store.storeAdmin.nisitId}
-                                                                            </div>
-                                                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                                                <span className="font-medium">Email:</span> {store.storeAdmin.email}
-                                                                            </div>
-                                                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                                                <span className="font-medium">Tel:</span> {store.storeAdmin.phone}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {/* Members - filtered to exclude duplicates */}
-                                                                    {uniqueMembers.map((member, idx) => (
-                                                                        <div key={idx} className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm">
-                                                                            <div className="flex items-center gap-3 mb-0">
-                                                                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                                                                                    {member.firstName.substring(0, 1)}{member.lastName.substring(0, 1)}
-                                                                                </div>
-                                                                                <div className="flex-1">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <span className="text-sm font-medium text-foreground">
-                                                                                            {member.firstName} {member.lastName}
-                                                                                        </span>
-                                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                                                            สมาชิก
-                                                                                        </span>
+                                                                                <div className="pl-11 space-y-0.5">
+                                                                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                        <span className="font-medium">ID:</span> {storeAdmin.nisitId}
+                                                                                    </div>
+                                                                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                        <span className="font-medium">Email:</span> {storeAdmin.email}
+                                                                                    </div>
+                                                                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                        <span className="font-medium">Tel:</span> {storeAdmin.phone}
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                            <div className="pl-11 space-y-0.5">
-                                                                                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                                                    <span className="font-medium">ID:</span> {member.nisitId}
+                                                                        ) : (
+                                                                            <div className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm text-muted-foreground text-sm items-center justify-center">
+                                                                                ไม่มีข้อมูล Admin
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Members - filtered to exclude duplicates */}
+                                                                        {uniqueMembers.map((member, idx) => (
+                                                                            <div key={idx} className="flex flex-col p-3 rounded-lg border border-border bg-background shadow-sm">
+                                                                                <div className="flex items-center gap-3 mb-0">
+                                                                                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                                                                                        {member.firstName.substring(0, 1)}{member.lastName.substring(0, 1)}
+                                                                                    </div>
+                                                                                    <div className="flex-1">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="text-sm font-medium text-foreground">
+                                                                                                {member.firstName} {member.lastName}
+                                                                                            </span>
+                                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                                                                สมาชิก
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
                                                                                 </div>
-                                                                                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                                                    <span className="font-medium">Email:</span> {member.email}
-                                                                                </div>
-                                                                                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                                                    <span className="font-medium">Tel:</span> {member.phone}
+                                                                                <div className="pl-11 space-y-0.5">
+                                                                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                        <span className="font-medium">ID:</span> {member.nisitId}
+                                                                                    </div>
+                                                                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                        <span className="font-medium">Email:</span> {member.email}
+                                                                                    </div>
+                                                                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                        <span className="font-medium">Tel:</span> {member.phone}
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ))}
+                                                                        ))}
 
-                                                                    {/* Pending Members */}
-                                                                    {store.memberAttemptEmails.map((attempt, idx) => (
-                                                                        <div key={`attempt-${idx}`} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-border bg-background/50 shadow-sm">
-                                                                            <div className="flex items-center gap-3">
-                                                                                <div className="h-8 w-8 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-xs font-medium text-yellow-700 dark:text-yellow-400">
-                                                                                    ?
+                                                                        {/* Pending Members */}
+                                                                        {store.memberAttemptEmails.map((attempt, idx) => (
+                                                                            <div key={`attempt-${idx}`} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-border bg-background/50 shadow-sm">
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <div className="h-8 w-8 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-xs font-medium text-yellow-700 dark:text-yellow-400">
+                                                                                        ?
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <div className="text-sm font-medium text-foreground">{attempt.email}</div>
+                                                                                        <div className="text-xs text-muted-foreground">
+                                                                                            {attempt.status === 'NotFound' ? 'ไม่พบผู้ใช้' :
+                                                                                                attempt.status === 'Pending' ? 'รอการยืนยัน' : 'เข้าร่วมแล้ว'}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+
+                                                                    {/* Club Info */}
+                                                                    {store.clubInfo && (
+                                                                        <div className="mt-4 p-4 rounded-lg border border-border bg-background">
+                                                                            <h5 className="text-sm font-semibold text-foreground mb-2">ข้อมูลชุมนุม</h5>
+                                                                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                                                                <div>
+                                                                                    <span className="text-muted-foreground">ชื่อชุมนุม:</span>
+                                                                                    <span className="ml-2 text-foreground">{store.clubInfo.clubName}</span>
                                                                                 </div>
                                                                                 <div>
-                                                                                    <div className="text-sm font-medium text-foreground">{attempt.email}</div>
-                                                                                    <div className="text-xs text-muted-foreground">
-                                                                                        {attempt.status === 'NotFound' ? 'ไม่พบผู้ใช้' :
-                                                                                            attempt.status === 'Pending' ? 'รอการยืนยัน' : 'เข้าร่วมแล้ว'}
-                                                                                    </div>
+                                                                                    <span className="text-muted-foreground">ประธานชุมนุม:</span>
+                                                                                    <span className="ml-2 text-foreground">{store.clubInfo.leaderNisitId} {store.clubInfo.leaderFirstName} {store.clubInfo.leaderLastName}</span>
                                                                                 </div>
                                                                             </div>
                                                                         </div>
-                                                                    ))}
+                                                                    )}
                                                                 </div>
-
-                                                                {/* Club Info */}
-                                                                {store.clubInfo && (
-                                                                    <div className="mt-4 p-4 rounded-lg border border-border bg-background">
-                                                                        <h5 className="text-sm font-semibold text-foreground mb-2">ข้อมูลชุมนุม</h5>
-                                                                        <div className="grid grid-cols-2 gap-2 text-sm">
-                                                                            <div>
-                                                                                <span className="text-muted-foreground">ชื่อชุมนุม:</span>
-                                                                                <span className="ml-2 text-foreground">{store.clubInfo.clubName}</span>
-                                                                            </div>
-                                                                            <div>
-                                                                                <span className="text-muted-foreground">ประธานชุมนุม:</span>
-                                                                                <span className="ml-2 text-foreground">{store.clubInfo.leaderNisitId} {store.clubInfo.leaderFirstName} {store.clubInfo.leaderLastName}</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                }
                                             </React.Fragment>
                                         );
                                     })}
@@ -687,7 +701,7 @@ export default function AdminDashboardPage() {
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
         </>
     );
 }
