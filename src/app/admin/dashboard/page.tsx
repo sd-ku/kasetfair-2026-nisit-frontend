@@ -19,7 +19,8 @@ import {
     ChevronRight,
     Store,
     Package,
-    Utensils
+    Utensils,
+    Undo2
 } from 'lucide-react';
 import { findAllStores, updateStoreStatus, getStats } from '@/services/admin/reviewStoreService';
 import { getMediaInfo } from '@/services/admin/mediaService';
@@ -49,11 +50,12 @@ export default function AdminDashboardPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<StoreState | undefined>(undefined);
     const [typeFilter, setTypeFilter] = useState<StoreType | undefined>(undefined);
+    const [searchQuery, setSearchQuery] = useState<string>('');
     const [updatingStoreId, setUpdatingStoreId] = useState<number | null>(null);
     const [goodImageUrls, setGoodImageUrls] = useState<Record<string, string>>({});
 
     // Fetch stores from API
-    const fetchStores = async (page: number = 1, status?: StoreState, type?: StoreType) => {
+    const fetchStores = async (page: number = 1, status?: StoreState, type?: StoreType, search?: string) => {
         try {
             setLoading(true);
             setError(null);
@@ -61,7 +63,8 @@ export default function AdminDashboardPage() {
                 page,
                 limit: 10,
                 status,
-                type
+                type,
+                search
             });
             setStores(response.data);
             setPagination(response.meta);
@@ -87,9 +90,9 @@ export default function AdminDashboardPage() {
 
     // Initial load
     useEffect(() => {
-        fetchStores(currentPage, statusFilter, typeFilter);
+        fetchStores(currentPage, statusFilter, typeFilter, searchQuery);
         fetchStats();
-    }, [currentPage, statusFilter, typeFilter]);
+    }, [currentPage, statusFilter, typeFilter, searchQuery]);
 
     const toggleMembers = (id: number) => {
         const newExpandedId = expandedRow === id ? null : id;
@@ -155,7 +158,7 @@ export default function AdminDashboardPage() {
             toast.success(`อัพเดทสถานะร้านค้าเรียบร้อยแล้ว`);
 
             // Refresh data to get updated stats
-            await fetchStores(currentPage, statusFilter, typeFilter);
+            await fetchStores(currentPage, statusFilter, typeFilter, searchQuery);
             await fetchStats();
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัพเดทสถานะ';
@@ -270,7 +273,7 @@ export default function AdminDashboardPage() {
                             <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
                         </div>
                         <button
-                            onClick={() => fetchStores(currentPage, statusFilter)}
+                            onClick={() => fetchStores(currentPage, statusFilter, typeFilter, searchQuery)}
                             className="px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md transition-colors"
                         >
                             ลองอีกครั้ง
@@ -286,6 +289,19 @@ export default function AdminDashboardPage() {
                             <p className="text-sm text-muted-foreground">จัดการและตรวจสอบสถานะร้านค้า</p>
                         </div>
                         <div className="flex gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    placeholder="ค้นหาร้านค้า, ID, บูธ..."
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="pl-9 pr-4 py-2 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors border border-border w-64 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                            </div>
                             <select
                                 value={typeFilter || ''}
                                 onChange={(e) => {
@@ -312,7 +328,7 @@ export default function AdminDashboardPage() {
                                 <option value="Rejected">ปฏิเสธ</option>
                             </select>
                             <button
-                                onClick={() => fetchStores(currentPage, statusFilter, typeFilter)}
+                                onClick={() => fetchStores(currentPage, statusFilter, typeFilter, searchQuery)}
                                 className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors"
                             >
                                 <RotateCcw size={16} className="inline mr-1" />
@@ -477,12 +493,12 @@ export default function AdminDashboardPage() {
                                                                             title="เปลี่ยนเป็นรอดำเนินการ"
                                                                             disabled={isUpdating}
                                                                         >
-                                                                            <RotateCcw size={18} />
+                                                                            <Undo2 size={18} />
                                                                         </button>
                                                                     )}
-                                                                    <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors">
+                                                                    {/* <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors">
                                                                         <MoreVertical size={18} />
-                                                                    </button>
+                                                                    </button> */}
                                                                 </>
                                                             )}
                                                         </div>

@@ -109,6 +109,7 @@ export type FindAllStoresParams = {
     type?: StoreType;
     page?: number;
     limit?: number;
+    search?: string; // store name, store id, booth number
 };
 
 // Update store status DTO

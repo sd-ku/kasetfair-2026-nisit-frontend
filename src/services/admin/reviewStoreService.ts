@@ -19,7 +19,7 @@ export async function findAllStores(
     params: FindAllStoresParams = {}
 ): Promise<FindAllStoresResponse> {
     try {
-        const { status, type, page = 1, limit = 10 } = params;
+        const { status, type, search, page = 1, limit = 10 } = params;
 
         const queryParams = new URLSearchParams();
         queryParams.append("page", page.toString());
@@ -30,6 +30,9 @@ export async function findAllStores(
         }
         if (type) {
             queryParams.append("type", type);
+        }
+        if (search) {
+            queryParams.append("search", search);
         }
 
         const res = await http.get(
