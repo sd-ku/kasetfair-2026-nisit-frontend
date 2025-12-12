@@ -86,10 +86,10 @@ export default function AdminSidebar() {
             </nav>
 
             <div className="p-4 border-t border-sidebar-border">
-                <button className="flex items-center gap-3 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full p-3 rounded-md transition-all group">
+                {/* <button className="flex items-center gap-3 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full p-3 rounded-md transition-all group">
                     <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
                     <span className="font-medium">ออกจากระบบ</span>
-                </button>
+                </button> */}
                 <div className="mt-4 flex items-center gap-3 px-3">
                     <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-sm font-medium">
                         AD

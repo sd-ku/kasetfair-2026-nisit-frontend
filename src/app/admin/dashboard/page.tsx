@@ -215,7 +215,7 @@ export default function AdminDashboardPage() {
             {/* Header */}
             <header className="h-16 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between px-8 z-10">
                 <h1 className="text-2xl font-bold tracking-tight">Dashboard Overview</h1>
-                <div className="flex items-center gap-4">
+                {/* <div className="flex items-center gap-4">
                     <div className="relative hidden sm:block">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <input
@@ -228,7 +228,7 @@ export default function AdminDashboardPage() {
                         <Bell size={20} />
                         <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500"></span>
                     </button>
-                </div>
+                </div> */}
             </header>
 
             <div className="flex-1 overflow-y-auto p-8">
