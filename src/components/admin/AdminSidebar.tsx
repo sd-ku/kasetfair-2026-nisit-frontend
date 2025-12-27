@@ -9,6 +9,7 @@ import {
     Users,
     GraduationCap,
     LogOut,
+    Settings,
 } from 'lucide-react';
 
 interface NavItemProps {
@@ -58,6 +59,11 @@ export default function AdminSidebar() {
             icon: <GraduationCap size={18} />,
             label: 'ผู้เข้าร่วมอบรม',
             href: '/admin/nisit-training-participant',
+        },
+        {
+            icon: <Settings size={18} />,
+            label: 'Registration Settings',
+            href: '/admin/registration-settings',
         },
     ];
 
