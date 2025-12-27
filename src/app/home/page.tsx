@@ -647,8 +647,11 @@ export default function HomePage() {
                     : "bg-emerald-600 text-white hover:bg-emerald-700"
                     }`}
                   onClick={handleCreateStore}
+                  disabled={lockSettings?.isCurrentlyLocked}
                 >
-                  {selectingStoreType ? (
+                  {lockSettings?.isCurrentlyLocked ? (
+                    <>ปิดรับลงทะเบียน</>
+                  ) : selectingStoreType ? (
                     <>ยกเลิก</>
                   ) : (
                     <>
@@ -663,7 +666,7 @@ export default function HomePage() {
                 )} */}
 
                 <AnimatePresence initial={false}>
-                  {selectingStoreType && (
+                  {selectingStoreType && !lockSettings?.isCurrentlyLocked && (
                     <motion.div
                       ref={selectorRef}
                       initial={{ opacity: 0, height: 0 }}
