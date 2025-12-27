@@ -35,7 +35,9 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowRight,
-  UserCog
+  UserCog,
+  Calendar,
+  Clock
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { getStoreValidate, leaveStore, transferStoreAdmin } from "@/services/storeServices"
@@ -47,6 +49,8 @@ import { getNisitInfo } from "@/services/nisitService"
 import { NisitInfo } from "@/services/dto/nisit-info.dto"
 import { logout } from "@/services/authService"
 import { convertStateToLabel, convertStoreTypeToLabel } from "@/utils/labelConverter"
+import { useRegistrationLock } from "@/hooks/useRegistrationLock"
+import { RegistrationLockWarning } from "@/components/RegistrationLockWarning"
 
 // --- Types ---
 type Invitation = {
@@ -110,6 +114,8 @@ export default function HomePage() {
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
   const [transferTargetId, setTransferTargetId] = useState("")
   const [transferring, setTransferring] = useState(false)
+
+  const { settings: lockSettings, loading: lockLoading } = useRegistrationLock('store')
 
   const displayName = useMemo(
     () => `${userInfo?.firstName} ${userInfo?.lastName}` || "Kaset Fair Member",
@@ -401,6 +407,53 @@ export default function HomePage() {
 
         </div>
       </header>
+
+      {/* Registration Status Card */}
+      {!lockLoading && lockSettings && (
+        <div className="mx-auto w-full max-w-3xl mt-4">
+          {lockSettings.isCurrentlyLocked ? (
+            <RegistrationLockWarning
+              title="ปิดรับการแก้ไขข้อมูล"
+              message={lockSettings.lockMessage || "ขณะนี้ปิดรับการแก้ไขข้อมูลชั่วคราว"}
+            />
+          ) : lockSettings.registrationEnd ? (
+            <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50">
+              <CardContent className="px-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-100">
+                    <Calendar className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-base font-semibold text-emerald-800 mb-1">
+                      ระบบเปิดรับการแก้ไขข้อมูล
+                    </h3>
+                    <div className="space-y-1">
+                      {lockSettings.registrationStart && (
+                        <p className="text-xs text-emerald-700 flex items-center gap-1.5">
+                          <Clock className="h-3 w-3" />
+                          เริ่ม: {new Date(lockSettings.registrationStart).toLocaleString('th-TH', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short'
+                          })}
+                        </p>
+                      )}
+                      {lockSettings.registrationEnd && (
+                        <p className="text-xs text-emerald-700 flex items-center gap-1.5">
+                          <Clock className="h-3 w-3" />
+                          สิ้นสุด: {new Date(lockSettings.registrationEnd).toLocaleString('th-TH', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short'
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="mx-auto mt-4 grid w-full max-w-3xl gap-4 md:mt-6">

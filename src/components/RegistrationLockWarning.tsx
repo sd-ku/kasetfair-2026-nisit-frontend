@@ -10,12 +10,12 @@ export function RegistrationLockWarning({
     title = "ปิดรับการแก้ไขข้อมูล"
 }: RegistrationLockWarningProps) {
     return (
-        <Card className="border-red-200 bg-red-50 shadow-lg mb-6">
-            <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                    <div className="p-3 rounded-lg bg-red-100">
+        <Card className="border-red-200 bg-red-50 shadow-lg">
+            <CardContent className="px-4">
+                <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-red-100">
                         <svg
-                            className="h-6 w-6 text-red-600"
+                            className="h-5 w-5 text-red-600"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -29,10 +29,10 @@ export function RegistrationLockWarning({
                         </svg>
                     </div>
                     <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-red-800 mb-2">
+                        <h3 className="text-base font-semibold text-red-800 mb-1">
                             {title}
                         </h3>
-                        <p className="text-sm text-red-700 whitespace-pre-wrap">
+                        <p className="text-xs text-red-700 whitespace-pre-wrap">
                             {message}
                         </p>
                     </div>

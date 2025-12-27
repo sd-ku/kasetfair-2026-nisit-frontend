@@ -16,6 +16,7 @@ import { getMediaUrl, uploadMediaViaPresign } from "@/services/mediaService"
 import { MediaPurpose } from "@/services/dto/media.dto"
 import { extractErrorMessage } from "@/services/utils/extractErrorMsg"
 import { useRegistrationLock } from "@/hooks/useRegistrationLock"
+import { RegistrationLockWarning } from "@/components/RegistrationLockWarning"
 
 type FormState = {
   firstName: string
@@ -219,35 +220,9 @@ export default function EditNisitPage() {
 
         {/* Registration Lock Warning */}
         {isRegistrationLocked && (
-          <Card className="border-red-200 bg-red-50 shadow-lg mb-6">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="p-3 rounded-lg bg-red-100">
-                  <svg
-                    className="h-6 w-6 text-red-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-red-800 mb-2">
-                    ปิดรับการแก้ไขข้อมูล
-                  </h3>
-                  <p className="text-sm text-red-700 whitespace-pre-wrap">
-                    {lockSettings?.lockMessage || "ขณะนี้ไม่สามารถแก้ไขข้อมูลได้ กรุณาลองใหม่อีกครั้งในภายหลัง"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="mb-6">
+            <RegistrationLockWarning />
+          </div>
         )}
 
         <Card className="border-emerald-200 shadow-lg">
