@@ -20,6 +20,9 @@ import { convertStateToLabel, convertStoreTypeToLabel } from "@/utils/labelConve
 
 import { getEmailStatusToText } from "@/utils/labelConverter"
 import { toast } from "@/lib/toast"
+import { useRegistrationLock } from "@/hooks/useRegistrationLock"
+import { RegistrationLockWarning } from "@/components/RegistrationLockWarning"
+import { STORE_LOCK_MESSAGES } from "@/utils/registrationLockHelper"
 
 const ensureMemberFields = (emails: string[]): string[] => (emails.length ? emails : [""])
 
@@ -32,6 +35,7 @@ export default function StoreInfoPage() {
   const [storeError, setStoreError] = useState<string | null>(null)
   const [storeMessage, setStoreMessage] = useState<string | null>(null)
   const [currentUserNisitId, setCurrentUserNisitId] = useState<string | null>(null)
+  const { settings: lockSettings, loading: lockLoading } = useRegistrationLock('store')
 
   const router = useRouter()
 
@@ -39,7 +43,8 @@ export default function StoreInfoPage() {
     () => isStoreAdminUtil(currentUserNisitId, store?.storeAdminNisitId ?? null),
     [currentUserNisitId, store?.storeAdminNisitId],
   )
-  const canEditStore = Boolean(store && isStoreAdmin)
+  const isLocked = lockSettings?.isCurrentlyLocked ?? false
+  const canEditStore = Boolean(store && isStoreAdmin && !isLocked)
 
   const memberStatusMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -233,6 +238,14 @@ export default function StoreInfoPage() {
           </div>
         </header>
 
+        {/* Registration Lock Warning */}
+        {isLocked && (
+          <RegistrationLockWarning
+            title={STORE_LOCK_MESSAGES.title}
+            message={lockSettings?.lockMessage || STORE_LOCK_MESSAGES.defaultMessage}
+          />
+        )}
+
         <Card className="border-emerald-100 shadow-md">
           <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -357,7 +370,9 @@ export default function StoreInfoPage() {
                 className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
                 disabled={savingStore || !canEditStore}
               >
-                {savingStore ? (
+                {isLocked ? (
+                  STORE_LOCK_MESSAGES.buttonText
+                ) : savingStore ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     กำลังบันทึกการเปลี่ยนแปลง...

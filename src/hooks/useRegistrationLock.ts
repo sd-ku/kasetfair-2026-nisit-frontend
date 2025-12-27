@@ -7,10 +7,13 @@ import {
     lockRegistration,
     unlockRegistration,
 } from "@/services/admin/registrationLockService";
+import { getStoreRegistrationSettings } from "@/services/storeRegistrationService";
 import type {
     RegistrationSettingsDto,
     UpdateRegistrationSettingsDto,
 } from "@/services/admin/dto/registration-lock.dto";
+
+type RegistrationLockMode = 'admin' | 'store';
 
 interface UseRegistrationLockReturn {
     settings: RegistrationSettingsDto | null;
@@ -25,10 +28,13 @@ interface UseRegistrationLockReturn {
 /**
  * React Hook for managing Registration Lock settings
  * 
+ * @param mode - 'admin' for full admin access, 'store' for read-only store access (default: 'store')
+ * 
  * @example
  * ```tsx
- * function MyComponent() {
- *   const { settings, loading, lock, unlock } = useRegistrationLock();
+ * // For admin pages
+ * function AdminComponent() {
+ *   const { settings, loading, lock, unlock } = useRegistrationLock('admin');
  *   
  *   if (loading) return <div>Loading...</div>;
  *   
@@ -40,9 +46,22 @@ interface UseRegistrationLockReturn {
  *     </div>
  *   );
  * }
+ * 
+ * // For store pages (read-only)
+ * function StoreComponent() {
+ *   const { settings, loading } = useRegistrationLock('store');
+ *   
+ *   if (loading) return <div>Loading...</div>;
+ *   
+ *   return (
+ *     <div>
+ *       <p>Status: {settings?.isCurrentlyLocked ? "Locked" : "Unlocked"}</p>
+ *     </div>
+ *   );
+ * }
  * ```
  */
-export function useRegistrationLock(): UseRegistrationLockReturn {
+export function useRegistrationLock(mode: RegistrationLockMode = 'store'): UseRegistrationLockReturn {
     const [settings, setSettings] = useState<RegistrationSettingsDto | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -51,16 +70,35 @@ export function useRegistrationLock(): UseRegistrationLockReturn {
         try {
             setLoading(true);
             setError(null);
-            const data = await getRegistrationSettings();
+
+            // Use appropriate API based on mode
+            const data = mode === 'admin'
+                ? await getRegistrationSettings()
+                : await getStoreRegistrationSettings();
+
             setSettings(data);
         } catch (err) {
             const message = err instanceof Error ? err.message : "Failed to load settings";
             setError(message);
             console.error("Failed to load registration settings:", err);
+
+            // For store mode, set a default "unlocked" state on error to prevent blocking
+            if (mode === 'store') {
+                setSettings({
+                    id: 0,
+                    isManuallyLocked: false,
+                    isCurrentlyLocked: false,
+                    lockMessage: "",
+                    registrationStart: null,
+                    registrationEnd: null,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                });
+            }
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [mode]);
 
     const lock = useCallback(async (message?: string) => {
         try {

@@ -18,6 +18,9 @@ import { StoreQuestionsForm } from "@/components/store/StoreQuestionsForm"
 import type { StoreResponseDto, GoodsType } from "@/services/dto/store-info.dto"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { useRegistrationLock } from "@/hooks/useRegistrationLock"
+import { RegistrationLockWarning } from "@/components/RegistrationLockWarning"
+import { STORE_LOCK_MESSAGES } from "@/utils/registrationLockHelper"
 
 type InitialUploadedFile = {
   id: string
@@ -36,6 +39,7 @@ export default function StoreLayoutPage() {
   const [initialLayoutUploadedFiles, setInitialLayoutUploadedFiles] = useState<InitialUploadedFile[]>([])
   const [currentUserNisitId, setCurrentUserNisitId] = useState<string | null>(null)
   const [goodType, setGoodType] = useState<GoodsType | null>(null)
+  const { settings: lockSettings, loading: lockLoading } = useRegistrationLock('store')
 
   const router = useRouter()
 
@@ -43,7 +47,8 @@ export default function StoreLayoutPage() {
     () => isStoreAdminUtil(currentUserNisitId, store?.storeAdminNisitId ?? null),
     [currentUserNisitId, store?.storeAdminNisitId],
   )
-  const canEditStore = Boolean(store && isStoreAdmin)
+  const isLocked = lockSettings?.isCurrentlyLocked ?? false
+  const canEditStore = Boolean(store && isStoreAdmin && !isLocked)
 
   const fetchStore = useCallback(async () => {
     try {
@@ -166,6 +171,14 @@ export default function StoreLayoutPage() {
           </div>
         </header>
 
+        {/* Registration Lock Warning */}
+        {isLocked && (
+          <RegistrationLockWarning
+            title={STORE_LOCK_MESSAGES.title}
+            message={lockSettings?.lockMessage || STORE_LOCK_MESSAGES.defaultMessage}
+          />
+        )}
+
         <Card
           className={cn(
             "relative overflow-visible border-emerald-100 bg-white/90 shadow-md",
@@ -217,9 +230,11 @@ export default function StoreLayoutPage() {
                 type="button"
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
                 onClick={handleSaveStoreFiles}
-                disabled={(!canEditStore || savingStoreFiles) && storeFiles.length === 0 && goodType === store?.goodType}
+                disabled={!canEditStore || savingStoreFiles || (storeFiles.length === 0 && goodType === store?.goodType)}
               >
-                {savingStoreFiles ? (
+                {isLocked ? (
+                  STORE_LOCK_MESSAGES.buttonText
+                ) : savingStoreFiles ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="ml-2">กำลังบันทึก...</span>
@@ -307,9 +322,11 @@ export default function StoreLayoutPage() {
                 type="button"
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
                 onClick={handleSaveStoreFiles}
-                disabled={(!canEditStore || savingStoreFiles) && storeFiles.length === 0 && goodType === store?.goodType}
+                disabled={!canEditStore || savingStoreFiles || (storeFiles.length === 0 && goodType === store?.goodType)}
               >
-                {savingStoreFiles ? (
+                {isLocked ? (
+                  STORE_LOCK_MESSAGES.buttonText
+                ) : savingStoreFiles ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="ml-2">กำลังบันทึก...</span>

@@ -24,6 +24,9 @@ import { MediaPurpose } from "@/services/dto/media.dto"
 import { getMediaUrl, uploadMediaViaPresign } from "@/services/mediaService"
 import type { GoodsResponseDto, GoodsType } from "@/services/dto/goods.dto"
 import { createGood, deleteGood, listGoods, updateGood, extractErrorMessage } from "@/services/storeServices"
+import { useRegistrationLock } from "@/hooks/useRegistrationLock"
+import { RegistrationLockWarning } from "@/components/RegistrationLockWarning"
+import { STORE_LOCK_MESSAGES } from "@/utils/registrationLockHelper"
 
 type GoodDraft = {
   name: string
@@ -64,6 +67,7 @@ export default function StoreGoodsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   // ไม่จำเป็นต้องใช้ goodUploadingMap สำหรับการเลือกไฟล์แล้ว เพราะเราจะไปโหลดตอน Save แทน
   const [goodUploadErrors, setGoodUploadErrors] = useState<Record<string, string | null>>({})
+  const { settings: lockSettings, loading: lockLoading } = useRegistrationLock('store')
 
   const router = useRouter()
 
@@ -229,6 +233,17 @@ export default function StoreGoodsPage() {
 
   // --- Modified: Handle Save (Upload + Update) ---
   const handleSaveGood = async (goodId: string, showToast = true) => {
+    // ตรวจสอบ registration lock ก่อนยิง API
+    if (lockSettings?.isCurrentlyLocked) {
+      if (showToast) {
+        toast({
+          variant: "error",
+          description: lockSettings?.lockMessage || "ปิดรับการแก้ไขแล้ว",
+        })
+      }
+      return
+    }
+
     const draft = goodDrafts[goodId]
     if (!draft) return
 
@@ -356,6 +371,15 @@ export default function StoreGoodsPage() {
   }
 
   const handleDeleteGood = async (goodId: string) => {
+    // ตรวจสอบ registration lock ก่อนยิง API
+    if (lockSettings?.isCurrentlyLocked) {
+      toast({
+        variant: "error",
+        description: lockSettings?.lockMessage || "ปิดรับการแก้ไขแล้ว",
+      })
+      return
+    }
+
     if (!window.confirm("ต้องการลบสินค้านี้หรือไม่?")) return
     setGoodsError(null)
     setGoodsMessage(null)
@@ -395,6 +419,15 @@ export default function StoreGoodsPage() {
   }
 
   const handleCreateDraftNewGood = async (draft: DraftNewGood) => {
+    // ตรวจสอบ registration lock ก่อนยิง API
+    if (lockSettings?.isCurrentlyLocked) {
+      toast({
+        variant: "error",
+        description: lockSettings?.lockMessage || "ปิดรับการแก้ไขแล้ว",
+      })
+      return
+    }
+
     const trimmedName = draft.name.trim()
     const parsedPrice = Number(draft.price)
 
@@ -633,76 +666,88 @@ export default function StoreGoodsPage() {
           <div className="rounded-lg bg-emerald-50 p-4 text-emerald-700 border border-emerald-100">{goodsMessage}</div>
         )}
 
-        {loadingGoods ? (
+        {loadingGoods || lockLoading ? (
           <div className="flex h-64 items-center justify-center">{renderLoading("กำลังโหลดรายการอาหาร...")}</div>
         ) : (
-          <form
-            onSubmit={handleSaveAllGoods}
-            className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
-          >
-            {/* 1. Add Button Card */}
-            <button
-              type="button"
-              onClick={handleAddDraftNewGood}
-              className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/50 aspect-[3/4] hover:border-emerald-400 hover:bg-emerald-50/30 transition-all duration-200 group"
+          <>
+            {/* Registration Lock Warning */}
+            {lockSettings?.isCurrentlyLocked && (
+              <RegistrationLockWarning
+                title={STORE_LOCK_MESSAGES.title}
+                message={lockSettings?.lockMessage || STORE_LOCK_MESSAGES.defaultMessage}
+              />
+            )}
+
+            <form
+              onSubmit={handleSaveAllGoods}
+              className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm group-hover:scale-110 transition-transform duration-200">
-                <Plus className="h-6 w-6 text-emerald-600" />
-              </div>
-              <span className="text-sm font-medium text-gray-600 group-hover:text-emerald-700">เพิ่มเมนูใหม่</span>
-            </button>
+              {/* 1. Add Button Card */}
+              <button
+                type="button"
+                onClick={handleAddDraftNewGood}
+                disabled={lockSettings?.isCurrentlyLocked}
+                className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/50 aspect-[3/4] hover:border-emerald-400 hover:bg-emerald-50/30 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-gray-50/50"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm group-hover:scale-110 transition-transform duration-200">
+                  <Plus className="h-6 w-6 text-emerald-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-600 group-hover:text-emerald-700">
+                  {lockSettings?.isCurrentlyLocked ? "ปิดรับการแก้ไข" : "เพิ่มเมนูใหม่"}
+                </span>
+              </button>
 
-            {/* 2. New Drafts */}
-            {draftNewGoods.map((draft) => {
-              const fieldErrors = goodFieldErrors[draft.tempId]
-              const rowError = goodRowErrors[draft.tempId]
-              const imageUrl = goodImageUrls[draft.tempId]
+              {/* 2. New Drafts */}
+              {draftNewGoods.map((draft) => {
+                const fieldErrors = goodFieldErrors[draft.tempId]
+                const rowError = goodRowErrors[draft.tempId]
+                const imageUrl = goodImageUrls[draft.tempId]
 
-              return (
-                <Card
-                  key={draft.tempId}
-                  className="group relative overflow-hidden border-0 bg-white shadow-lg ring-2 ring-emerald-500/20 rounded-xl flex flex-col"
-                >
-                  <div className="relative aspect-[4/3] w-full bg-emerald-50 flex items-center justify-center overflow-hidden group/image">
-                    {/* Preview Image */}
-                    {imageUrl ? (
-                      <img
-                        src={imageUrl}
-                        alt="New good preview"
-                        className="absolute inset-0 h-full w-full object-cover"
+                return (
+                  <Card
+                    key={draft.tempId}
+                    className="group relative overflow-hidden border-0 bg-white shadow-lg ring-2 ring-emerald-500/20 rounded-xl flex flex-col"
+                  >
+                    <div className="relative aspect-[4/3] w-full bg-emerald-50 flex items-center justify-center overflow-hidden group/image">
+                      {/* Preview Image */}
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt="New good preview"
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="h-10 w-10 text-emerald-200" />
+                      )}
+
+                      {/* Upload Overlay */}
+                      <label
+                        htmlFor={`file-upload-new-${draft.tempId}`}
+                        className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity z-10 cursor-pointer ${imageUrl ? "opacity-0 group-hover/image:opacity-100" : "opacity-0 hover:opacity-100"}`}
+                      >
+                        <div className="pointer-events-none relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg ring-2 ring-white">
+                          <span className="flex items-center gap-2 font-medium">
+                            <UploadCloud className="h-3 w-3" />
+                            {imageUrl ? "เปลี่ยนรูป" : "เพิ่มรูป"}
+                          </span>
+                        </div>
+                      </label>
+                      <input
+                        id={`file-upload-new-${draft.tempId}`}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const files = e.target.files
+                          if (files && files.length > 0) {
+                            handleGoodFileChange(draft.tempId, Array.from(files))
+                          }
+                          e.target.value = ""
+                        }}
+                        disabled={savingAllGoods || lockSettings?.isCurrentlyLocked}
                       />
-                    ) : (
-                      <ImageIcon className="h-10 w-10 text-emerald-200" />
-                    )}
 
-                    {/* Upload Overlay */}
-                    <label
-                      htmlFor={`file-upload-new-${draft.tempId}`}
-                      className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity z-10 cursor-pointer ${imageUrl ? "opacity-0 group-hover/image:opacity-100" : "opacity-0 hover:opacity-100"}`}
-                    >
-                      <div className="pointer-events-none relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg ring-2 ring-white">
-                        <span className="flex items-center gap-2 font-medium">
-                          <UploadCloud className="h-3 w-3" />
-                          {imageUrl ? "เปลี่ยนรูป" : "เพิ่มรูป"}
-                        </span>
-                      </div>
-                    </label>
-                    <input
-                      id={`file-upload-new-${draft.tempId}`}
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        const files = e.target.files
-                        if (files && files.length > 0) {
-                          handleGoodFileChange(draft.tempId, Array.from(files))
-                        }
-                        e.target.value = ""
-                      }}
-                      disabled={savingAllGoods}
-                    />
-
-                    {/* <Button
+                      {/* <Button
                       type="button"
                       variant="ghost"
                       size="icon"
@@ -711,236 +756,249 @@ export default function StoreGoodsPage() {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button> */}
-                  </div>
-
-                  <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-emerald-600">ชื่อเมนูใหม่</label>
-                      <Input
-                        value={draft.name}
-                        onChange={(e) => handleDraftNewGoodChange(draft.tempId, "name", e.target.value)}
-                        placeholder="ชื่อเมนูใหม่"
-                        className={`h-9 text-sm bg-emerald-50/50 ${fieldErrors?.name ? "border-red-500" : "border-emerald-100"
-                          }`}
-                        autoFocus
-                      />
-                      {fieldErrors?.name && <p className="text-xs text-red-500 px-1">{fieldErrors.name}</p>}
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-emerald-600">ราคา</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600/70 text-sm">฿</span>
+                    <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-emerald-600">ชื่อเมนูใหม่</label>
                         <Input
-                          value={draft.price}
-                          onChange={(e) => handleDraftNewGoodChange(draft.tempId, "price", e.target.value)}
-                          placeholder="0"
-                          inputMode="decimal"
-                          className={`h-9 pl-7 text-sm font-semibold text-emerald-700 bg-emerald-50/50 ${fieldErrors?.price ? "border-red-500" : "border-emerald-100"
+                          value={draft.name}
+                          onChange={(e) => handleDraftNewGoodChange(draft.tempId, "name", e.target.value)}
+                          placeholder="ชื่อเมนูใหม่"
+                          className={`h-9 text-sm bg-emerald-50/50 ${fieldErrors?.name ? "border-red-500" : "border-emerald-100"
                             }`}
+                          disabled={lockSettings?.isCurrentlyLocked}
+                          autoFocus
                         />
+                        {fieldErrors?.name && <p className="text-xs text-red-500 px-1">{fieldErrors.name}</p>}
                       </div>
-                    </div>
 
-                    <div className="flex flex-col gap-2 pt-1 mt-auto">
-                      <Button
-                        onClick={(e) => handleSaveAllGoods(e as any)}
-                        className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-md rounded-full px-6 w-full"
-                        disabled={savingAllGoods || loadingGoods}
-                      >
-                        {savingAllGoods ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            กำลังบันทึก
-                          </>
-                        ) : (
-                          <>
-                            <Save className="mr-2 h-4 w-4" />
-                            บันทึก
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 w-full rounded-full h-8 text-xs"
-                        onClick={() => handleRemoveDraftNewGood(draft.tempId)}
-                        disabled={savingAllGoods}
-                      >
-                        ยกเลิก
-                      </Button>
-                    </div>
-                    {fieldErrors?.price && <p className="text-xs text-red-500 px-1">{fieldErrors.price}</p>}
-                    {rowError && <p className="text-xs text-red-500 px-1 mt-1">{rowError}</p>}
-                  </CardContent>
-                </Card>
-              )
-            })}
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-emerald-600">ราคา</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600/70 text-sm">฿</span>
+                          <Input
+                            value={draft.price}
+                            onChange={(e) => handleDraftNewGoodChange(draft.tempId, "price", e.target.value)}
+                            placeholder="0"
+                            inputMode="decimal"
+                            disabled={lockSettings?.isCurrentlyLocked}
+                            className={`h-9 pl-7 text-sm font-semibold text-emerald-700 bg-emerald-50/50 ${fieldErrors?.price ? "border-red-500" : "border-emerald-100"
+                              }`}
+                          />
+                        </div>
+                      </div>
 
-            {/* 3. Existing Goods */}
-            {goods.map((good) => {
-              const draft = goodDrafts[good.id] ?? {
-                name: "",
-                price: "",
-                type: good.type,
-                goodMediaId: good.goodMediaId,
-              }
-              const fieldErrors = goodFieldErrors[good.id]
-              const rowError = goodRowErrors[good.id]
-              const deleting = deletingGoodsMap[good.id]
-              const saving = savingGoodsMap[good.id]
-              const isEditing = editingId === good.id
-              const imageUrl = goodImageUrls[good.id]
-
-              return (
-                <Card
-                  key={good.id}
-                  className={`group relative overflow-hidden border-0 bg-white rounded-xl flex flex-col transition-all duration-200 ${isEditing ? "ring-2 ring-emerald-500 shadow-lg z-10" : "shadow-md hover:shadow-xl"
-                    }`}
-                >
-                  {/* Image Area */}
-                  <div className="relative aspect-[4/3] w-full bg-gray-100 flex items-center justify-center overflow-hidden">
-                    {/* Background Image */}
-                    {imageUrl ? (
-                      <img
-                        src={imageUrl}
-                        alt={draft.name || "Good image"}
-                        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${isEditing ? 'opacity-40' : 'opacity-100'}`}
-                      />
-                    ) : (
-                      !isEditing && <Utensils className="h-12 w-12 text-gray-300" />
-                    )}
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none" />
-
-                    {/* Upload Overlay Button (Visible only in Edit Mode) */}
-                    {isEditing && (
-                      <>
-                        <label
-                          htmlFor={`file-upload-edit-${good.id}`}
-                          className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
+                      <div className="flex flex-col gap-2 pt-1 mt-auto">
+                        <Button
+                          onClick={(e) => handleSaveAllGoods(e as any)}
+                          className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-md rounded-full px-6 w-full"
+                          disabled={savingAllGoods || loadingGoods || lockSettings?.isCurrentlyLocked}
                         >
-                          <div className="pointer-events-none relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg ring-2 ring-white">
-                            <span className="flex items-center gap-2 font-medium">
-                              <UploadCloud className="h-3 w-3" />
-                              เปลี่ยนรูป
-                            </span>
-                          </div>
-                        </label>
-                        <input
-                          id={`file-upload-edit-${good.id}`}
-                          type="file"
-                          accept="image/png,image/jpeg,image/jpg,image/webp"
-                          className="hidden"
-                          onChange={(e) => {
-                            const files = e.target.files
-                            if (files && files.length > 0) {
-                              handleGoodFileChange(good.id, Array.from(files))
-                            }
-                            e.target.value = ""
-                          }}
-                          disabled={saving}
+                          {lockSettings?.isCurrentlyLocked ? (
+                            STORE_LOCK_MESSAGES.buttonText
+                          ) : savingAllGoods ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              กำลังบันทึก
+                            </>
+                          ) : (
+                            <>
+                              <Save className="mr-2 h-4 w-4" />
+                              บันทึก
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50 w-full rounded-full h-8 text-xs"
+                          onClick={() => handleRemoveDraftNewGood(draft.tempId)}
+                          disabled={savingAllGoods || lockSettings?.isCurrentlyLocked}
+                        >
+                          ยกเลิก
+                        </Button>
+                      </div>
+                      {fieldErrors?.price && <p className="text-xs text-red-500 px-1">{fieldErrors.price}</p>}
+                      {rowError && <p className="text-xs text-red-500 px-1 mt-1">{rowError}</p>}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+
+              {/* 3. Existing Goods */}
+              {goods.map((good) => {
+                const draft = goodDrafts[good.id] ?? {
+                  name: "",
+                  price: "",
+                  type: good.type,
+                  goodMediaId: good.goodMediaId,
+                }
+                const fieldErrors = goodFieldErrors[good.id]
+                const rowError = goodRowErrors[good.id]
+                const deleting = deletingGoodsMap[good.id]
+                const saving = savingGoodsMap[good.id]
+                const isEditing = editingId === good.id
+                const imageUrl = goodImageUrls[good.id]
+
+                return (
+                  <Card
+                    key={good.id}
+                    className={`group relative overflow-hidden border-0 bg-white rounded-xl flex flex-col transition-all duration-200 ${isEditing ? "ring-2 ring-emerald-500 shadow-lg z-10" : "shadow-md hover:shadow-xl"
+                      }`}
+                  >
+                    {/* Image Area */}
+                    <div className="relative aspect-[4/3] w-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                      {/* Background Image */}
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={draft.name || "Good image"}
+                          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${isEditing ? 'opacity-40' : 'opacity-100'}`}
                         />
-                      </>
-                    )}
+                      ) : (
+                        !isEditing && <Utensils className="h-12 w-12 text-gray-300" />
+                      )}
 
-                    {!isEditing && (
-                      <Button
-                        type="button"
-                        size="icon"
-                        className="absolute bottom-2 right-2 h-8 w-8 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg transition-transform hover:scale-110 z-10"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleStartEdit(good.id)
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none" />
 
-                  <CardContent className="p-2 space-y-1.5 flex-1 flex flex-col">
-                    {isEditing ? (
-                      <>
-                        <div className="space-y-2">
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500">ชื่อเมนู</label>
-                            <Input
-                              value={draft.name}
-                              onChange={(e) => handleGoodDraftChange(good.id, "name", e.target.value)}
-                              placeholder="ชื่ออาหาร"
-                              className={`h-8 text-xs px-2 ${fieldErrors?.name ? "border-red-500" : ""}`}
-                              autoFocus
-                            />
-                          </div>
+                      {/* Upload Overlay Button (Visible only in Edit Mode) */}
+                      {isEditing && (
+                        <>
+                          <label
+                            htmlFor={`file-upload-edit-${good.id}`}
+                            className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
+                          >
+                            <div className="pointer-events-none relative overflow-hidden rounded-full bg-emerald-600 px-4 py-2 text-xs text-white shadow-lg ring-2 ring-white">
+                              <span className="flex items-center gap-2 font-medium">
+                                <UploadCloud className="h-3 w-3" />
+                                เปลี่ยนรูป
+                              </span>
+                            </div>
+                          </label>
+                          <input
+                            id={`file-upload-edit-${good.id}`}
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const files = e.target.files
+                              if (files && files.length > 0) {
+                                handleGoodFileChange(good.id, Array.from(files))
+                              }
+                              e.target.value = ""
+                            }}
+                            disabled={saving || lockSettings?.isCurrentlyLocked}
+                          />
+                        </>
+                      )}
 
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500">ราคา</label>
-                            <div className="relative">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">฿</span>
+                      {!isEditing && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="absolute bottom-2 right-2 h-8 w-8 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg transition-transform hover:scale-110 z-10"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleStartEdit(good.id)
+                          }}
+                          disabled={lockSettings?.isCurrentlyLocked}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <CardContent className="p-2 space-y-1.5 flex-1 flex flex-col">
+                      {isEditing ? (
+                        <>
+                          <div className="space-y-2">
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-gray-500">ชื่อเมนู</label>
                               <Input
-                                value={draft.price}
-                                onChange={(e) => handleGoodDraftChange(good.id, "price", e.target.value)}
-                                placeholder="0"
-                                inputMode="decimal"
-                                className={`h-8 pl-5 text-xs ${fieldErrors?.price ? "border-red-500" : ""}`}
+                                value={draft.name}
+                                onChange={(e) => handleGoodDraftChange(good.id, "name", e.target.value)}
+                                placeholder="ชื่ออาหาร"
+                                className={`h-8 text-xs px-2 ${fieldErrors?.name ? "border-red-500" : ""}`}
+                                disabled={lockSettings?.isCurrentlyLocked}
+                                autoFocus
                               />
                             </div>
+
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-gray-500">ราคา</label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">฿</span>
+                                <Input
+                                  value={draft.price}
+                                  onChange={(e) => handleGoodDraftChange(good.id, "price", e.target.value)}
+                                  placeholder="0"
+                                  inputMode="decimal"
+                                  disabled={lockSettings?.isCurrentlyLocked}
+                                  className={`h-8 pl-5 text-xs ${fieldErrors?.price ? "border-red-500" : ""}`}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-1 pt-1 mt-auto">
+                            <Button
+                              type="button"
+                              onClick={() => handleSaveGood(good.id)}
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-7 text-[10px] px-0"
+                              disabled={saving || lockSettings?.isCurrentlyLocked}
+                            >
+                              {lockSettings?.isCurrentlyLocked
+                                ? STORE_LOCK_MESSAGES.buttonText
+                                : saving
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : "บันทึก"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="h-7 w-7 rounded-md shrink-0"
+                              onClick={() => handleDeleteGood(good.id)}
+                              disabled={deleting || lockSettings?.isCurrentlyLocked}
+                            >
+                              {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => handleCancelEdit(good.id)}
+                              disabled={lockSettings?.isCurrentlyLocked}
+                              className="h-7 w-7 p-0 shrink-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <div
+                          className="flex flex-col h-full justify-between cursor-pointer"
+                          onClick={() => handleStartEdit(good.id)}
+                        >
+                          <div>
+                            <h3 className="font-semibold text-gray-900 line-clamp-2 leading-tight mb-1">
+                              {draft.name || <span className="text-gray-400 italic">ไม่มีชื่อ</span>}
+                            </h3>
+                          </div>
+                          <div className="flex items-end justify-between mt-2">
+                            <p className="text-lg font-bold text-emerald-600">฿{Number(draft.price).toLocaleString()}</p>
                           </div>
                         </div>
+                      )}
 
-                        <div className="flex gap-1 pt-1 mt-auto">
-                          <Button
-                            type="button"
-                            onClick={() => handleSaveGood(good.id)}
-                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-7 text-[10px] px-0"
-                            disabled={saving}
-                          >
-                            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : "บันทึก"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon"
-                            className="h-7 w-7 rounded-md shrink-0"
-                            onClick={() => handleDeleteGood(good.id)}
-                            disabled={deleting}
-                          >
-                            {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => handleCancelEdit(good.id)}
-                            className="h-7 w-7 p-0 shrink-0"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </>
-                    ) : (
-                      <div
-                        className="flex flex-col h-full justify-between cursor-pointer"
-                        onClick={() => handleStartEdit(good.id)}
-                      >
-                        <div>
-                          <h3 className="font-semibold text-gray-900 line-clamp-2 leading-tight mb-1">
-                            {draft.name || <span className="text-gray-400 italic">ไม่มีชื่อ</span>}
-                          </h3>
-                        </div>
-                        <div className="flex items-end justify-between mt-2">
-                          <p className="text-lg font-bold text-emerald-600">฿{Number(draft.price).toLocaleString()}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {rowError && <p className="text-xs text-red-500 mt-1">{rowError}</p>}
-                    {goodUploadErrors[good.id] && <p className="text-[11px] text-red-500">{goodUploadErrors[good.id]}</p>}
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </form>
+                      {/* {rowError && <p className="text-xs text-red-500 mt-1">{rowError}</p>} */}
+                      {goodUploadErrors[good.id] && <p className="text-[11px] text-red-500">{goodUploadErrors[good.id]}</p>}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </form>
+          </>
         )}
       </div>
     </div>

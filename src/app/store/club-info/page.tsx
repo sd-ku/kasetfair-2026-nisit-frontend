@@ -32,6 +32,9 @@ import {
 } from "lucide-react"
 import { ClubInfoResponseDto } from "@/services/dto/club-info.dto"
 import { toast } from "@/lib/toast"
+import { useRegistrationLock } from "@/hooks/useRegistrationLock"
+import { RegistrationLockWarning } from "@/components/RegistrationLockWarning"
+import { STORE_LOCK_MESSAGES } from "@/utils/registrationLockHelper"
 
 export type ClubInfoFormValues = {
   clubName: string
@@ -111,6 +114,7 @@ export default function ClubInfoEditPage() {
   const [fieldErrors, setFieldErrors] = useState<ClubInfoFormErrors | undefined>()
   const [generalError, setGeneralError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const { settings: lockSettings, loading: lockLoading } = useRegistrationLock('store')
 
   const fetchClubInfo = useCallback(async () => {
     setLoading(true)
@@ -178,6 +182,8 @@ export default function ClubInfoEditPage() {
     !values.leaderNisitId.trim() ||
     !values.leaderEmail.trim() ||
     !values.leaderPhone.trim()
+
+  const isLocked = lockSettings?.isCurrentlyLocked ?? false
 
   const handleChange = (key: keyof ClubInfoFormValues, value: string) => {
     setValues((prev) => ({
@@ -372,6 +378,14 @@ export default function ClubInfoEditPage() {
           </div>
         </header>
 
+        {/* Registration Lock Warning */}
+        {isLocked && (
+          <RegistrationLockWarning
+            title={STORE_LOCK_MESSAGES.title}
+            message={lockSettings?.lockMessage || STORE_LOCK_MESSAGES.defaultMessage}
+          />
+        )}
+
         {/* Body */}
         <div className="space-y-4">
           {successMessage && (
@@ -405,6 +419,7 @@ export default function ClubInfoEditPage() {
                       handleChange("clubName", event.target.value)
                     }
                     placeholder="ตัวอย่าง: สโมสรนิสิตคณะเกษตร"
+                    disabled={isLocked}
                     required
                   />
                   {resolveError("clubName") && (
@@ -424,6 +439,7 @@ export default function ClubInfoEditPage() {
                         handleChange("leaderFirstName", event.target.value)
                       }
                       placeholder="ชื่อ"
+                      disabled={isLocked}
                       required
                     />
                     {resolveError("leaderFirstName") && (
@@ -441,6 +457,7 @@ export default function ClubInfoEditPage() {
                         handleChange("leaderLastName", event.target.value)
                       }
                       placeholder="นามสกุล"
+                      disabled={isLocked}
                       required
                     />
                     {resolveError("leaderLastName") && (
@@ -462,6 +479,7 @@ export default function ClubInfoEditPage() {
                       }
                       placeholder="65XXXXXXXX"
                       inputMode="numeric"
+                      disabled={isLocked}
                       required
                     />
                     {resolveError("leaderNisitId") && (
@@ -480,6 +498,7 @@ export default function ClubInfoEditPage() {
                         handleChange("leaderEmail", event.target.value)
                       }
                       placeholder="president@ku.th"
+                      disabled={isLocked}
                       required
                     />
                     {resolveError("leaderEmail") && (
@@ -500,6 +519,7 @@ export default function ClubInfoEditPage() {
                     }
                     placeholder="0812345678"
                     inputMode="tel"
+                    disabled={isLocked}
                     required
                   />
                   {resolveError("leaderPhone") && (
@@ -526,6 +546,7 @@ export default function ClubInfoEditPage() {
                     accept="application/pdf,image/png,image/jpeg,image/jpg"
                     maxSize={10 * 1024 * 1024}
                     onFilesChange={handleFilesChange}
+                    disabled={isLocked}
                     initialFiles={initialUploadedFiles}
                   />
                   <p className="text-xs text-emerald-600">
@@ -543,9 +564,13 @@ export default function ClubInfoEditPage() {
                 <Button
                   type="submit"
                   className="min-w-[180px] bg-emerald-600 text-white hover:bg-emerald-700"
-                  disabled={isSubmitDisabled}
+                  disabled={isSubmitDisabled || isLocked}
                 >
-                  {submitting ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
+                  {isLocked
+                    ? STORE_LOCK_MESSAGES.buttonText
+                    : submitting
+                      ? "กำลังบันทึก..."
+                      : "บันทึกการเปลี่ยนแปลง"}
                 </Button>
               </CardFooter>
             </form>

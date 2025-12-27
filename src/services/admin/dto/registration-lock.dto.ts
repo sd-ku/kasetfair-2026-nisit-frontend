@@ -39,3 +39,13 @@ export interface RegistrationLockErrorDto {
     registrationStart?: string | null;
     registrationEnd?: string | null;
 }
+
+/**
+ * Registration Status Response (Public endpoint)
+ */
+export interface RegistrationStatusResponseDto {
+    isLocked: boolean;
+    message: string;
+    registrationStart?: string;
+    registrationEnd?: string;
+}

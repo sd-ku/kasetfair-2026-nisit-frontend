@@ -6,7 +6,7 @@ import { Lock, Unlock, Calendar, MessageSquare, Save, RefreshCw, AlertCircle, Ch
 import { DateTimePicker } from "@/components/DateTimePicker";
 
 export default function RegistrationSettingsPage() {
-    const { settings, loading, error, update } = useRegistrationLock();
+    const { settings, loading, error, update } = useRegistrationLock('admin');
 
     // Form state
     const [isManuallyLocked, setIsManuallyLocked] = useState(false);

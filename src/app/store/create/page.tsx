@@ -15,6 +15,7 @@ import { createStore } from "@/services/storeDraftService"
 import { toast } from "@/lib/toast"
 import { getStoreStatus } from "@/services/storeServices"
 import type { StoreResponseDto } from "@/services/dto/store-info.dto"
+import { useRegistrationLock } from "@/hooks/useRegistrationLock"
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,7 @@ function StoreCreateContent() {
   const [error, setError] = useState<string | null>(null)
   const [storeStatus, setStoreStatus] = useState<StoreResponseDto | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(true)
+  const { settings: lockSettings, loading: lockLoading } = useRegistrationLock('store')
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -197,7 +199,7 @@ function StoreCreateContent() {
     }
   }, [storeName, members, isSubmitting, router])
 
-  if (loadingStatus) {
+  if (loadingStatus || lockLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100">
         <p className="text-emerald-700">กำลังโหลดข้อมูล...</p>
@@ -206,6 +208,7 @@ function StoreCreateContent() {
   }
 
   const isPendingStore = storeStatus?.state === "Pending"
+  const isRegistrationLocked = lockSettings?.isCurrentlyLocked ?? false
 
   if (isPendingStore) {
     return (
@@ -247,6 +250,39 @@ function StoreCreateContent() {
             </div>
           </CardHeader>
         </Card>
+
+        {/* Registration Lock Warning */}
+        {isRegistrationLocked && (
+          <Card className="border-red-200 bg-red-50 shadow-xl">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-lg bg-red-100">
+                  <svg
+                    className="h-6 w-6 text-red-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-red-800 mb-2">
+                    ปิดรับลงทะเบียนร้านค้า
+                  </h3>
+                  <p className="text-sm text-red-700 whitespace-pre-wrap">
+                    {lockSettings?.lockMessage || "ขณะนี้ปิดรับลงทะเบียนร้านค้าชั่วคราว กรุณาลองใหม่อีกครั้งในภายหลัง"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-emerald-100 bg-white/90 shadow-xl">
           <CardHeader className="-mb-2">
@@ -348,9 +384,13 @@ function StoreCreateContent() {
               <Button
                 type="submit"
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isRegistrationLocked}
               >
-                {isSubmitting ? "กำลังบันทึกข้อมูล..." : "บันทึกและไปขั้นตอนถัดไป"}
+                {isRegistrationLocked
+                  ? "ปิดรับลงทะเบียน"
+                  : isSubmitting
+                    ? "กำลังบันทึกข้อมูล..."
+                    : "บันทึกและไปขั้นตอนถัดไป"}
               </Button>
             </CardFooter>
           </form>

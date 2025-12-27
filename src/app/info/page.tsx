@@ -15,6 +15,7 @@ import { GoogleFileUpload } from "@/components/uploadFile"
 import { getMediaUrl, uploadMediaViaPresign } from "@/services/mediaService"
 import { MediaPurpose } from "@/services/dto/media.dto"
 import { extractErrorMessage } from "@/services/utils/extractErrorMsg"
+import { useRegistrationLock } from "@/hooks/useRegistrationLock"
 
 type FormState = {
   firstName: string
@@ -51,6 +52,7 @@ export default function EditNisitPage() {
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   const [initialCardUploadedFiles, setInitialCardUploadedFiles] = useState<InitialUploadedFile[]>([])
+  const { settings: lockSettings, loading: lockLoading } = useRegistrationLock('store')
 
   const hasFetched = useRef(false)
 
@@ -197,13 +199,15 @@ export default function EditNisitPage() {
     router.back()
   }
 
-  if (loading) {
+  if (loading || lockLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50 p-4">
         <p className="text-emerald-700">กำลังโหลดข้อมูลนิสิต...</p>
       </div>
     )
   }
+
+  const isRegistrationLocked = lockSettings?.isCurrentlyLocked ?? false
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center p-4">
@@ -212,6 +216,39 @@ export default function EditNisitPage() {
           <h1 className="text-3xl font-bold text-emerald-800 mb-2">แก้ไขข้อมูลนิสิต</h1>
           <p className="text-emerald-600">ปรับปรุงข้อมูลส่วนตัวให้ถูกต้อง</p>
         </div>
+
+        {/* Registration Lock Warning */}
+        {isRegistrationLocked && (
+          <Card className="border-red-200 bg-red-50 shadow-lg mb-6">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-lg bg-red-100">
+                  <svg
+                    className="h-6 w-6 text-red-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-red-800 mb-2">
+                    ปิดรับการแก้ไขข้อมูล
+                  </h3>
+                  <p className="text-sm text-red-700 whitespace-pre-wrap">
+                    {lockSettings?.lockMessage || "ขณะนี้ไม่สามารถแก้ไขข้อมูลได้ กรุณาลองใหม่อีกครั้งในภายหลัง"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-emerald-200 shadow-lg">
           <form className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
@@ -260,7 +297,7 @@ export default function EditNisitPage() {
                 label="เบอร์โทรศัพท์"
                 value={formData.phone}
                 onChange={handleChange}
-                disabled={saving}
+                disabled={saving || isRegistrationLocked}
                 type="tel"
                 inputMode="numeric"
                 pattern="^0[0-9]{9}$"
@@ -276,7 +313,7 @@ export default function EditNisitPage() {
                   accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
                   maxSize={5 * 1024 * 1024}
                   onFilesChange={handleFilesChange}
-                  disabled={saving}
+                  disabled={saving || isRegistrationLocked}
                   initialFiles={initialCardUploadedFiles}
                 />
               </div>
@@ -295,16 +332,20 @@ export default function EditNisitPage() {
                 variant="outline"
                 className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
                 onClick={handleBack}
-                disabled={saving}
+                disabled={saving || isRegistrationLocked}
               >
                 ย้อนกลับ
               </Button>
               <Button
                 type="submit"
                 className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-emerald-400"
-                disabled={saving}
+                disabled={saving || isRegistrationLocked}
               >
-                {saving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
+                {isRegistrationLocked
+                  ? "ปิดรับการแก้ไข"
+                  : saving
+                    ? "กำลังบันทึก..."
+                    : "บันทึกการเปลี่ยนแปลง"}
               </Button>
             </CardFooter>
           </form>
