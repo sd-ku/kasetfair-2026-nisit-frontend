@@ -1,0 +1,110 @@
+                    <div className="p-6 border-b border-border">
+                        {/* Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                            <div>
+                                <h2 className="text-lg font-semibold text-card-foreground">รายการคำขอสร้างร้านค้าทั้งหมด</h2>
+                                <p className="text-sm text-muted-foreground">จัดการและตรวจสอบสถานะร้านค้า</p>
+                            </div>
+                            
+                            {/* Search Bar */}
+                            <div className="relative w-full sm:w-80">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    placeholder="ค้นหาร้านค้า, ID, บูธ..."
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="w-full pl-9 pr-4 py-2 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors border border-border focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Filters Row */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            {/* Filter Dropdowns */}
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={typeFilter || ''}
+                                    onChange={(e) => {
+                                        setTypeFilter(e.target.value as StoreType || undefined);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors border border-border"
+                                >
+                                    <option value="">ประเภททั้งหมด</option>
+                                    <option value="Club">องค์กรนิสิต</option>
+                                    <option value="Nisit">ร้านค้านิสิต</option>
+                                </select>
+                                
+                                <select
+                                    value={statusFilter || ''}
+                                    onChange={(e) => {
+                                        setStatusFilter(e.target.value as StoreState || undefined);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors border border-border"
+                                >
+                                    <option value="">สถานะทั้งหมด</option>
+                                    <option value="Pending">รอดำเนินการ</option>
+                                    <option value="Validated">อนุมัติแล้ว</option>
+                                    <option value="Rejected">ปฏิเสธ</option>
+                                </select>
+                                
+                                <select
+                                    value={sortFilter}
+                                    onChange={(e) => {
+                                        setSortFilter(e.target.value as 'id' | 'name');
+                                        setCurrentPage(1);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors border border-border"
+                                >
+                                    <option value="id">เรียงตาม ID</option>
+                                    <option value="name">เรียงตามชื่อ</option>
+                                </select>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="h-8 w-px bg-border hidden sm:block" />
+
+                            {/* View Mode Toggle */}
+                            <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg border border-border">
+                                <button
+                                    onClick={() => setViewMode('store')}
+                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                                        viewMode === 'store'
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    <Store size={14} />
+                                    <span className="hidden lg:inline">Store</span>
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('review')}
+                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                                        viewMode === 'review'
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    <ListChecks size={14} />
+                                    <span className="hidden lg:inline">Review</span>
+                                </button>
+                            </div>
+
+                            {/* Spacer */}
+                            <div className="flex-1" />
+
+                            {/* Refresh Button */}
+                            <button
+                                onClick={() => fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter)}
+                                className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors flex items-center gap-2"
+                            >
+                                <RotateCcw size={16} />
+                                <span className="hidden sm:inline">รีเฟรช</span>
+                            </button>
+                        </div>
+                    </div>

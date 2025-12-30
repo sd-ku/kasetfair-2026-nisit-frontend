@@ -4,6 +4,8 @@ import {
     FindAllStoresResponse,
     UpdateStoreStatusDto,
     UpdateStoreStatusResponse,
+    ValidateAllStoresResponse,
+    ValidateSingleStoreResponse,
 } from "./dto/review-store.dto";
 import { extractErrorMessage } from "../utils/extractErrorMsg";
 import { StatsResponseDto } from "./dto/stats-store.dto";
@@ -19,7 +21,7 @@ export async function findAllStores(
     params: FindAllStoresParams = {}
 ): Promise<FindAllStoresResponse> {
     try {
-        const { status, type, search, page = 1, limit = 10 } = params;
+        const { status, type, search, sort, page = 1, limit = 10 } = params;
 
         const queryParams = new URLSearchParams();
         queryParams.append("page", page.toString());
@@ -33,6 +35,9 @@ export async function findAllStores(
         }
         if (search) {
             queryParams.append("search", search);
+        }
+        if (sort) {
+            queryParams.append("sort", sort);
         }
 
         const res = await http.get(
@@ -123,6 +128,100 @@ export async function getStats(): Promise<StatsResponseDto> {
         const message = extractErrorMessage(
             error,
             "Failed to fetch stats"
+        );
+        throw new Error(message);
+    }
+}
+
+/**
+ * Validate all stores and create review drafts
+ * @returns Promise with validation results
+ */
+export async function validateAllStores(): Promise<ValidateAllStoresResponse> {
+    try {
+        const res = await http.post(`${ADMIN_STORE_API}/validate-all`);
+
+        if (res.status === 200 || res.status === 201) {
+            return res.data;
+        }
+
+        throw new Error("Failed to validate stores");
+    } catch (error) {
+        const message = extractErrorMessage(
+            error,
+            "Failed to validate stores"
+        );
+        throw new Error(message);
+    }
+}
+
+/**
+ * Validate a single store and create review draft
+ * @param id - Store ID
+ * @returns Promise with validation result
+ */
+export async function validateSingleStore(
+    id: number
+): Promise<ValidateSingleStoreResponse> {
+    try {
+        const res = await http.post(`${ADMIN_STORE_API}/${id}/validate`);
+
+        if (res.status === 200 || res.status === 201) {
+            return res.data;
+        }
+
+        throw new Error("Failed to validate store");
+    } catch (error) {
+        const message = extractErrorMessage(
+            error,
+            "Failed to validate store"
+        );
+        throw new Error(message);
+    }
+}
+
+/**
+ * Merge review status from drafts to all stores
+ * @returns Promise with merge results
+ */
+export async function mergeAllReviewStatus(): Promise<any> {
+    try {
+        const res = await http.post(`${ADMIN_STORE_API}/merge-review-status`);
+
+        if (res.status === 200 || res.status === 201) {
+            return res.data;
+        }
+
+        throw new Error("Failed to merge review status");
+    } catch (error) {
+        const message = extractErrorMessage(
+            error,
+            "Failed to merge review status"
+        );
+        throw new Error(message);
+    }
+}
+
+/**
+ * Merge review status from draft to a single store
+ * @param id - Store ID
+ * @returns Promise with merge result
+ */
+export async function mergeSingleReviewStatus(id: number): Promise<any> {
+    try {
+        const res = await http.post(
+            `${ADMIN_STORE_API}/${id}/merge-review-status`
+        );
+
+        if (res.status === 200 || res.status === 201) {
+            return res.data;
+        }
+
+        throw new Error("Failed to merge review status");
+    } catch (error) {
+        const message = extractErrorMessage(
+            error,
+            "Failed to merge review status"
         );
         throw new Error(message);
     }

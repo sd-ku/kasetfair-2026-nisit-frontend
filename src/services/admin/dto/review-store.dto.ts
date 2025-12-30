@@ -61,10 +61,28 @@ export type QuestionAnswerDto = {
     };
 };
 
-// Review draft information (if needed)
+// Review status enum
+export type ReviewStatus = "NeedFix" | "Pending" | "Rejected" | "deleted";
+
+// Admin role enum
+export type AdminRole = "SUPER_ADMIN" | "ADMIN";
+
+// Admin information
+export type AdminDto = {
+    id: number;
+    email: string;
+    name: string | null;
+    role: AdminRole;
+};
+
+// Review draft information - ผลการตรวจสอบร้านค้าโดย admin
 export type ReviewDraftDto = {
     id: number;
-    // Add other fields as needed
+    status: ReviewStatus;        // สถานะการตรวจสอบ (NeedFix = ต้องแก้ไข, Pending = รอจับฉลาก, Rejected = ถูกปฏิเสธ, deleted = ถูกลบ)
+    comment: string | null;      // ข้อความจาก admin อธิบายผลการตรวจสอบหรือสิ่งที่ต้องแก้ไข
+    createdAt: string;           // วันที่สร้างผลการตรวจสอบ
+    updatedAt: string;           // วันที่แก้ไขผลการตรวจสอบล่าสุด
+    admin: AdminDto;             // ข้อมูล admin ที่ทำการตรวจสอบ
 };
 
 // Main store data for admin review
@@ -110,6 +128,7 @@ export type FindAllStoresParams = {
     page?: number;
     limit?: number;
     search?: string; // store name, store id, booth number
+    sort?: 'id' | 'name'; // sort by id or name
 };
 
 // Update store status DTO
@@ -119,3 +138,18 @@ export type UpdateStoreStatusDto = {
 
 // Update store status response
 export type UpdateStoreStatusResponse = AdminStoreDto;
+
+// Validate all stores response
+export type ValidateAllStoresResponse = {
+    message: string;
+    totalStores: number;
+    validatedStores: number;
+    createdDrafts: number;
+};
+
+// Validate single store response
+export type ValidateSingleStoreResponse = {
+    message: string;
+    store: AdminStoreDto;
+    reviewDraft: ReviewDraftDto;
+};
