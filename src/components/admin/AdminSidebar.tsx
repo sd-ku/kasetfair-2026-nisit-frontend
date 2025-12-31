@@ -10,6 +10,7 @@ import {
     GraduationCap,
     LogOut,
     Settings,
+    Gift,
 } from 'lucide-react';
 
 interface NavItemProps {
@@ -64,6 +65,11 @@ export default function AdminSidebar() {
             icon: <Settings size={18} />,
             label: 'Registration Settings',
             href: '/admin/registration-settings',
+        },
+        {
+            icon: <Gift size={18} />,
+            label: 'Lucky Draw',
+            href: '/admin/lucky-draw',
         },
     ];
 

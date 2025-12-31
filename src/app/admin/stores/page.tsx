@@ -608,9 +608,9 @@ export default function StoresPage() {
                                                     </td>
                                                     <td className="p-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                                            {/* <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
                                                                 {store.storeName.substring(0, 1).toUpperCase()}
-                                                            </div>
+                                                            </div> */}
                                                             <div>
                                                                 <div className="font-medium text-foreground">{store.storeName}</div>
                                                                 <div className="text-xs text-muted-foreground">
