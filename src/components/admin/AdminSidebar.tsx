@@ -11,6 +11,8 @@ import {
     LogOut,
     Settings,
     Gift,
+    MapPin,
+    UserCheck,
 } from 'lucide-react';
 
 interface NavItemProps {
@@ -71,7 +73,18 @@ export default function AdminSidebar() {
             label: 'Lucky Draw',
             href: '/admin/lucky-draw',
         },
+        {
+            icon: <MapPin size={18} />,
+            label: 'Booth Management',
+            href: '/admin/booth',
+        },
+        {
+            icon: <UserCheck size={18} />,
+            label: 'Booth Assignment',
+            href: '/admin/booth/assignment',
+        },
     ];
+
 
     return (
         <aside className="w-72 bg-sidebar border-r border-sidebar-border flex flex-col hidden md:flex">
