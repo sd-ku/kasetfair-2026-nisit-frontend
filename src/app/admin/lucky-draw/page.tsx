@@ -1,17 +1,19 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { createLuckyDrawWinner, getLuckyDrawWinners, LuckyDrawResponse } from '@/services/admin/luckyDrawService';
-import { findAllStores } from '@/services/admin/reviewStoreService';
-import { Loader2, RefreshCw } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createLuckyDrawWinner, getLuckyDrawWinners, LuckyDrawResponse, generateWheel, getActiveEntries, resetWheel } from '@/services/admin/luckyDrawService';
+import { Loader2, RefreshCw, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function LuckyDrawPage() {
     const [winners, setWinners] = useState<LuckyDrawResponse[]>([]);
     const [latestWinner, setLatestWinner] = useState<string | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [iframeSrc, setIframeSrc] = useState("https://wheelofnames.com/th/");
     const [loadingStores, setLoadingStores] = useState(false);
+
+    // ใช้ useRef แทน document.getElementById (React Best Practice)
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const wheelContainerRef = useRef<HTMLDivElement>(null);
 
     const fetchWinners = async () => {
         try {
@@ -22,68 +24,62 @@ export default function LuckyDrawPage() {
         }
     };
 
+    // โหลดรายชื่อร้านจาก Backend และเติมลงวงล้อ
+    const loadEntriesToWheel = async (entries: string[]) => {
+        if (!iframeRef.current || !iframeRef.current.contentWindow) {
+            console.warn('Iframe not ready yet');
+            return;
+        }
+
+        // ส่งข้อมูลไปที่ iframe ด้วย postMessage
+        iframeRef.current.contentWindow.postMessage({
+            name: 'setEntries',
+            entries: entries
+        }, 'https://wheelofnames.com');
+    };
+
     const handleAutoFill = async () => {
         try {
             setLoadingStores(true);
-            const response = await findAllStores({
-                limit: 1000,
-                status: 'Validated'
+
+            // เรียก Backend API เพื่อโหลดร้านค้าและบันทึกลง database
+            const response = await generateWheel({
+                state: 'Validated'
             });
 
-            if (response.data.length === 0) {
-                toast.error('ไม่พบร้านค้าที่ได้รับการอนุมัติ');
-                return;
-            }
+            // เติมข้อมูลลงวงล้อ
+            await loadEntriesToWheel(response.entries);
 
-            const allEntries = response.data.map(store => `${store.id}. ${store.storeName}`);
-            const iframe = document.getElementById('wheelFrame') as HTMLIFrameElement;
-
-            if (!iframe || !iframe.contentWindow) {
-                toast.error('ไม่พบ iframe ของวงล้อ');
-                return;
-            }
-
-            // แบ่งส่งข้อมูลเป็น batch ทีละ 50 รายการ
-            const BATCH_SIZE = 50;
-            const totalBatches = Math.ceil(allEntries.length / BATCH_SIZE);
-
-            // ล้างข้อมูลเดิมก่อน
-            iframe.contentWindow.postMessage({
-                name: 'setEntries',
-                entries: []
-            }, 'https://wheelofnames.com');
-
-            // รอให้ล้างข้อมูลเสร็จ
-            await new Promise(resolve => setTimeout(resolve, 300));
-
-            // ส่งข้อมูลทีละ batch
-            for (let i = 0; i < totalBatches; i++) {
-                const start = i * BATCH_SIZE;
-                const end = Math.min(start + BATCH_SIZE, allEntries.length);
-                const batch = allEntries.slice(start, end);
-
-                iframe.contentWindow.postMessage({
-                    name: 'addEntries',
-                    entries: batch
-                }, 'https://wheelofnames.com');
-
-                // หน่วงเวลาระหว่าง batch
-                if (i < totalBatches - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-            }
-
-            toast.success(`โหลดข้อมูล ${allEntries.length} ร้านค้าเรียบร้อยแล้ว (${totalBatches} batches)`);
-        } catch (error) {
-            console.error('Failed to auto fill stores', error);
-            toast.error('เกิดข้อผิดพลาดในการโหลดข้อมูลร้านค้า');
+            toast.success(`โหลดข้อมูล ${response.totalStores} ร้านค้าเรียบร้อยแล้ว`);
+        } catch (error: any) {
+            console.error('Failed to generate wheel', error);
+            const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างวงล้อ';
+            toast.error(errorMessage);
         } finally {
             setLoadingStores(false);
         }
     };
 
+    const handleReset = async () => {
+        try {
+            await resetWheel();
+            // ล้างวงล้อ
+            if (iframeRef.current?.contentWindow) {
+                iframeRef.current.contentWindow.postMessage({
+                    name: 'setEntries',
+                    entries: []
+                }, 'https://wheelofnames.com');
+            }
+            toast.success('รีเซ็ตวงล้อเรียบร้อยแล้ว');
+        } catch (error) {
+            console.error('Failed to reset wheel', error);
+            toast.error('เกิดข้อผิดพลาดในการรีเซ็ตวงล้อ');
+        }
+    };
+
     const toggleFullscreen = () => {
-        const wheelContainer = document.getElementById('wheelContainer');
+        // ใช้ ref แทน getElementById
+        const wheelContainer = wheelContainerRef.current;
 
         if (!isFullscreen) {
             // Enter fullscreen
@@ -110,6 +106,24 @@ export default function LuckyDrawPage() {
 
     useEffect(() => {
         fetchWinners();
+
+        // โหลด active entries จาก database เมื่อ component mount
+        // (กรณี refresh หน้า จะได้กู้คืนข้อมูลวงล้อ)
+        const loadActiveEntries = async () => {
+            try {
+                const entries = await getActiveEntries();
+                if (entries.length > 0) {
+                    // รอให้ iframe โหลดเสร็จก่อน
+                    setTimeout(() => {
+                        loadEntriesToWheel(entries);
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error('Failed to load active entries', error);
+            }
+        };
+
+        loadActiveEntries();
 
         const handleMessage = async (event: MessageEvent) => {
             if (event.origin !== "https://wheelofnames.com") {
@@ -163,7 +177,7 @@ export default function LuckyDrawPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Wheel Section */}
                 <div
-                    id="wheelContainer"
+                    ref={wheelContainerRef}
                     className={`transition-all duration-300 ${isFullscreen
                         ? 'fixed inset-0 z-50 w-screen h-screen bg-black flex flex-col'
                         : 'bg-white p-6 rounded-2xl shadow-xl border border-gray-100 flex flex-col h-[700px]'
@@ -189,6 +203,14 @@ export default function LuckyDrawPage() {
                                     <span className="text-sm font-medium">โหลดรายชื่อร้าน</span>
                                 </button>
                                 <button
+                                    onClick={handleReset}
+                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-red-600 hover:text-red-700 flex items-center gap-2"
+                                    title="Reset Wheel"
+                                >
+                                    <RotateCcw className="w-5 h-5" />
+                                    <span className="text-sm font-medium">รีเซ็ต</span>
+                                </button>
+                                <button
                                     onClick={toggleFullscreen}
                                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900 flex items-center gap-2"
                                     title="ขยายเต็มจอ"
@@ -202,7 +224,7 @@ export default function LuckyDrawPage() {
                         </div>
                     )}
 
-                    {isFullscreen && (
+                    {/* {isFullscreen && (
                         <button
                             onClick={toggleFullscreen}
                             className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 p-2 bg-gray-800/80 hover:bg-gray-700 text-white rounded-full shadow-lg backdrop-blur-sm transition-all hover:scale-110 flex items-center justify-center w-10 h-10 border border-gray-600"
@@ -213,12 +235,12 @@ export default function LuckyDrawPage() {
                                 <line x1="6" y1="6" x2="18" y2="18"></line>
                             </svg>
                         </button>
-                    )}
+                    )} */}
 
                     <div className={`flex-1 w-full bg-gray-50 overflow-hidden relative ${!isFullscreen ? 'rounded-xl' : ''}`}>
                         <iframe
-                            id="wheelFrame"
-                            src={iframeSrc}
+                            ref={iframeRef}
+                            src="https://wheelofnames.com/th/"
                             className="absolute inset-0 w-full h-full border-0"
                             title="Wheel of Names"
                         >
