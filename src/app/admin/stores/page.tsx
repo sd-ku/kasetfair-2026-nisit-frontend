@@ -75,6 +75,7 @@ export default function StoresPage() {
     });
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<StoreState | undefined>(undefined);
+    const [reviewStatusFilter, setReviewStatusFilter] = useState<ReviewStatus | undefined>(undefined);
     const [typeFilter, setTypeFilter] = useState<StoreType | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [sortFilter, setSortFilter] = useState<'id' | 'name'>('id');
@@ -89,7 +90,7 @@ export default function StoresPage() {
     const [dropdownPosition, setDropdownPosition] = useState<Record<number, 'top' | 'bottom'>>({});
 
     // Fetch stores from API
-    const fetchStores = async (page: number = 1, status?: StoreState, type?: StoreType, search?: string, sort?: 'id' | 'name') => {
+    const fetchStores = async (page: number = 1, status?: StoreState, type?: StoreType, reviewStatus?: ReviewStatus, search?: string, sort?: 'id' | 'name') => {
         try {
             setLoading(true);
             setError(null);
@@ -98,6 +99,7 @@ export default function StoresPage() {
                 limit: 10,
                 status,
                 type,
+                reviewStatus,
                 search,
                 sort
             });
@@ -125,9 +127,9 @@ export default function StoresPage() {
 
     // Initial load
     useEffect(() => {
-        fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter);
+        fetchStores(currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter);
         fetchStats();
-    }, [currentPage, statusFilter, typeFilter, searchQuery, sortFilter]);
+    }, [currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter]);
 
     const toggleMembers = (id: number) => {
         const newExpandedId = expandedRow === id ? null : id;
@@ -193,7 +195,7 @@ export default function StoresPage() {
             toast.success(`อัพเดทสถานะร้านค้าเรียบร้อยแล้ว`);
 
             // Refresh data to get updated stats
-            await fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter);
+            await fetchStores(currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter);
             await fetchStats();
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัพเดทสถานะ';
@@ -245,7 +247,7 @@ export default function StoresPage() {
             );
 
             // Refresh data
-            await fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter);
+            await fetchStores(currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter);
             await fetchStats();
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการ validate';
@@ -271,7 +273,7 @@ export default function StoresPage() {
             );
 
             // Refresh data
-            await fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter);
+            await fetchStores(currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter);
             await fetchStats();
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการ merge';
@@ -290,7 +292,7 @@ export default function StoresPage() {
             toast.success(`Merge สถานะร้าน #${id} สำเร็จ`);
 
             // Refresh data
-            await fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter);
+            await fetchStores(currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter);
             await fetchStats();
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการ merge';
@@ -310,7 +312,7 @@ export default function StoresPage() {
             toast.success(`อัพเดทสถานะร้าน #${id} เป็น ${statusLabel} สำเร็จ`);
 
             // Refresh data
-            await fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter);
+            await fetchStores(currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter);
             await fetchStats();
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการอัพเดทสถานะ';
@@ -336,7 +338,7 @@ export default function StoresPage() {
             );
 
             // Refresh data
-            await fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter);
+            await fetchStores(currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter);
             await fetchStats();
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการ validate';
@@ -390,7 +392,7 @@ export default function StoresPage() {
     const getReviewStatusDisplay = (status: ReviewStatus) => {
         const statusMap: Record<ReviewStatus, { label: string; className: string }> = {
             'NeedFix': { label: 'ต้องแก้ไข', className: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' },
-            'Pending': { label: 'รอจับฉลาก', className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' },
+            'Pending': { label: 'ผ่าน', className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' },
             'Rejected': { label: 'ถูกปฏิเสธ', className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' },
             'deleted': { label: 'ถูกลบ', className: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800' }
         };
@@ -473,7 +475,7 @@ export default function StoresPage() {
                             <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
                         </div>
                         <button
-                            onClick={() => fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter)}
+                            onClick={() => fetchStores(currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter)}
                             className="px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md transition-colors"
                         >
                             ลองอีกครั้ง
@@ -532,10 +534,24 @@ export default function StoresPage() {
                                     }}
                                     className="px-4 py-2 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors border border-border"
                                 >
-                                    <option value="">สถานะทั้งหมด</option>
+                                    <option value="">สถานะร้านทั้งหมด</option>
                                     <option value="Pending">รอดำเนินการ</option>
                                     <option value="Validated">อนุมัติแล้ว</option>
                                     <option value="Rejected">ปฏิเสธ</option>
+                                </select>
+
+                                <select
+                                    value={reviewStatusFilter || ''}
+                                    onChange={(e) => {
+                                        setReviewStatusFilter(e.target.value as ReviewStatus || undefined);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors border border-border"
+                                >
+                                    <option value="">Review Status ทั้งหมด</option>
+                                    <option value="NeedFix">ต้องแก้ไข</option>
+                                    <option value="Pending">ผ่าน (รอจับฉลาก)</option>
+                                    <option value="Rejected">ถูกปฏิเสธ</option>
                                 </select>
 
                                 <select
@@ -556,7 +572,7 @@ export default function StoresPage() {
 
                             {/* Refresh Button */}
                             <button
-                                onClick={() => fetchStores(currentPage, statusFilter, typeFilter, searchQuery, sortFilter)}
+                                onClick={() => fetchStores(currentPage, statusFilter, typeFilter, reviewStatusFilter, searchQuery, sortFilter)}
                                 className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors flex items-center gap-2"
                             >
                                 <RotateCcw size={16} />
@@ -735,7 +751,22 @@ export default function StoresPage() {
                                                     {/* Review Status & Actions Column - Combined */}
                                                     <td className="p-4 text-center">
                                                         {store.reviewDrafts.length > 0 ? (
-                                                            <div className="relative inline-block w-full max-w-xs group/card" style={{ position: 'static' }}>
+                                                            <div
+                                                                className="relative inline-block w-full max-w-xs group/card"
+                                                                style={{ position: 'static' }}
+                                                                onMouseEnter={(e) => {
+                                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                                    const viewportHeight = window.innerHeight;
+                                                                    const spaceBelow = viewportHeight - rect.bottom;
+                                                                    const spaceAbove = rect.top;
+                                                                    const dropdownHeight = 350; // Reduced height estimate which is closer to reality (approx 300-400px)
+
+                                                                    setDropdownPosition(prev => ({
+                                                                        ...prev,
+                                                                        [store.id]: spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? 'top' : 'bottom'
+                                                                    }));
+                                                                }}
+                                                            >
                                                                 <div className="relative">
                                                                     {(() => {
                                                                         const latestReview = store.reviewDrafts[0];
@@ -756,18 +787,6 @@ export default function StoresPage() {
                                                                                     {/* Right: Actions Button */}
                                                                                     <button
                                                                                         className="h-6 w-6 flex-shrink-0 inline-flex items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors z-10"
-                                                                                        onMouseEnter={(e) => {
-                                                                                            const rect = e.currentTarget.getBoundingClientRect();
-                                                                                            const viewportHeight = window.innerHeight;
-                                                                                            const spaceBelow = viewportHeight - rect.bottom;
-                                                                                            const spaceAbove = rect.top;
-                                                                                            const dropdownHeight = 400;
-
-                                                                                            setDropdownPosition(prev => ({
-                                                                                                ...prev,
-                                                                                                [store.id]: spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? 'top' : 'bottom'
-                                                                                            }));
-                                                                                        }}
                                                                                     >
                                                                                         {(validatingStoreId === store.id || mergingStoreId === store.id || updatingStatusId === store.id) ? (
                                                                                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -844,47 +863,31 @@ export default function StoresPage() {
                                                                                             </p>
                                                                                         </div>
 
-                                                                                        <div className="p-1.5">
+                                                                                        <div className="p-1">
                                                                                             {/* Manual Actions */}
-                                                                                            {store.state === 'Validated' || store.state === 'Rejected' ? (
-                                                                                                /* Undo Button - Revert to Pending */
-                                                                                                <button
-                                                                                                    onClick={() => handleUpdateStatus(store.id, 'Pending')}
-                                                                                                    disabled={updatingStatusId !== null}
-                                                                                                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-orange-50 dark:hover:bg-orange-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
-                                                                                                >
-                                                                                                    <div className="h-7 w-7 rounded-md bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
-                                                                                                        <RotateCcw className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                                                                                                    </div>
-                                                                                                    <span className="font-medium text-orange-600 dark:text-orange-400">ย้อนสถานะกลับ</span>
-                                                                                                </button>
-                                                                                            ) : (
-                                                                                                <>
-                                                                                                    {/* Manual Validate Button */}
-                                                                                                    <button
-                                                                                                        onClick={() => handleUpdateStatus(store.id, 'Validated')}
-                                                                                                        disabled={updatingStatusId !== null}
-                                                                                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-green-50 dark:hover:bg-green-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
-                                                                                                    >
-                                                                                                        <div className="h-7 w-7 rounded-md bg-green-100 dark:bg-green-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
-                                                                                                            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                                                                        </div>
-                                                                                                        <span className="font-medium text-green-600 dark:text-green-400">อนุมัติ</span>
-                                                                                                    </button>
+                                                                                            {/* Manual Validate Button */}
+                                                                                            <button
+                                                                                                onClick={() => handleUpdateStatus(store.id, 'Validated')}
+                                                                                                disabled={updatingStatusId !== null}
+                                                                                                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-green-50 dark:hover:bg-green-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
+                                                                                            >
+                                                                                                <div className="h-7 w-7 rounded-md bg-green-100 dark:bg-green-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                                                                                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                                                                                </div>
+                                                                                                <span className="font-medium text-green-600 dark:text-green-400">อนุมัติ</span>
+                                                                                            </button>
 
-                                                                                                    {/* Manual Reject Button */}
-                                                                                                    <button
-                                                                                                        onClick={() => handleUpdateStatus(store.id, 'Rejected')}
-                                                                                                        disabled={updatingStatusId !== null}
-                                                                                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-red-50 dark:hover:bg-red-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
-                                                                                                    >
-                                                                                                        <div className="h-7 w-7 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
-                                                                                                            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                                                                                                        </div>
-                                                                                                        <span className="font-medium text-red-600 dark:text-red-400">ปฏิเสธ</span>
-                                                                                                    </button>
-                                                                                                </>
-                                                                                            )}
+                                                                                            {/* Manual Reject Button */}
+                                                                                            <button
+                                                                                                onClick={() => handleUpdateStatus(store.id, 'Rejected')}
+                                                                                                disabled={updatingStatusId !== null}
+                                                                                                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-red-50 dark:hover:bg-red-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
+                                                                                            >
+                                                                                                <div className="h-7 w-7 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                                                                                    <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                                                                                </div>
+                                                                                                <span className="font-medium text-red-600 dark:text-red-400">ปฏิเสธ</span>
+                                                                                            </button>
                                                                                         </div>
                                                                                     </div>
                                                                                 </div>

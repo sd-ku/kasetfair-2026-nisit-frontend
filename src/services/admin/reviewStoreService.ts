@@ -21,7 +21,7 @@ export async function findAllStores(
     params: FindAllStoresParams = {}
 ): Promise<FindAllStoresResponse> {
     try {
-        const { status, type, search, sort, page = 1, limit = 10 } = params;
+        const { status, type, reviewStatus, search, sort, page = 1, limit = 10 } = params;
 
         const queryParams = new URLSearchParams();
         queryParams.append("page", page.toString());
@@ -32,6 +32,9 @@ export async function findAllStores(
         }
         if (type) {
             queryParams.append("type", type);
+        }
+        if (reviewStatus) {
+            queryParams.append("reviewStatus", reviewStatus);
         }
         if (search) {
             queryParams.append("search", search);

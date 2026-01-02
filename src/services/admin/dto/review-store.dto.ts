@@ -125,6 +125,7 @@ export type FindAllStoresResponse = {
 export type FindAllStoresParams = {
     status?: StoreState;
     type?: StoreType;
+    reviewStatus?: ReviewStatus;
     page?: number;
     limit?: number;
     search?: string; // store name, store id, booth number
