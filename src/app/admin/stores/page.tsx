@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Store,
     CheckCircle,
@@ -29,8 +29,15 @@ import {
     GitMerge,
     Info,
     MessageSquare,
-    MessageSquareText
+    MessageSquareText,
+    MoreHorizontal,
+    MoreVertical
 } from 'lucide-react';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import {
     findAllStores,
     updateStoreStatus,
@@ -78,6 +85,8 @@ export default function StoresPage() {
     const [mergingAll, setMergingAll] = useState(false);
     const [mergingStoreId, setMergingStoreId] = useState<number | null>(null);
     const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
+    const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
+    const [dropdownPosition, setDropdownPosition] = useState<Record<number, 'top' | 'bottom'>>({});
 
     // Fetch stores from API
     const fetchStores = async (page: number = 1, status?: StoreState, type?: StoreType, search?: string, sort?: 'id' | 'name') => {
@@ -455,7 +464,7 @@ export default function StoresPage() {
                 </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="overflow-y-auto p-8">
                 {/* Error State */}
                 {error && (
                     <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
@@ -473,7 +482,7 @@ export default function StoresPage() {
                 )}
 
                 {/* Main Table Section */}
-                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-card rounded-xl border border-border shadow-sm overflow-visible flex flex-col">
                     <div className="p-6 border-b border-border">
                         {/* Header */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -556,7 +565,7 @@ export default function StoresPage() {
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div>
                         {loading ? (
                             <div className="flex items-center justify-center py-20">
                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -581,8 +590,8 @@ export default function StoresPage() {
                                         <th className="p-4 text-center">แผนผังบูธ</th>
                                         <th className="p-4 text-center">ฟอร์มสมัคร</th>
                                         <th className="p-4 text-center">คำถาม</th>
-                                        <th className="p-4 text-center">สถานะ</th>
-                                        <th className="p-4 pr-6 text-center">Actions</th>
+                                        <th className="p-4 text-center">สถานะร้าน</th>
+                                        <th className="p-4 text-center">Review & Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
@@ -703,129 +712,193 @@ export default function StoresPage() {
                                                         </button>
                                                     </td>
 
-                                                    {/* Combined Status Column - Store State (top) and Review Status (bottom) */}
+                                                    {/* Store Status Column - Actual Store State */}
                                                     <td className="p-4 text-center">
-                                                        <div className="flex flex-col items-center gap-2">
-                                                            {/* Store Status Badge - Top */}
-                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusDisplay.className}`}>
-                                                                {statusDisplay.label}
-                                                            </span>
+                                                        <div className="relative group/status inline-block">
+                                                            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all hover:scale-105 ${statusDisplay.className}`}>
+                                                                {/* Status Icon */}
+                                                                {store.state === 'Validated' && <CheckCircle className="h-3.5 w-3.5" />}
+                                                                {store.state === 'Rejected' && <XCircle className="h-3.5 w-3.5" />}
+                                                                {store.state === 'Pending' && <AlertCircle className="h-3.5 w-3.5" />}
+                                                                {store.state === 'Submitted' && <FileCheck className="h-3.5 w-3.5" />}
+                                                                <span>{statusDisplay.label}</span>
+                                                            </div>
 
-                                                            {/* Divider */}
-                                                            <div className="w-full h-px bg-border/100" />
+                                                            {/* Tooltip */}
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all whitespace-nowrap z-50">
+                                                                สถานะร้านปัจจุบัน
+                                                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
 
-                                                            {/* Review Status Badge - Bottom */}
-                                                            {store.reviewDrafts.length > 0 ? (
-                                                                <div className="flex flex-col items-center gap-1">
+                                                    {/* Review Status & Actions Column - Combined */}
+                                                    <td className="p-4 text-center">
+                                                        {store.reviewDrafts.length > 0 ? (
+                                                            <div className="relative inline-block w-full max-w-xs group/card" style={{ position: 'static' }}>
+                                                                <div className="relative">
                                                                     {(() => {
                                                                         const latestReview = store.reviewDrafts[0];
                                                                         const reviewDisplay = getReviewStatusDisplay(latestReview.status);
                                                                         return (
-                                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${reviewDisplay.className}`}>
-                                                                                {reviewDisplay.label}
-                                                                            </span>
+                                                                            <>
+                                                                                {/* Review Card with inline actions */}
+                                                                                <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border-2 transition-all hover:scale-[1.02] ${reviewDisplay.className}`}>
+                                                                                    {/* Left: Review Info */}
+                                                                                    <div className="flex items-center gap-1.5">
+                                                                                        <MessageSquare className="h-3.5 w-3.5" />
+                                                                                        <span className="text-xs font-semibold">{reviewDisplay.label}</span>
+                                                                                        <span className="px-1.5 py-0.5 bg-black/10 dark:bg-white/10 rounded-full text-[10px] font-bold">
+                                                                                            {store.reviewDrafts.length}
+                                                                                        </span>
+                                                                                    </div>
+
+                                                                                    {/* Right: Actions Button */}
+                                                                                    <button
+                                                                                        className="h-6 w-6 flex-shrink-0 inline-flex items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors z-10"
+                                                                                        onMouseEnter={(e) => {
+                                                                                            const rect = e.currentTarget.getBoundingClientRect();
+                                                                                            const viewportHeight = window.innerHeight;
+                                                                                            const spaceBelow = viewportHeight - rect.bottom;
+                                                                                            const spaceAbove = rect.top;
+                                                                                            const dropdownHeight = 400;
+
+                                                                                            setDropdownPosition(prev => ({
+                                                                                                ...prev,
+                                                                                                [store.id]: spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? 'top' : 'bottom'
+                                                                                            }));
+                                                                                        }}
+                                                                                    >
+                                                                                        {(validatingStoreId === store.id || mergingStoreId === store.id || updatingStatusId === store.id) ? (
+                                                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                                        ) : (
+                                                                                            <MoreVertical className="h-3.5 w-3.5" />
+                                                                                        )}
+                                                                                    </button>
+                                                                                </div>
+
+                                                                                {/* Dropdown Menu */}
+                                                                                <div className={`absolute right-0 w-56 opacity-0 invisible group-hover/card:opacity-100 group-hover/card:visible hover:opacity-100 hover:visible transition-all duration-200 z-[999999] ${dropdownPosition[store.id] === 'top'
+                                                                                    ? 'bottom-full mb-1 group-hover/card:-translate-y-0 hover:-translate-y-0 translate-y-2'
+                                                                                    : 'top-full mt-1 group-hover/card:translate-y-0 hover:translate-y-0 -translate-y-2'
+                                                                                    }`}>
+                                                                                    <div className="bg-background border border-border rounded-lg shadow-xl overflow-hidden backdrop-blur-sm">
+                                                                                        {/* Header Section */}
+                                                                                        <div className="px-3 py-2 bg-gradient-to-r from-primary/5 to-primary/10 border-b border-border">
+                                                                                            <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                                                                                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse"></span>
+                                                                                                การจัดการร้านค้า
+                                                                                            </p>
+                                                                                        </div>
+
+                                                                                        <div className="p-1.5">
+                                                                                            {/* Auto Validate Button */}
+                                                                                            <button
+                                                                                                onClick={() => handleValidateSingle(store.id)}
+                                                                                                disabled={validatingStoreId !== null}
+                                                                                                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-purple-50 dark:hover:bg-purple-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
+                                                                                            >
+                                                                                                <div className="h-7 w-7 rounded-md bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                                                                                    <Zap className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                                                                                </div>
+                                                                                                <span className="font-medium text-foreground">Auto Validate</span>
+                                                                                            </button>
+
+                                                                                            {/* Review action buttons - Show if has reviews */}
+                                                                                            {store.reviewDrafts.length > 0 && (
+                                                                                                <>
+                                                                                                    {/* View Review Details Button */}
+                                                                                                    <button
+                                                                                                        onClick={() => toggleReviewDetails(store.id)}
+                                                                                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
+                                                                                                    >
+                                                                                                        <div className="h-7 w-7 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                                                                                            <MessageSquareText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                                                                        </div>
+                                                                                                        <span className="font-medium text-foreground">ดูรายละเอียด Review</span>
+                                                                                                    </button>
+
+                                                                                                    {/* Merge Single Button */}
+                                                                                                    <button
+                                                                                                        onClick={() => handleMergeSingle(store.id)}
+                                                                                                        disabled={mergingStoreId !== null}
+                                                                                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-cyan-50 dark:hover:bg-cyan-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
+                                                                                                    >
+                                                                                                        <div className="h-7 w-7 rounded-md bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                                                                                            <GitMerge className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                                                                                                        </div>
+                                                                                                        <span className="font-medium text-foreground">Merge Review Status</span>
+                                                                                                    </button>
+                                                                                                </>
+                                                                                            )}
+                                                                                        </div>
+
+                                                                                        {/* Divider */}
+                                                                                        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent my-1" />
+
+                                                                                        {/* Manual Actions Header */}
+                                                                                        <div className="px-3 py-2 bg-muted/30">
+                                                                                            <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                                                                                                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50"></span>
+                                                                                                เปลี่ยนสถานะด้วยตนเอง
+                                                                                            </p>
+                                                                                        </div>
+
+                                                                                        <div className="p-1.5">
+                                                                                            {/* Manual Actions */}
+                                                                                            {store.state === 'Validated' || store.state === 'Rejected' ? (
+                                                                                                /* Undo Button - Revert to Pending */
+                                                                                                <button
+                                                                                                    onClick={() => handleUpdateStatus(store.id, 'Pending')}
+                                                                                                    disabled={updatingStatusId !== null}
+                                                                                                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-orange-50 dark:hover:bg-orange-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
+                                                                                                >
+                                                                                                    <div className="h-7 w-7 rounded-md bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                                                                                        <RotateCcw className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                                                                                    </div>
+                                                                                                    <span className="font-medium text-orange-600 dark:text-orange-400">ย้อนสถานะกลับ</span>
+                                                                                                </button>
+                                                                                            ) : (
+                                                                                                <>
+                                                                                                    {/* Manual Validate Button */}
+                                                                                                    <button
+                                                                                                        onClick={() => handleUpdateStatus(store.id, 'Validated')}
+                                                                                                        disabled={updatingStatusId !== null}
+                                                                                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-green-50 dark:hover:bg-green-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
+                                                                                                    >
+                                                                                                        <div className="h-7 w-7 rounded-md bg-green-100 dark:bg-green-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                                                                                            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                                                                                        </div>
+                                                                                                        <span className="font-medium text-green-600 dark:text-green-400">อนุมัติ</span>
+                                                                                                    </button>
+
+                                                                                                    {/* Manual Reject Button */}
+                                                                                                    <button
+                                                                                                        onClick={() => handleUpdateStatus(store.id, 'Rejected')}
+                                                                                                        disabled={updatingStatusId !== null}
+                                                                                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-red-50 dark:hover:bg-red-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
+                                                                                                    >
+                                                                                                        <div className="h-7 w-7 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                                                                                            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                                                                                        </div>
+                                                                                                        <span className="font-medium text-red-600 dark:text-red-400">ปฏิเสธ</span>
+                                                                                                    </button>
+                                                                                                </>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </>
                                                                         );
                                                                     })()}
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        {store.reviewDrafts.length} review{store.reviewDrafts.length > 1 ? 's' : ''}
-                                                                    </span>
                                                                 </div>
-                                                            ) : (
-                                                                <span className="text-xs text-muted-foreground italic">
-                                                                    ยังไม่มีการ review
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Actions Column */}
-                                                    <td className="p-4 pr-6">
-                                                        <div className="flex flex-col items-center gap-2">
-                                                            {/* Manual Validation Buttons - Top Row */}
-                                                            <div className="flex items-center justify-center gap-1.5">
-                                                                {store.state === 'Validated' || store.state === 'Rejected' ? (
-                                                                    /* Undo Button - Revert to Pending */
-                                                                    <button
-                                                                        onClick={() => handleUpdateStatus(store.id, 'Pending')}
-                                                                        className="p-1.5 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-colors"
-                                                                        title="ย้อนผลตัดสิน (กลับเป็น Pending)"
-                                                                        disabled={updatingStatusId !== null}
-                                                                    >
-                                                                        <RotateCcw size={16} />
-                                                                    </button>
-                                                                ) : (
-                                                                    <>
-                                                                        {/* Manual Validate Button */}
-                                                                        <button
-                                                                            onClick={() => handleUpdateStatus(store.id, 'Validated')}
-                                                                            className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors"
-                                                                            title="ตั้งเป็น Validated"
-                                                                            disabled={updatingStatusId !== null}
-                                                                        >
-                                                                            <CheckCircle size={16} />
-                                                                        </button>
-
-                                                                        {/* Manual Reject Button */}
-                                                                        <button
-                                                                            onClick={() => handleUpdateStatus(store.id, 'Rejected')}
-                                                                            className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
-                                                                            title="ตั้งเป็น Rejected"
-                                                                            disabled={updatingStatusId !== null}
-                                                                        >
-                                                                            <XCircle size={16} />
-                                                                        </button>
-                                                                    </>
-                                                                )}
                                                             </div>
-
-                                                            {/* Divider */}
-                                                            <div className="w-full h-px bg-border/100" />
-
-                                                            {/* Auto Validate & Review Actions - Bottom Row */}
-                                                            <div className="flex items-center justify-center gap-1.5">
-                                                                {/* Auto Validate Button - Always show */}
-                                                                {validatingStoreId === store.id ? (
-                                                                    <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() => handleValidateSingle(store.id)}
-                                                                        className="p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors"
-                                                                        title="Auto Validate ร้านนี้"
-                                                                        disabled={validatingStoreId !== null}
-                                                                    >
-                                                                        <Zap size={16} />
-                                                                    </button>
-                                                                )}
-
-                                                                {/* Review action buttons - Always show if has reviews */}
-                                                                {store.reviewDrafts.length > 0 && (
-                                                                    <>
-                                                                        {/* View Review Details Button */}
-                                                                        <button
-                                                                            onClick={() => toggleReviewDetails(store.id)}
-                                                                            className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                                                                            title="ดูรายละเอียด Review"
-                                                                        >
-                                                                            <MessageSquareText size={16} />
-                                                                        </button>
-
-                                                                        {/* Merge Single Button */}
-                                                                        {mergingStoreId === store.id ? (
-                                                                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                                                        ) : (
-                                                                            <button
-                                                                                onClick={() => handleMergeSingle(store.id)}
-                                                                                className="p-1.5 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 rounded-md transition-colors"
-                                                                                title="Merge Review Status"
-                                                                                disabled={mergingStoreId !== null}
-                                                                            >
-                                                                                <GitMerge size={16} />
-                                                                            </button>
-                                                                        )}
-                                                                    </>
-                                                                )}
+                                                        ) : (
+                                                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted/50 text-muted-foreground text-xs">
+                                                                <MessageSquare className="h-3 w-3 opacity-50" />
+                                                                <span className="italic">ไม่มี review</span>
                                                             </div>
-                                                        </div>
+                                                        )}
                                                     </td>
                                                 </tr>
 
@@ -1121,7 +1194,7 @@ export default function StoresPage() {
                                             </React.Fragment>
                                         );
                                     })}
-                                </tbody>
+                                </tbody >
                             </table>
                         )}
                     </div>

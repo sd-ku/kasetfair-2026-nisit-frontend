@@ -1,19 +1,31 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
-import { createLuckyDrawWinner, getLuckyDrawWinners, LuckyDrawResponse, generateWheel, getActiveEntries, resetWheel } from '@/services/admin/luckyDrawService';
-import { Loader2, RefreshCw, RotateCcw } from 'lucide-react';
-import { toast } from 'sonner';
+import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 
-export default function LuckyDrawPage() {
+const Wheel = dynamic(() => import('react-custom-roulette').then((mod) => mod.Wheel), {
+    ssr: false,
+});
+import { generateWheel, createLuckyDrawWinner, getLuckyDrawWinners, LuckyDrawResponse } from '@/services/admin/luckyDrawService';
+import { toast } from 'sonner';
+import { RefreshCw } from 'lucide-react';
+
+const COLORS = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#1A535C', '#FF9F1C', '#E63946', '#F1FAEE', '#A8DADC', '#457B9D', '#1D3557'];
+
+export default function OptimizedWheel() {
+    const [mustSpin, setMustSpin] = useState(false);
+    const [prizeNumber, setPrizeNumber] = useState(0);
+
+    // เก็บรายชื่อร้านค้าทั้งหมด
+    const [allEntries, setAllEntries] = useState<string[]>([]);
+
+    // ข้อมูลที่แสดงบนวงล้อ (จะเท่ากับ allEntries ทั้งหมด)
+    const [wheelData, setWheelData] = useState<any[]>([{ option: 'Loading...', style: { backgroundColor: '#ccc' } }]);
+
+    const [winnerName, setWinnerName] = useState<string>("");
     const [winners, setWinners] = useState<LuckyDrawResponse[]>([]);
     const [latestWinner, setLatestWinner] = useState<string | null>(null);
-    const [isFullscreen, setIsFullscreen] = useState(false);
     const [loadingStores, setLoadingStores] = useState(false);
-
-    // ใช้ useRef แทน document.getElementById (React Best Practice)
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-    const wheelContainerRef = useRef<HTMLDivElement>(null);
 
     const fetchWinners = async () => {
         try {
@@ -24,151 +36,114 @@ export default function LuckyDrawPage() {
         }
     };
 
-    // โหลดรายชื่อร้านจาก Backend และเติมลงวงล้อ
-    const loadEntriesToWheel = async (entries: string[]) => {
-        if (!iframeRef.current || !iframeRef.current.contentWindow) {
-            console.warn('Iframe not ready yet');
-            return;
-        }
-
-        // ส่งข้อมูลไปที่ iframe ด้วย postMessage
-        iframeRef.current.contentWindow.postMessage({
-            name: 'setEntries',
-            entries: entries
-        }, 'https://wheelofnames.com');
-    };
-
-    const handleAutoFill = async () => {
+    const loadWheelData = async () => {
         try {
             setLoadingStores(true);
+            const response = await generateWheel({ state: 'Validated' });
 
-            // เรียก Backend API เพื่อโหลดร้านค้าและบันทึกลง database
-            const response = await generateWheel({
-                state: 'Validated'
-            });
+            if (response.entries && response.entries.length > 0) {
+                // เก็บรายชื่อทั้งหมด
+                setAllEntries(response.entries);
 
-            // เติมข้อมูลลงวงล้อ
-            await loadEntriesToWheel(response.entries);
+                // แสดงชื่อร้านค้าทั้งหมดบนวงล้อ (เหมือน wheelofnames)
+                const wheelEntries = response.entries.map((entry, i) => ({
+                    option: entry.length > 20 ? entry.substring(0, 20) + '..' : entry,
+                    style: {
+                        backgroundColor: COLORS[i % COLORS.length],
+                        textColor: 'white'
+                    }
+                }));
+                setWheelData(wheelEntries);
 
-            toast.success(`โหลดข้อมูล ${response.totalStores} ร้านค้าเรียบร้อยแล้ว`);
+                toast.success(`โหลดข้อมูล ${response.totalStores} ร้านค้าทั้งหมดลงวงล้อเรียบร้อยแล้ว`);
+            }
         } catch (error: any) {
-            console.error('Failed to generate wheel', error);
-            const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างวงล้อ';
+            console.error('Failed to load wheel data', error);
+            const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูล';
             toast.error(errorMessage);
         } finally {
             setLoadingStores(false);
         }
     };
 
-    const handleReset = async () => {
-        try {
-            await resetWheel();
-            // ล้างวงล้อ
-            if (iframeRef.current?.contentWindow) {
-                iframeRef.current.contentWindow.postMessage({
-                    name: 'setEntries',
-                    entries: []
-                }, 'https://wheelofnames.com');
-            }
-            toast.success('รีเซ็ตวงล้อเรียบร้อยแล้ว');
-        } catch (error) {
-            console.error('Failed to reset wheel', error);
-            toast.error('เกิดข้อผิดพลาดในการรีเซ็ตวงล้อ');
-        }
-    };
+    // 🧪 Mock Data สำหรับทดสอบ
+    const loadMockData = () => {
+        const mockStores = [
+            'ร้านกาแฟสดใจกลางเมือง',
+            'ร้านขนมหวานแสนอร่อย',
+            'ร้านอาหารเจ้าเด็ด',
+            'ร้านเสื้อผ้าแฟชั่น',
+            'ร้านของใช้ในบ้าน',
+            'ร้านหนังสือและเครื่องเขียน',
+            'ร้านดอกไม้บานสวย',
+            'ร้านขายพืชสวนถูกใจ',
+            'ร้านขนมไทยโบราณ',
+            'ร้านเบเกอรี่หอมกรุ่น',
+            'ร้านน้ำผลไม้สดใหม่',
+            'ร้านอุปกรณ์กีฬา',
+            'ร้านของเล่นเด็ก',
+            'ร้านเครื่องประดับ',
+            'ร้านรองเท้าคุณภาพ'
+        ];
 
-    const toggleFullscreen = () => {
-        // ใช้ ref แทน getElementById
-        const wheelContainer = wheelContainerRef.current;
+        setAllEntries(mockStores);
 
-        if (!isFullscreen) {
-            // Enter fullscreen
-            if (wheelContainer?.requestFullscreen) {
-                wheelContainer.requestFullscreen();
-            } else if ((wheelContainer as any)?.webkitRequestFullscreen) {
-                (wheelContainer as any).webkitRequestFullscreen();
-            } else if ((wheelContainer as any)?.msRequestFullscreen) {
-                (wheelContainer as any).msRequestFullscreen();
+        const wheelEntries = mockStores.map((entry, i) => ({
+            option: entry.length > 20 ? entry.substring(0, 20) + '..' : entry,
+            style: {
+                backgroundColor: COLORS[i % COLORS.length],
+                textColor: 'white'
             }
-            setIsFullscreen(true);
-        } else {
-            // Exit fullscreen
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if ((document as any).webkitExitFullscreen) {
-                (document as any).webkitExitFullscreen();
-            } else if ((document as any).msExitFullscreen) {
-                (document as any).msExitFullscreen();
-            }
-            setIsFullscreen(false);
-        }
+        }));
+        setWheelData(wheelEntries);
+
+        toast.success(`โหลด Mock Data ${mockStores.length} ร้านเรียบร้อยแล้ว (ทดสอบ)`);
     };
 
     useEffect(() => {
         fetchWinners();
-
-        // โหลด active entries จาก database เมื่อ component mount
-        // (กรณี refresh หน้า จะได้กู้คืนข้อมูลวงล้อ)
-        const loadActiveEntries = async () => {
-            try {
-                const entries = await getActiveEntries();
-                if (entries.length > 0) {
-                    // รอให้ iframe โหลดเสร็จก่อน
-                    setTimeout(() => {
-                        loadEntriesToWheel(entries);
-                    }, 1000);
-                }
-            } catch (error) {
-                console.error('Failed to load active entries', error);
-            }
-        };
-
-        loadActiveEntries();
-
-        const handleMessage = async (event: MessageEvent) => {
-            if (event.origin !== "https://wheelofnames.com") {
-                return;
-            }
-
-            console.log("Received data from wheel:", event.data);
-
-            // Adapt based on actual payload. Using event.data.winner as per user suggestion.
-            const winnerName = event.data?.winner;
-
-            if (winnerName && typeof winnerName === 'string') {
-                setLatestWinner(winnerName);
-                try {
-                    // Play a sound or show a confetti here if desired
-                    await createLuckyDrawWinner(winnerName);
-                    fetchWinners(); // Refresh list
-                } catch (error) {
-                    console.error("Failed to save winner", error);
-                }
-            }
-        };
-
-        // Handle fullscreen change events
-        const handleFullscreenChange = () => {
-            const isCurrentlyFullscreen = !!(
-                document.fullscreenElement ||
-                (document as any).webkitFullscreenElement ||
-                (document as any).msFullscreenElement
-            );
-            setIsFullscreen(isCurrentlyFullscreen);
-        };
-
-        window.addEventListener("message", handleMessage);
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('msfullscreenchange', handleFullscreenChange);
-
-        return () => {
-            window.removeEventListener("message", handleMessage);
-            document.removeEventListener('fullscreenchange', handleFullscreenChange);
-            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('msfullscreenchange', handleFullscreenChange);
-        };
+        loadWheelData();
     }, []);
+
+    const handleSpinClick = () => {
+        if (mustSpin || allEntries.length === 0) {
+            if (allEntries.length === 0) toast.error('กรุณาโหลดรายชื่อร้านค้าก่อน');
+            return;
+        }
+
+        // สุ่มผู้ชนะจากรายชื่อทั้งหมด
+        const randomIndex = Math.floor(Math.random() * allEntries.length);
+        const winnerName = allEntries[randomIndex];
+        setWinnerName(winnerName);
+
+        // ตั้งให้วงล้อหยุดที่ช่องนั้นเลย
+        setPrizeNumber(randomIndex);
+        setMustSpin(true);
+    };
+
+    const handleStopSpinning = async () => {
+        setMustSpin(false);
+        setLatestWinner(winnerName);
+        toast.success(`🎉 ผู้ชนะคือ: ${winnerName}`);
+
+        try {
+            await createLuckyDrawWinner(winnerName);
+            fetchWinners();
+        } catch (error) {
+            console.error('Failed to save winner', error);
+            toast.error('ไม่สามารถบันทึกผู้ชนะได้');
+        }
+    };
+
+    // 🔥 คำนวณขนาดฟอนต์ตามจำนวนช่อง
+    const calculateFontSize = (entryCount: number): number => {
+        if (entryCount <= 50) return 16;      // ช่องน้อย ฟอนต์ใหญ่
+        if (entryCount <= 100) return 14;     // ช่องปานกลาง
+        if (entryCount <= 200) return 12;     // ช่องค่อนข้างเยอะ
+        if (entryCount <= 300) return 10;     // ช่องเยอะ
+        if (entryCount <= 500) return 8;      // ช่องเยอะมาก
+        return 7;                              // ช่องเยอะสุด ๆ
+    };
 
     return (
         <div className="container mx-auto p-6 space-y-8">
@@ -176,107 +151,98 @@ export default function LuckyDrawPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Wheel Section */}
-                <div
-                    ref={wheelContainerRef}
-                    className={`transition-all duration-300 ${isFullscreen
-                        ? 'fixed inset-0 z-50 w-screen h-screen bg-black flex flex-col'
-                        : 'bg-white p-6 rounded-2xl shadow-xl border border-gray-100 flex flex-col h-[700px]'
-                        }`}
-                >
-                    {!isFullscreen && (
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
-                                <span className="text-2xl">🎡</span> Wheel of Names
-                            </h2>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={handleAutoFill}
-                                    disabled={loadingStores}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-blue-600 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
-                                    title="Auto Fill Stores"
-                                >
-                                    {loadingStores ? (
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                    ) : (
-                                        <RefreshCw className="w-5 h-5" />
-                                    )}
-                                    <span className="text-sm font-medium">โหลดรายชื่อร้าน</span>
-                                </button>
-                                <button
-                                    onClick={handleReset}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-red-600 hover:text-red-700 flex items-center gap-2"
-                                    title="Reset Wheel"
-                                >
-                                    <RotateCcw className="w-5 h-5" />
-                                    <span className="text-sm font-medium">รีเซ็ต</span>
-                                </button>
-                                <button
-                                    onClick={toggleFullscreen}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                                    title="ขยายเต็มจอ"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-                                    </svg>
-                                    <span className="text-sm font-medium">ขยายเต็มจอ</span>
-                                </button>
-                            </div>
+                <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 flex flex-col h-[700px]">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
+                            <span className="text-2xl">🎡</span> Lucky Draw Wheel
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={loadWheelData}
+                                disabled={loadingStores}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-blue-600 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
+                                <span className="text-sm font-medium">โหลดรายชื่อร้าน</span>
+                            </button>
+                            <button
+                                onClick={loadMockData}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-purple-600 hover:text-purple-700 flex items-center gap-2"
+                            >
+                                🧪
+                                <span className="text-sm font-medium">Mock Data (15 ร้าน)</span>
+                            </button>
                         </div>
-                    )}
-
-                    {/* {isFullscreen && (
-                        <button
-                            onClick={toggleFullscreen}
-                            className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 p-2 bg-gray-800/80 hover:bg-gray-700 text-white rounded-full shadow-lg backdrop-blur-sm transition-all hover:scale-110 flex items-center justify-center w-10 h-10 border border-gray-600"
-                            title="Exit Fullscreen"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    )} */}
-
-                    <div className={`flex-1 w-full bg-gray-50 overflow-hidden relative ${!isFullscreen ? 'rounded-xl' : ''}`}>
-                        <iframe
-                            ref={iframeRef}
-                            src="https://wheelofnames.com/th/"
-                            className="absolute inset-0 w-full h-full border-0"
-                            title="Wheel of Names"
-                        >
-                        </iframe>
                     </div>
-                    {!isFullscreen && (
-                        <p className="mt-4 text-xs text-gray-400 text-center">
-                            *Ensure the iframe src corresponds to your saved wheel URL.
-                        </p>
-                    )}
+
+                    <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+                        <div className="text-center space-y-2">
+                            <p className="text-lg font-semibold text-gray-700">
+                                จำนวนร้านค้าทั้งหมด: <span className="text-blue-600">{allEntries.length}</span> ร้าน
+                            </p>
+                            {allEntries.length > 0 && (
+                                <p className="text-sm text-gray-500">
+                                    แสดงชื่อร้านค้าทั้งหมดบนวงล้อ • กดปุ่ม "สุ่มรางวัล" เพื่อเริ่มหมุน
+                                </p>
+                            )}
+                        </div>
+
+                        {/* 🔥 ส่วนปรับแต่งวงล้อ */}
+                        <div className="scale-100 lg:scale-100">
+                            <Wheel
+                                mustStartSpinning={mustSpin}
+                                prizeNumber={prizeNumber}
+                                data={wheelData}
+                                onStopSpinning={handleStopSpinning}
+
+                                // Config ให้สวยเหมือน wheelofnames
+                                spinDuration={0.8} // ความเร็ว
+                                outerBorderColor="#333"
+                                innerRadius={10} // รูตรงกลาง
+                                innerBorderColor="#333"
+                                innerBorderWidth={0}
+                                outerBorderWidth={0}
+                                radiusLineWidth={0} // ไม่มีเส้นขอบระหว่างช่อง
+
+                                // ✨ จุดสำคัญ: การจัดตัวอักษร
+                                fontSize={calculateFontSize(allEntries.length)} // 🔥 ปรับขนาดอัตโนมัติตามจำนวนช่อง
+                                perpendicularText={false} // 🔥 ให้ตัวหนังสือเป็นแนวนอนไปตามรัศมี
+                                textDistance={62} // ขยับตัวหนังสือออกไปทางขอบวงล้อ
+                            />
+                        </div>
+
+                        <button
+                            onClick={handleSpinClick}
+                            disabled={mustSpin || allEntries.length === 0}
+                            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 text-lg"
+                        >
+                            {mustSpin ? '🎲 กำลังหมุน...' : '🎲 กดสุ่มรางวัล'}
+                        </button>
+                    </div>
                 </div>
 
-                {/* Winners Section */}
+                {/* Winners Section (เหมือนเดิม) */}
                 <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 flex flex-col h-[700px]">
+                    {/* ... code ส่วนตาราง winners เหมือนเดิม ... */}
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
                             <span className="text-2xl">🏆</span> Winners History
                         </h2>
-                        <button
-                            onClick={fetchWinners}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
-                            title="Refresh"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 21h5v-5" /></svg>
+                        <button onClick={fetchWinners} className="p-2 hover:bg-gray-100 rounded-full text-gray-500">
+                            <RefreshCw className="w-5 h-5" />
                         </button>
                     </div>
 
                     {latestWinner && (
                         <div className="mb-6 p-8 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl text-center shadow-sm animate-bounce">
                             <p className="text-sm text-orange-600 uppercase tracking-wide font-bold mb-1">🎉 Recent Winner 🎉</p>
-                            <p className="text-5xl font-extrabold text-gray-800 break-words">{latestWinner}</p>
+                            <p className="text-4xl lg:text-5xl font-extrabold text-gray-800 break-words">{latestWinner}</p>
                         </div>
                     )}
 
                     <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
                         <table className="w-full text-left border-collapse">
+                            {/* ... table headers ... */}
                             <thead className="sticky top-0 bg-white z-10">
                                 <tr>
                                     <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">No.</th>
@@ -286,26 +252,26 @@ export default function LuckyDrawPage() {
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {winners.map((w, index) => (
-                                    <tr key={w.id} className="group hover:bg-gray-50 transition-all duration-200">
+                                    <tr key={w.id} className="group hover:bg-gray-50">
                                         <td className="px-4 py-4 text-gray-400 text-sm font-mono">#{winners.length - index}</td>
                                         <td className="px-4 py-4 font-semibold text-gray-700 text-lg">{w.winner}</td>
                                         <td className="px-4 py-4 text-right text-gray-500 text-sm">
-                                            {new Date(w.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            {new Date(w.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
                                         </td>
                                     </tr>
                                 ))}
-                                {winners.length === 0 && (
-                                    <tr>
-                                        <td colSpan={3} className="px-4 py-12 text-center text-gray-400 italic">
-                                            No winners yet. Spin the wheel to start!
-                                        </td>
-                                    </tr>
-                                )}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
+
+            <style jsx global>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #555; }
+            `}</style>
         </div>
     );
 }
