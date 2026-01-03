@@ -888,6 +888,18 @@ export default function StoresPage() {
                                                                                                 </div>
                                                                                                 <span className="font-medium text-red-600 dark:text-red-400">ปฏิเสธ</span>
                                                                                             </button>
+
+                                                                                            {/* Manual Restatus Button */}
+                                                                                            <button
+                                                                                                onClick={() => handleUpdateStatus(store.id, 'Pending')}
+                                                                                                disabled={updatingStatusId !== null}
+                                                                                                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none hover:bg-orange-50 dark:hover:bg-orange-900/20 disabled:pointer-events-none disabled:opacity-50 text-left transition-colors group/item"
+                                                                                            >
+                                                                                                <div className="h-7 w-7 rounded-md bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center group-hover/item:scale-110 transition-transform">
+                                                                                                    <RotateCcw className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                                                                                </div>
+                                                                                                <span className="font-medium text-orange-600 dark:text-orange-400">ย้อนกลับ</span>
+                                                                                            </button>
                                                                                         </div>
                                                                                     </div>
                                                                                 </div>

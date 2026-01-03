@@ -5,7 +5,26 @@ export const convertStateToLabel = (state: string): string => {
         case "storedetails": return "รายละเอียดร้านค้า"
         case "productdetails": return "รายละเอียดสินค้า"
         case "pending": return "รอการพิจารณา"
+        case "validated": return "อนุมัติ"
+        case "rejected": return "ไม่อนุมัติ"
         default: return "ไม่ระบุ"
+    }
+}
+
+export const getStatusColor = (state: string) => {
+    if (!state) return "border-slate-200 bg-slate-100 text-slate-700"
+    switch (state.toLowerCase()) {
+        case "validated":
+            return "border-emerald-300 bg-emerald-200 text-emerald-800"
+        case "pending":
+            return "border-teal-200 bg-teal-100 text-teal-700"
+        case "rejected":
+            return "border-red-200 bg-red-100 text-red-700"
+        case "storedetails":
+        case "productdetails":
+            return "border-blue-200 bg-blue-100 text-blue-700"
+        default:
+            return "border-slate-200 bg-slate-100 text-slate-700"
     }
 }
 

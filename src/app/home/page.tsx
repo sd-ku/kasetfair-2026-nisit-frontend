@@ -48,7 +48,7 @@ import { Label } from "@/components/ui/label"
 import { getNisitInfo } from "@/services/nisitService"
 import { NisitInfo } from "@/services/dto/nisit-info.dto"
 import { logout } from "@/services/authService"
-import { convertStateToLabel, convertStoreTypeToLabel } from "@/utils/labelConverter"
+import { convertStateToLabel, convertStoreTypeToLabel, getStatusColor } from "@/utils/labelConverter"
 import { useRegistrationLock } from "@/hooks/useRegistrationLock"
 import { RegistrationLockWarning } from "@/components/RegistrationLockWarning"
 
@@ -371,37 +371,175 @@ export default function HomePage() {
 
   const isOwner = store?.storeAdminNisitId && userInfo?.nisitId === store.storeAdminNisitId
 
-  return (
-    <div className="min-h-screen bg-emerald-50 px-4 py-6">
-      <header className="mx-auto w-full max-w-3xl shadowmb-6 px-1 sm:px-0">
-        <div className="rounded-2xl bg-white border border-emerald-50 p-4 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] flex items-center justify-between gap-4">
+  // Modern theme system with vibrant colors and gradients
+  const getPageTheme = (state: string) => {
+    switch (state?.toLowerCase()) {
+      case "validated":
+        return {
+          // Page level - Vibrant gradient backgrounds
+          background: "bg-gradient-to-br from-emerald-100 via-green-100 to-teal-100",
+          // Header card - Glassmorphism
+          headerBg: "bg-white/80 backdrop-blur-xl",
+          headerBorder: "border-emerald-200/50",
+          headerShadow: "shadow-lg shadow-emerald-200/50",
+          headerRing: "ring-2 ring-emerald-200/30",
+          headerAccent: "bg-gradient-to-br from-emerald-600 to-green-700 text-white shadow-lg shadow-emerald-300/50",
+          headerAccentText: "text-emerald-700 font-semibold",
+          // Store card - Enhanced depth
+          cardBg: "bg-white/90 backdrop-blur-sm",
+          cardBorder: "border-emerald-300/60",
+          cardShadow: "shadow-xl shadow-emerald-200/40",
+          // Store info container - Gradient backgrounds
+          container: "bg-gradient-to-br from-emerald-100 to-green-100 border-emerald-300/60",
+          containerShadow: "shadow-md shadow-emerald-200/30",
+          title: "text-emerald-950 font-bold",
+          sub: "text-emerald-800/90",
+          // Buttons - Modern gradients
+          primaryButton: "bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 shadow-lg shadow-emerald-300/50 hover:shadow-xl hover:shadow-emerald-400/50",
+          outlineButton: "border-2 border-emerald-400/60 text-emerald-800 hover:bg-emerald-100/80 hover:border-emerald-500 backdrop-blur-sm",
+          // Progress section
+          progressReady: "border-emerald-400/60 bg-gradient-to-br from-emerald-100 to-green-100 shadow-inner",
+          progressNotReady: "border-amber-300/60 bg-gradient-to-br from-amber-50 to-orange-50 shadow-inner",
+          progressBar: "bg-gradient-to-r from-emerald-600 to-green-600",
+          // Badge
+          badgeGlow: "shadow-lg shadow-emerald-300/50",
+        }
+      case "pending":
+        return {
+          background: "bg-gradient-to-br from-teal-50 via-emerald-50 to-green-50",
+          headerBg: "bg-white/80 backdrop-blur-xl",
+          headerBorder: "border-teal-100/50",
+          headerShadow: "shadow-lg shadow-teal-100/50",
+          headerRing: "ring-2 ring-teal-100/30",
+          headerAccent: "bg-gradient-to-br from-teal-400 to-emerald-500 text-white shadow-lg shadow-teal-200/50",
+          headerAccentText: "text-teal-600 font-semibold",
+          cardBg: "bg-white/90 backdrop-blur-sm",
+          cardBorder: "border-teal-200/60",
+          cardShadow: "shadow-xl shadow-teal-100/40",
+          container: "bg-gradient-to-br from-teal-50 to-emerald-50 border-teal-200/60",
+          containerShadow: "shadow-md shadow-teal-100/30",
+          title: "text-teal-950 font-bold",
+          sub: "text-teal-700/90",
+          primaryButton: "bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 shadow-lg shadow-teal-200/50 hover:shadow-xl hover:shadow-teal-300/50",
+          outlineButton: "border-2 border-teal-300/60 text-teal-700 hover:bg-teal-50/80 hover:border-teal-400 backdrop-blur-sm",
+          progressReady: "border-teal-300/60 bg-gradient-to-br from-teal-50 to-emerald-50 shadow-inner",
+          progressNotReady: "border-amber-300/60 bg-gradient-to-br from-amber-50 to-orange-50 shadow-inner",
+          progressBar: "bg-gradient-to-r from-teal-400 to-emerald-500",
+          badgeGlow: "shadow-lg shadow-teal-200/50",
+        }
+      case "rejected":
+        return {
+          background: "bg-gradient-to-br from-red-50 via-rose-50 to-pink-50",
+          headerBg: "bg-white/80 backdrop-blur-xl",
+          headerBorder: "border-red-100/50",
+          headerShadow: "shadow-lg shadow-red-100/50",
+          headerRing: "ring-2 ring-red-100/30",
+          headerAccent: "bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-lg shadow-red-200/50",
+          headerAccentText: "text-red-600 font-semibold",
+          cardBg: "bg-white/90 backdrop-blur-sm",
+          cardBorder: "border-red-200/60",
+          cardShadow: "shadow-xl shadow-red-100/40",
+          container: "bg-gradient-to-br from-red-50 to-rose-50 border-red-200/60",
+          containerShadow: "shadow-md shadow-red-100/30",
+          title: "text-red-950 font-bold",
+          sub: "text-red-700/90",
+          primaryButton: "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 shadow-lg shadow-red-200/50 hover:shadow-xl hover:shadow-red-300/50",
+          outlineButton: "border-2 border-red-300/60 text-red-700 hover:bg-red-50/80 hover:border-red-400 backdrop-blur-sm",
+          progressReady: "border-red-300/60 bg-gradient-to-br from-red-50 to-rose-50 shadow-inner",
+          progressNotReady: "border-orange-300/60 bg-gradient-to-br from-orange-50 to-red-50 shadow-inner",
+          progressBar: "bg-gradient-to-r from-red-500 to-rose-500",
+          badgeGlow: "shadow-lg shadow-red-200/50",
+        }
+      case "storedetails":
+      case "productdetails":
+        return {
+          background: "bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50",
+          headerBg: "bg-white/80 backdrop-blur-xl",
+          headerBorder: "border-blue-100/50",
+          headerShadow: "shadow-lg shadow-blue-100/50",
+          headerRing: "ring-2 ring-blue-100/30",
+          headerAccent: "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-200/50",
+          headerAccentText: "text-blue-600 font-semibold",
+          cardBg: "bg-white/90 backdrop-blur-sm",
+          cardBorder: "border-blue-200/60",
+          cardShadow: "shadow-xl shadow-blue-100/40",
+          container: "bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200/60",
+          containerShadow: "shadow-md shadow-blue-100/30",
+          title: "text-blue-950 font-bold",
+          sub: "text-blue-700/90",
+          primaryButton: "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-200/50 hover:shadow-xl hover:shadow-blue-300/50",
+          outlineButton: "border-2 border-blue-300/60 text-blue-700 hover:bg-blue-50/80 hover:border-blue-400 backdrop-blur-sm",
+          progressReady: "border-blue-300/60 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-inner",
+          progressNotReady: "border-amber-300/60 bg-gradient-to-br from-amber-50 to-orange-50 shadow-inner",
+          progressBar: "bg-gradient-to-r from-blue-500 to-indigo-500",
+          badgeGlow: "shadow-lg shadow-blue-200/50",
+        }
+      default:
+        return {
+          background: "bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50",
+          headerBg: "bg-white/80 backdrop-blur-xl",
+          headerBorder: "border-emerald-100/50",
+          headerShadow: "shadow-lg shadow-emerald-100/50",
+          headerRing: "ring-2 ring-emerald-100/30",
+          headerAccent: "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-200/50",
+          headerAccentText: "text-emerald-600 font-semibold",
+          cardBg: "bg-white/90 backdrop-blur-sm",
+          cardBorder: "border-emerald-200/60",
+          cardShadow: "shadow-xl shadow-emerald-100/40",
+          container: "bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200/60",
+          containerShadow: "shadow-md shadow-emerald-100/30",
+          title: "text-emerald-950 font-bold",
+          sub: "text-emerald-700/90",
+          primaryButton: "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-200/50 hover:shadow-xl hover:shadow-emerald-300/50",
+          outlineButton: "border-2 border-emerald-300/60 text-emerald-700 hover:bg-emerald-50/80 hover:border-emerald-400 backdrop-blur-sm",
+          progressReady: "border-emerald-300/60 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-inner",
+          progressNotReady: "border-amber-300/60 bg-gradient-to-br from-amber-50 to-orange-50 shadow-inner",
+          progressBar: "bg-gradient-to-r from-emerald-500 to-teal-500",
+          badgeGlow: "shadow-lg shadow-emerald-200/50",
+        }
+    }
+  }
 
-          <div className="flex items-center gap-3.5 overflow-hidden">
+  const theme = getPageTheme(store?.state || "")
+
+  return (
+    <div className={cn("min-h-screen px-4 py-8 transition-all duration-500 ease-in-out", theme.background)}>
+      <header className="mx-auto w-full max-w-3xl mb-4 px-1 sm:px-0">
+        <div className={cn(
+          "rounded-3xl p-5 flex items-center justify-between gap-4 border transition-all duration-500 ease-in-out",
+          theme.headerBg,
+          theme.headerBorder,
+          theme.headerShadow
+        )}>
+
+          <div className="flex items-center gap-4 overflow-hidden">
             <Link
               href="/info"
-              // เพิ่ม ring ให้ดูมีมิติเมื่ออยู่บนการ์ดขาว
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold text-lg ring-4 ring-emerald-50 transition-all active:scale-95"
+              className={cn(
+                "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl font-bold text-lg transition-all duration-300 hover:scale-105 active:scale-95",
+                theme.headerAccent,
+                theme.headerRing
+              )}
             >
               {displayInitial}
             </Link>
             <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium text-emerald-500">ยินดีต้อนรับ,</span>
-              <h1 className="text-lg font-bold text-slate-800 truncate leading-tight">
+              <span className={cn("text-xs font-medium", theme.headerAccentText)}>ยินดีต้อนรับ</span>
+              <h1 className="text-lg font-bold text-slate-900 truncate leading-tight">
                 {displayName}
               </h1>
             </div>
           </div>
 
           <div>
-            {/* ใช้ปุ่มสีเทาอ่อนๆ (slate-100) เพื่อให้ดูเป็น action รองลงมา */}
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
-              className="h-9 w-9 p-0 rounded-xl bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors sm:w-auto sm:px-3"
+              className="h-10 w-10 p-0 rounded-xl hover:bg-red-50/80 hover:text-red-600 transition-all duration-300 sm:w-auto sm:px-4"
               onClick={() => handleLogout()}
             >
               <LogOut className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline text-xs">ออกระบบ</span>
+              <span className="hidden sm:inline text-xs font-medium">ออกระบบ</span>
             </Button>
           </div>
 
@@ -410,15 +548,20 @@ export default function HomePage() {
 
       {/* Registration Status Card */}
       {!lockLoading && lockSettings && (
-        <div className="mx-auto w-full max-w-3xl mt-4">
+        <div className="mx-auto w-full max-w-3xl mb-6">
           {lockSettings.isCurrentlyLocked ? (
             <RegistrationLockWarning
               title="ปิดรับการแก้ไขข้อมูล"
               message={lockSettings.lockMessage || "ขณะนี้ปิดรับการแก้ไขข้อมูลชั่วคราว"}
             />
           ) : lockSettings.registrationEnd ? (
-            <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50">
-              <CardContent className="px-4">
+            <Card className={cn(
+              "border-2 backdrop-blur-sm transition-all duration-500",
+              theme.cardBorder,
+              theme.cardBg,
+              theme.cardShadow
+            )}>
+              <CardContent className="p-5">
                 <div className="flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-emerald-100">
                     <Calendar className="h-5 w-5 text-emerald-600" />
@@ -456,20 +599,30 @@ export default function HomePage() {
       )}
 
       {/* Main Content */}
-      <main className="mx-auto mt-4 grid w-full max-w-3xl gap-4 md:mt-6">
+      <main className="mx-auto grid w-full max-w-3xl gap-3">
 
         {/* My Store Card */}
-        <Card className="border-emerald-100 md:col-span-2 lg:col-span-1">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-emerald-900">
-              <Store className="h-5 w-5" />
+        <Card className={cn(
+          "md:col-span-2 lg:col-span-1 border-2 gap-1 transition-all duration-500 ease-in-out hover:scale-[1.01]",
+          theme.cardBg,
+          theme.cardBorder,
+          theme.cardShadow
+        )}>
+          <CardHeader className="gap-0">
+            <CardTitle className="flex items-center gap-3 text-slate-900 text-base">
+              <div className={cn(
+                "p-2.5 rounded-xl transition-all duration-300",
+                theme.headerAccent
+              )}>
+                <Store className="h-5 w-5" />
+              </div>
               ร้านของฉัน
             </CardTitle>
-            <CardDescription className="text-sm">
+            {/* <CardDescription className="text-sm text-slate-600 mt-2">
               {store ? "สถานะความพร้อมและข้อมูลร้านค้า" : "สร้างร้านเพื่อจัดการบูธและทีมงาน"}
-            </CardDescription>
+            </CardDescription> */}
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4 pt-4">
 
             {/* Loading State */}
             {loadingStore && (
@@ -493,17 +646,25 @@ export default function HomePage() {
             {!loadingStore && !storeError && validationData && store && (
               <div className="space-y-4">
                 {/* Store Header */}
-                <div className="rounded-xl bg-emerald-50/50 p-3 border border-emerald-100">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="text-lg font-bold text-emerald-900">
+                <div className={cn(
+                  "rounded-2xl p-4 border-2 transition-all duration-500 ease-in-out",
+                  theme.container,
+                  theme.containerShadow
+                )}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className={cn("text-lg font-bold mb-1.5", theme.title)}>
                         <div style={{ wordBreak: 'break-all' }}>{store.storeName}</div>
                       </h3>
-                      <p className="text-xs text-emerald-600">
+                      <p className={cn("text-xs", theme.sub)}>
                         หมายเลขร้าน: {store.id} | {convertStoreTypeToLabel(store.type)} | บูธ: {store.boothNumber || "-"}
                       </p>
                     </div>
-                    <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-700">
+                    <Badge variant="outline" className={cn(
+                      "text-xs px-2.5 py-1 font-semibold border-2 transition-all duration-300",
+                      getStatusColor(store.state),
+                      theme.badgeGlow
+                    )}>
                       {convertStateToLabel(store.state)}
                     </Badge>
                   </div>
@@ -511,42 +672,47 @@ export default function HomePage() {
 
                 {/* --- VALIDATION / PROGRESS SECTION --- */}
                 <div className={cn(
-                  "rounded-lg border transition-all overflow-hidden",
-                  isReady ? "border-emerald-200 bg-emerald-50/30" : "border-amber-200 bg-amber-50/30"
+                  "rounded-2xl border-2 transition-all overflow-hidden duration-500 ease-in-out",
+                  isReady ? theme.progressReady : theme.progressNotReady
                 )}>
                   {/* Progress Header */}
                   <div
-                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-black/5"
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-black/5 transition-colors duration-200"
                     onClick={() => setShowValidationDetails(!showValidationDetails)}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                       {isReady ? (
-                        <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                        <CheckCircle2 className="h-9 w-9 text-emerald-600" />
                       ) : (
                         <div className="relative">
-                          <AlertCircle className="h-8 w-8 text-amber-500" />
+                          <AlertCircle className="h-9 w-9 text-amber-600" />
                         </div>
                       )}
                       <div>
                         <div className="text-sm font-bold text-gray-900">
                           {isReady ? "ข้อมูลครบถ้วน" : "ข้อมูลยังไม่ครบ"}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-600 font-medium">
                           ความคืบหน้า {progress}%
                         </div>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl hover:bg-black/10 transition-colors">
                       {showValidationDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </Button>
                   </div>
 
                   {/* Progress Line */}
-                  <div className="h-1 w-full bg-white/50">
+                  <div className="h-2 w-full bg-white/60 relative overflow-hidden">
                     <div
-                      className={cn("h-full transition-all duration-1000", isReady ? "bg-emerald-500" : "bg-amber-500")}
+                      className={cn(
+                        "h-full transition-all duration-1000 ease-out relative overflow-hidden",
+                        theme.progressBar
+                      )}
                       style={{ width: `${progress}%` }}
-                    />
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                    </div>
                   </div>
 
                   {/* Detail List */}
@@ -600,14 +766,17 @@ export default function HomePage() {
 
                 {/* Action Buttons */}
                 <div className={cn(
-                  "grid gap-2 pt-2",
+                  "grid gap-3 pt-3",
                   isOwner ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2"
                 )}>
                   {/* Transfer Button (Only for Admin) */}
                   {isOwner && (
                     <Button
                       variant="outline"
-                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                      className={cn(
+                        "transition-all duration-300 hover:scale-105 active:scale-95 font-semibold",
+                        theme.outlineButton
+                      )}
                       onClick={() => setTransferDialogOpen(true)}
                       disabled={leaving}
                     >
@@ -618,7 +787,7 @@ export default function HomePage() {
 
                   <Button
                     variant="outline"
-                    className="border-red-200 text-red-600 hover:bg-red-50"
+                    className="border-2 border-red-300/60 text-red-700 hover:bg-red-50/80 hover:border-red-400 backdrop-blur-sm transition-all duration-300 hover:scale-105 active:scale-95 font-semibold"
                     onClick={handleLeaveStoreClick}
                     disabled={leaving}
                   >
@@ -627,7 +796,8 @@ export default function HomePage() {
 
                   <Button
                     className={cn(
-                      "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm",
+                      "text-white font-semibold transition-all duration-300 hover:scale-105 active:scale-95",
+                      theme.primaryButton,
                       isOwner && "sm:col-span-2"
                     )}
                     onClick={() => router.push("/store")}
@@ -640,12 +810,14 @@ export default function HomePage() {
 
             {/* NO STORE: CREATE UI */}
             {!loadingStore && !storeError && !store && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <Button
-                  className={`w-full ${selectingStoreType
-                    ? "border border-emerald-600 text-emerald-600 bg-white hover:bg-emerald-50"
-                    : "bg-emerald-600 text-white hover:bg-emerald-700"
-                    }`}
+                  className={cn(
+                    "w-full h-12 text-sm font-semibold transition-all duration-300 hover:scale-105 active:scale-95",
+                    selectingStoreType
+                      ? theme.outlineButton
+                      : theme.primaryButton
+                  )}
                   onClick={handleCreateStore}
                   disabled={lockSettings?.isCurrentlyLocked}
                 >
@@ -672,28 +844,38 @@ export default function HomePage() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
                       className="overflow-hidden"
                     >
-                      <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
-                        <p className="mb-3 text-sm font-medium text-emerald-800">
+                      <div className={cn(
+                        "rounded-2xl border-2 p-5 backdrop-blur-sm transition-all duration-500",
+                        theme.container,
+                        theme.containerShadow
+                      )}>
+                        <p className="mb-3 text-sm font-bold text-slate-900">
                           เลือกประเภทร้านค้า
                         </p>
-                        <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="grid gap-3 sm:grid-cols-2">
                           <Button
-                            className="w-full justify-start gap-2 bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200"
+                            className={cn(
+                              "w-full h-12 justify-start gap-2.5 text-sm font-semibold transition-all duration-300 hover:scale-105 active:scale-95",
+                              theme.outlineButton
+                            )}
                             variant="outline"
                             onClick={() => handleSelectStoreType("Nisit")}
                           >
-                            <GraduationCap className="h-4 w-4" />
+                            <GraduationCap className="h-5 w-5" />
                             ร้านนิสิต
                           </Button>
                           <Button
-                            className="w-full justify-start gap-2 bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200"
+                            className={cn(
+                              "w-full h-12 justify-start gap-2.5 text-sm font-semibold transition-all duration-300 hover:scale-105 active:scale-95",
+                              theme.outlineButton
+                            )}
                             variant="outline"
                             onClick={() => handleSelectStoreType("Club")}
                           >
-                            <Building2 className="h-4 w-4" />
+                            <Building2 className="h-5 w-5" />
                             ร้านชมรม/องค์กร
                           </Button>
                         </div>
@@ -763,6 +945,6 @@ export default function HomePage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+    </div >
   )
 }
