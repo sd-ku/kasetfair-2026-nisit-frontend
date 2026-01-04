@@ -7,6 +7,16 @@ export interface LuckyDrawResponse {
     createdAt: string;
 }
 
+export interface LuckyDrawEntryResponse {
+    id: number;
+    storeId: number;
+    storeName: string;
+    isDrawn: boolean;
+    drawnAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface GenerateWheelRequest {
     state?: 'Validated' | 'Pending' | 'Rejected' | 'CreateStore' | 'ClubInfo' | 'StoreDetails' | 'ProductDetails' | 'Submitted' | 'Success' | 'deleted';
 }
@@ -24,6 +34,11 @@ export async function createLuckyDrawWinner(winner: string): Promise<LuckyDrawRe
 
 export async function getLuckyDrawWinners(): Promise<LuckyDrawResponse[]> {
     const res = await http.get('/api/admin/lucky-draw/winners');
+    return res.data;
+}
+
+export async function getLuckyDrawEntries(): Promise<LuckyDrawEntryResponse[]> {
+    const res = await http.get('/api/admin/lucky-draw/entries');
     return res.data;
 }
 

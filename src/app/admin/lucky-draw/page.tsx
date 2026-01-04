@@ -1,31 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-
-const Wheel = dynamic(() => import('react-custom-roulette').then((mod) => mod.Wheel), {
-    ssr: false,
-});
-import { generateWheel, createLuckyDrawWinner, getLuckyDrawWinners, LuckyDrawResponse } from '@/services/admin/luckyDrawService';
+import { createLuckyDrawWinner, getLuckyDrawWinners, getLuckyDrawEntries, LuckyDrawResponse, LuckyDrawEntryResponse } from '@/services/admin/luckyDrawService';
 import { toast } from 'sonner';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Users, X } from 'lucide-react';
+import LuckyDrawWheel from '@/components/admin/LuckyDrawWheel';
 
-const COLORS = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#1A535C', '#FF9F1C', '#E63946', '#F1FAEE', '#A8DADC', '#457B9D', '#1D3557'];
-
-export default function OptimizedWheel() {
-    const [mustSpin, setMustSpin] = useState(false);
-    const [prizeNumber, setPrizeNumber] = useState(0);
-
-    // เก็บรายชื่อร้านค้าทั้งหมด
-    const [allEntries, setAllEntries] = useState<string[]>([]);
-
-    // ข้อมูลที่แสดงบนวงล้อ (จะเท่ากับ allEntries ทั้งหมด)
-    const [wheelData, setWheelData] = useState<any[]>([{ option: 'Loading...', style: { backgroundColor: '#ccc' } }]);
-
-    const [winnerName, setWinnerName] = useState<string>("");
+export default function LuckyDrawPage() {
     const [winners, setWinners] = useState<LuckyDrawResponse[]>([]);
     const [latestWinner, setLatestWinner] = useState<string | null>(null);
-    const [loadingStores, setLoadingStores] = useState(false);
+    const [entries, setEntries] = useState<LuckyDrawEntryResponse[]>([]);
+    const [showEntriesModal, setShowEntriesModal] = useState(false);
 
     const fetchWinners = async () => {
         try {
@@ -36,95 +21,22 @@ export default function OptimizedWheel() {
         }
     };
 
-    const loadWheelData = async () => {
+    const fetchEntries = async () => {
         try {
-            setLoadingStores(true);
-            const response = await generateWheel({ state: 'Validated' });
-
-            if (response.entries && response.entries.length > 0) {
-                // เก็บรายชื่อทั้งหมด
-                setAllEntries(response.entries);
-
-                // แสดงชื่อร้านค้าทั้งหมดบนวงล้อ (เหมือน wheelofnames)
-                const wheelEntries = response.entries.map((entry, i) => ({
-                    option: entry.length > 20 ? entry.substring(0, 20) + '..' : entry,
-                    style: {
-                        backgroundColor: COLORS[i % COLORS.length],
-                        textColor: 'white'
-                    }
-                }));
-                setWheelData(wheelEntries);
-
-                toast.success(`โหลดข้อมูล ${response.totalStores} ร้านค้าทั้งหมดลงวงล้อเรียบร้อยแล้ว`);
-            }
-        } catch (error: any) {
-            console.error('Failed to load wheel data', error);
-            const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูล';
-            toast.error(errorMessage);
-        } finally {
-            setLoadingStores(false);
+            const data = await getLuckyDrawEntries();
+            setEntries(data);
+        } catch (error) {
+            console.error('Failed to fetch entries', error);
+            toast.error('ไม่สามารถดึงข้อมูลผู้มีสิทธิ์จับฉลากได้');
         }
-    };
-
-    // 🧪 Mock Data สำหรับทดสอบ
-    const loadMockData = () => {
-        const mockStores = [
-            'ร้านกาแฟสดใจกลางเมือง',
-            'ร้านขนมหวานแสนอร่อย',
-            'ร้านอาหารเจ้าเด็ด',
-            'ร้านเสื้อผ้าแฟชั่น',
-            'ร้านของใช้ในบ้าน',
-            'ร้านหนังสือและเครื่องเขียน',
-            'ร้านดอกไม้บานสวย',
-            'ร้านขายพืชสวนถูกใจ',
-            'ร้านขนมไทยโบราณ',
-            'ร้านเบเกอรี่หอมกรุ่น',
-            'ร้านน้ำผลไม้สดใหม่',
-            'ร้านอุปกรณ์กีฬา',
-            'ร้านของเล่นเด็ก',
-            'ร้านเครื่องประดับ',
-            'ร้านรองเท้าคุณภาพ'
-        ];
-
-        setAllEntries(mockStores);
-
-        const wheelEntries = mockStores.map((entry, i) => ({
-            option: entry.length > 20 ? entry.substring(0, 20) + '..' : entry,
-            style: {
-                backgroundColor: COLORS[i % COLORS.length],
-                textColor: 'white'
-            }
-        }));
-        setWheelData(wheelEntries);
-
-        toast.success(`โหลด Mock Data ${mockStores.length} ร้านเรียบร้อยแล้ว (ทดสอบ)`);
     };
 
     useEffect(() => {
         fetchWinners();
-        loadWheelData();
     }, []);
 
-    const handleSpinClick = () => {
-        if (mustSpin || allEntries.length === 0) {
-            if (allEntries.length === 0) toast.error('กรุณาโหลดรายชื่อร้านค้าก่อน');
-            return;
-        }
-
-        // สุ่มผู้ชนะจากรายชื่อทั้งหมด
-        const randomIndex = Math.floor(Math.random() * allEntries.length);
-        const winnerName = allEntries[randomIndex];
-        setWinnerName(winnerName);
-
-        // ตั้งให้วงล้อหยุดที่ช่องนั้นเลย
-        setPrizeNumber(randomIndex);
-        setMustSpin(true);
-    };
-
-    const handleStopSpinning = async () => {
-        setMustSpin(false);
+    const handleWinnerSelected = async (winnerName: string) => {
         setLatestWinner(winnerName);
-        toast.success(`🎉 ผู้ชนะคือ: ${winnerName}`);
 
         try {
             await createLuckyDrawWinner(winnerName);
@@ -135,95 +47,30 @@ export default function OptimizedWheel() {
         }
     };
 
-    // 🔥 คำนวณขนาดฟอนต์ตามจำนวนช่อง
-    const calculateFontSize = (entryCount: number): number => {
-        if (entryCount <= 50) return 16;      // ช่องน้อย ฟอนต์ใหญ่
-        if (entryCount <= 100) return 14;     // ช่องปานกลาง
-        if (entryCount <= 200) return 12;     // ช่องค่อนข้างเยอะ
-        if (entryCount <= 300) return 10;     // ช่องเยอะ
-        if (entryCount <= 500) return 8;      // ช่องเยอะมาก
-        return 7;                              // ช่องเยอะสุด ๆ
+    const handleOpenEntriesModal = async () => {
+        await fetchEntries();
+        setShowEntriesModal(true);
     };
 
     return (
-        <div className="container mx-auto p-6 space-y-8">
-            <h1 className="text-3xl font-bold text-gray-800 animate-fade-in-down">Lucky Draw System</h1>
+        <div className="container overflow-auto mx-auto p-6 space-y-8">
+            <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-bold text-gray-800 animate-fade-in-down">Lucky Draw System</h1>
+                <button
+                    onClick={handleOpenEntriesModal}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md transition-colors"
+                >
+                    <Users className="w-5 h-5" />
+                    <span>ดูรายชื่อผู้มีสิทธิ์</span>
+                </button>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Wheel Section */}
+                <LuckyDrawWheel onWinnerSelected={handleWinnerSelected} />
+
+                {/* Winners Section */}
                 <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 flex flex-col h-[700px]">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
-                            <span className="text-2xl">🎡</span> Lucky Draw Wheel
-                        </h2>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={loadWheelData}
-                                disabled={loadingStores}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-blue-600 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
-                            >
-                                <RefreshCw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
-                                <span className="text-sm font-medium">โหลดรายชื่อร้าน</span>
-                            </button>
-                            <button
-                                onClick={loadMockData}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-purple-600 hover:text-purple-700 flex items-center gap-2"
-                            >
-                                🧪
-                                <span className="text-sm font-medium">Mock Data (15 ร้าน)</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 flex flex-col items-center justify-center space-y-6">
-                        <div className="text-center space-y-2">
-                            <p className="text-lg font-semibold text-gray-700">
-                                จำนวนร้านค้าทั้งหมด: <span className="text-blue-600">{allEntries.length}</span> ร้าน
-                            </p>
-                            {allEntries.length > 0 && (
-                                <p className="text-sm text-gray-500">
-                                    แสดงชื่อร้านค้าทั้งหมดบนวงล้อ • กดปุ่ม "สุ่มรางวัล" เพื่อเริ่มหมุน
-                                </p>
-                            )}
-                        </div>
-
-                        {/* 🔥 ส่วนปรับแต่งวงล้อ */}
-                        <div className="scale-100 lg:scale-100">
-                            <Wheel
-                                mustStartSpinning={mustSpin}
-                                prizeNumber={prizeNumber}
-                                data={wheelData}
-                                onStopSpinning={handleStopSpinning}
-
-                                // Config ให้สวยเหมือน wheelofnames
-                                spinDuration={0.8} // ความเร็ว
-                                outerBorderColor="#333"
-                                innerRadius={10} // รูตรงกลาง
-                                innerBorderColor="#333"
-                                innerBorderWidth={0}
-                                outerBorderWidth={0}
-                                radiusLineWidth={0} // ไม่มีเส้นขอบระหว่างช่อง
-
-                                // ✨ จุดสำคัญ: การจัดตัวอักษร
-                                fontSize={calculateFontSize(allEntries.length)} // 🔥 ปรับขนาดอัตโนมัติตามจำนวนช่อง
-                                perpendicularText={false} // 🔥 ให้ตัวหนังสือเป็นแนวนอนไปตามรัศมี
-                                textDistance={62} // ขยับตัวหนังสือออกไปทางขอบวงล้อ
-                            />
-                        </div>
-
-                        <button
-                            onClick={handleSpinClick}
-                            disabled={mustSpin || allEntries.length === 0}
-                            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 text-lg"
-                        >
-                            {mustSpin ? '🎲 กำลังหมุน...' : '🎲 กดสุ่มรางวัล'}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Winners Section (เหมือนเดิม) */}
-                <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 flex flex-col h-[700px]">
-                    {/* ... code ส่วนตาราง winners เหมือนเดิม ... */}
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
                             <span className="text-2xl">🏆</span> Winners History
@@ -242,7 +89,6 @@ export default function OptimizedWheel() {
 
                     <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            {/* ... table headers ... */}
                             <thead className="sticky top-0 bg-white z-10">
                                 <tr>
                                     <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">No.</th>
@@ -265,6 +111,99 @@ export default function OptimizedWheel() {
                     </div>
                 </div>
             </div>
+
+            {/* Entries Modal */}
+            {showEntriesModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                                <Users className="w-6 h-6 text-blue-600" />
+                                รายชื่อผู้มีสิทธิ์จับฉลาก
+                            </h2>
+                            <button
+                                onClick={() => setShowEntriesModal(false)}
+                                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <X className="w-6 h-6 text-gray-500" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <div className="mb-4 flex justify-between items-center">
+                                <p className="text-sm text-gray-600">
+                                    ทั้งหมด <span className="font-bold text-blue-600">{entries.length}</span> ร้านค้า
+                                    {' | '}
+                                    ยังไม่ถูกสุ่ม <span className="font-bold text-green-600">{entries.filter(e => !e.isDrawn).length}</span> ร้าน
+                                    {' | '}
+                                    ถูกสุ่มแล้ว <span className="font-bold text-orange-600">{entries.filter(e => e.isDrawn).length}</span> ร้าน
+                                </p>
+                                <button
+                                    onClick={fetchEntries}
+                                    className="p-2 hover:bg-gray-100 rounded-full text-gray-500"
+                                >
+                                    <RefreshCw className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-gray-50 sticky top-0">
+                                        <tr>
+                                            <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider border-b-2 border-gray-200">ID</th>
+                                            <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider border-b-2 border-gray-200">ชื่อร้านค้า</th>
+                                            <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider border-b-2 border-gray-200 text-center">สถานะ</th>
+                                            <th className="px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider border-b-2 border-gray-200 text-right">เวลาที่ถูกสุ่ม</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {entries.map((entry) => (
+                                            <tr
+                                                key={entry.id}
+                                                className={`hover:bg-gray-50 transition-colors ${entry.isDrawn ? 'bg-orange-50/30' : ''}`}
+                                            >
+                                                <td className="px-4 py-3 text-sm font-mono text-gray-600">{entry.storeId}</td>
+                                                <td className="px-4 py-3 text-sm font-semibold text-gray-800">{entry.storeName}</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {entry.isDrawn ? (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                            ถูกสุ่มแล้ว
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                            ยังไม่ถูกสุ่ม
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-500 text-right">
+                                                    {entry.drawnAt
+                                                        ? new Date(entry.drawnAt).toLocaleString('th-TH', {
+                                                            dateStyle: 'short',
+                                                            timeStyle: 'short'
+                                                        })
+                                                        : '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-6 border-t border-gray-200 flex justify-end">
+                            <button
+                                onClick={() => setShowEntriesModal(false)}
+                                className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg shadow-md transition-colors"
+                            >
+                                ปิด
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style jsx global>{`
                 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
