@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { generateWheel, getActiveEntries } from '@/services/admin/luckyDrawService';
+import { generateWheel, getActiveEntries, checkBoothAvailability } from '@/services/admin/luckyDrawService';
 import { toast } from 'sonner';
 import { RefreshCw, Maximize, Minimize, RotateCcw } from 'lucide-react';
 
@@ -18,7 +18,7 @@ const COLORS = [
 ];
 
 interface LuckyDrawWheelProps {
-    onWinnerSelected: (winnerName: string) => void;
+    onWinnerSelected: (winnerName: string) => Promise<any>;
 }
 
 export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps) {
@@ -30,6 +30,7 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
     const [loadingStores, setLoadingStores] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showWinnerPopup, setShowWinnerPopup] = useState(false);
+    const [hasAvailableBooths, setHasAvailableBooths] = useState(true);
 
     // 🎵 Audio refs for sound effects
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -151,6 +152,20 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
     };
 
     /**
+     * ตรวจสอบว่ามี booth ว่างหรือไม่
+     */
+    const checkAvailability = async () => {
+        try {
+            const availability = await checkBoothAvailability();
+            setHasAvailableBooths(availability.hasAvailableBooths);
+            return availability;
+        } catch (error) {
+            console.error('Failed to check booth availability', error);
+            return null;
+        }
+    };
+
+    /**
      * โหลดรายชื่อร้านค้าครั้งแรก (generate wheel + create entries)
      */
     const loadWheelData = async () => {
@@ -172,6 +187,9 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
                 setWheelData(wheelEntries);
 
                 toast.success(`โหลดข้อมูล ${response.totalStores} ร้านค้าทั้งหมดลงวงล้อเรียบร้อยแล้ว`);
+
+                // ตรวจสอบ booth availability
+                await checkAvailability();
             }
         } catch (error: any) {
             console.error('Failed to load wheel data', error);
@@ -204,6 +222,9 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
                 setWheelData(wheelEntries);
 
                 toast.success(`รีเฟรชรายชื่อเรียบร้อย: เหลือ ${entries.length} ร้าน`);
+
+                // ตรวจสอบ booth availability
+                await checkAvailability();
             } else {
                 setAllEntries([]);
                 setWheelData([{ option: 'ไม่มีร้านค้าที่ยังไม่ถูกสุ่ม', style: { backgroundColor: '#ccc', textColor: '#666' } }]);
@@ -252,9 +273,16 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
         toast.success(`โหลด Mock Data ${mockStores.length} ร้านเรียบร้อยแล้ว (ทดสอบ)`);
     };
 
-    const handleSpinClick = () => {
+    const handleSpinClick = async () => {
         if (mustSpin || allEntries.length === 0) {
             if (allEntries.length === 0) toast.error('กรุณาโหลดรายชื่อร้านค้าก่อน');
+            return;
+        }
+
+        // ตรวจสอบว่ามี booth ว่างหรือไม่
+        const availability = await checkAvailability();
+        if (availability && !availability.hasAvailableBooths) {
+            toast.error('⚠️ ไม่มี booth ว่างเหลือแล้ว!\nไม่สามารถจับฉลากได้ กรุณาเพิ่ม booth หรือจัดการ booth ที่มีอยู่');
             return;
         }
 
@@ -271,7 +299,7 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
         setMustSpin(true);
     };
 
-    const handleStopSpinning = () => {
+    const handleStopSpinning = async () => {
         setMustSpin(false);
 
         // 🎵 Play winner sound
@@ -281,9 +309,22 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
         setShowWinnerPopup(true);
 
         toast.success(`🎉 ผู้ชนะคือ: ${winnerName}`);
-        onWinnerSelected(winnerName);
 
-        // 🔥 ลบผู้ชนะออกจากรายชื่อ
+        // ⏳ บันทึก winner (backend จะเก็บไว้แม้ assign ไม่สำเร็จ)
+        try {
+            const result: any = await onWinnerSelected(winnerName);
+
+            // ตรวจสอบว่า assign booth สำเร็จหรือไม่
+            if (result?.assignmentError) {
+                toast.warning(`⚠️ ${result.message}\nร้านถูกบันทึกแล้ว แต่ยังไม่ได้ booth`);
+            }
+        } catch (error: any) {
+            console.error('Failed to save winner:', error);
+            const errorMessage = error?.response?.data?.message || error?.message || 'เกิดข้อผิดพลาด';
+            toast.error(`❌ ${errorMessage}`);
+        }
+
+        // ✅ ลบผู้ชนะออกจากรายชื่อเสมอ (เพราะ backend เก็บ winner ไว้แล้ว)
         const updatedEntries = allEntries.filter(entry => entry !== winnerName);
         setAllEntries(updatedEntries);
 

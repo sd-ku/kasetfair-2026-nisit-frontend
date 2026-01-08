@@ -56,3 +56,15 @@ export async function resetWheel(): Promise<{ message: string }> {
     const res = await http.post('/api/admin/lucky-draw/reset');
     return res.data;
 }
+
+export interface BoothAvailabilityResponse {
+    hasAvailableBooths: boolean;
+    foodBooths: number;
+    nonFoodBooths: number;
+    message: string;
+}
+
+export async function checkBoothAvailability(): Promise<BoothAvailabilityResponse> {
+    const res = await http.get('/api/admin/lucky-draw/check-booth-availability');
+    return res.data;
+}

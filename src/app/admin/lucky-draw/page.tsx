@@ -39,11 +39,13 @@ export default function LuckyDrawPage() {
         setLatestWinner(winnerName);
 
         try {
-            await createLuckyDrawWinner(winnerName);
+            const result = await createLuckyDrawWinner(winnerName);
             fetchWinners();
+            return result; // Return response เพื่อให้ wheel component ตรวจสอบ assignmentError
         } catch (error) {
             console.error('Failed to save winner', error);
             toast.error('ไม่สามารถบันทึกผู้ชนะได้');
+            throw error; // Throw error เพื่อให้ wheel component จัดการ
         }
     };
 
