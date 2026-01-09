@@ -95,6 +95,8 @@ export default function LuckyDrawPage() {
                                 <tr>
                                     <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">No.</th>
                                     <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Name</th>
+                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 text-center">Booth</th>
+                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 text-center">Status</th>
                                     <th className="px-4 py-3 text-xs font-bold text-gray-400 text-right uppercase tracking-wider border-b border-gray-100">Time</th>
                                 </tr>
                             </thead>
@@ -103,6 +105,32 @@ export default function LuckyDrawPage() {
                                     <tr key={w.id} className="group hover:bg-gray-50">
                                         <td className="px-4 py-4 text-gray-400 text-sm font-mono">#{winners.length - index}</td>
                                         <td className="px-4 py-4 font-semibold text-gray-700 text-lg">{w.winner}</td>
+                                        <td className="px-4 py-4 text-center">
+                                            {w.boothNumber ? (
+                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+                                                    {w.boothNumber}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-400 text-sm">-</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            {w.status === 'CONFIRMED' ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-600 text-white">
+                                                    ✓ ยืนยันแล้ว
+                                                </span>
+                                            ) : w.status === 'PENDING' ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                    ⏳ รอยืนยัน
+                                                </span>
+                                            ) : w.status === 'FORFEITED' ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                    ✗ สละสิทธิ์
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-400 text-sm">-</span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-4 text-right text-gray-500 text-sm">
                                             {new Date(w.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
                                         </td>

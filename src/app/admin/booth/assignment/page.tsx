@@ -7,13 +7,16 @@ import {
     getLatestPendingAssignment,
     createAssignment,
     verifyAssignment,
+    verifyByStoreId,
     forfeitAssignment,
+    lookupStoreByBarcode,
     BoothAssignmentResponse,
     BoothStatsResponse,
     BoothZone,
     BoothAssignmentStatus,
+    LookupStoreResponse,
 } from '@/services/admin/boothService';
-import { QrCode, CheckCircle, XCircle, RefreshCw, AlertCircle, Utensils, Package, Scan, UserCheck } from 'lucide-react';
+import { QrCode, CheckCircle, XCircle, RefreshCw, AlertCircle, Utensils, Package, Scan, UserCheck, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function BoothAssignmentPage() {
@@ -26,6 +29,7 @@ export default function BoothAssignmentPage() {
     // Barcode scan state
     const [barcode, setBarcode] = useState('');
     const [scanning, setScanning] = useState(false);
+    const [lookupResult, setLookupResult] = useState<LookupStoreResponse | null>(null);
     const barcodeInputRef = useRef<HTMLInputElement>(null);
 
     // Manual assign state
@@ -72,28 +76,20 @@ export default function BoothAssignmentPage() {
             return;
         }
 
-        if (!latestPending) {
-            toast.error('ไม่มี assignment ที่รอยืนยัน');
-            return;
-        }
-
         try {
             setScanning(true);
-            const result = await verifyAssignment({
-                barcode: barcode.trim(),
-                assignmentId: latestPending.id,
-            });
+            const result = await lookupStoreByBarcode(barcode.trim());
 
-            toast.success(`ยืนยันสำเร็จ! ร้าน "${result.store?.storeName}" ได้รับ Booth ${result.booth.boothNumber}`);
+            setLookupResult(result);
+            toast.success(`พบข้อมูล: ${result.nisit.firstName} ${result.nisit.lastName} - ร้าน "${result.store.storeName}"`);
             setBarcode('');
-            fetchData();
         } catch (error: any) {
-            console.error('Failed to verify', error);
-            const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการยืนยัน';
+            console.error('Failed to lookup store', error);
+            const errorMessage = error?.response?.data?.message || 'ไม่พบข้อมูล';
             toast.error(errorMessage);
+            setLookupResult(null);
         } finally {
             setScanning(false);
-            // Re-focus input
             if (barcodeInputRef.current) {
                 barcodeInputRef.current.focus();
             }
@@ -169,7 +165,7 @@ export default function BoothAssignmentPage() {
     const currentZoneStats = getStatsByZone(activeZone);
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
+        <div className="overflow-auto container mx-auto p-6 space-y-6">
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
@@ -197,112 +193,222 @@ export default function BoothAssignmentPage() {
                 </div>
             </div>
 
-            {/* Zone Selector */}
-            <div className="flex gap-4">
-                <button
-                    onClick={() => setActiveZone('FOOD')}
-                    className={`flex-1 p-4 rounded-xl border-2 transition-all ${activeZone === 'FOOD'
-                        ? 'border-orange-500 bg-orange-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                >
-                    <div className="flex items-center gap-3">
-                        <div className={`p-3 rounded-lg ${activeZone === 'FOOD' ? 'bg-orange-500' : 'bg-gray-200'}`}>
-                            <Utensils className={`w-6 h-6 ${activeZone === 'FOOD' ? 'text-white' : 'text-gray-600'}`} />
-                        </div>
-                        <div className="text-left">
-                            <p className="font-semibold text-gray-800">โซนอาหาร (FOOD)</p>
-                            <p className="text-sm text-gray-500">
-                                {getStatsByZone('FOOD')?.confirmed || 0} / {getStatsByZone('FOOD')?.total || 0} confirmed
-                            </p>
-                        </div>
-                    </div>
-                </button>
-                <button
-                    onClick={() => setActiveZone('NON_FOOD')}
-                    className={`flex-1 p-4 rounded-xl border-2 transition-all ${activeZone === 'NON_FOOD'
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                >
-                    <div className="flex items-center gap-3">
-                        <div className={`p-3 rounded-lg ${activeZone === 'NON_FOOD' ? 'bg-blue-500' : 'bg-gray-200'}`}>
-                            <Package className={`w-6 h-6 ${activeZone === 'NON_FOOD' ? 'text-white' : 'text-gray-600'}`} />
-                        </div>
-                        <div className="text-left">
-                            <p className="font-semibold text-gray-800">โซนไม่ใช่อาหาร (NON_FOOD)</p>
-                            <p className="text-sm text-gray-500">
-                                {getStatsByZone('NON_FOOD')?.confirmed || 0} / {getStatsByZone('NON_FOOD')?.total || 0} confirmed
-                            </p>
-                        </div>
-                    </div>
-                </button>
+            {/* Barcode Scanner - Lookup Store */}
+            <div className="bg-white border-2 border-blue-300 rounded-2xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                    <Scan className="w-6 h-6 text-blue-600" />
+                    <h2 className="text-xl font-bold text-gray-800">ค้นหาร้านจากบาร์โค้ดนิสิต</h2>
+                </div>
+                <div className="flex gap-3">
+                    <input
+                        ref={barcodeInputRef}
+                        type="text"
+                        value={barcode}
+                        onChange={(e) => setBarcode(e.target.value)}
+                        onKeyDown={handleBarcodeKeyDown}
+                        placeholder="สแกนบาร์โค้ดที่นี่... (เช่น 20065105035316)"
+                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg font-mono"
+                        autoComplete="off"
+                    />
+                    <button
+                        onClick={handleScan}
+                        disabled={scanning || !barcode.trim()}
+                        className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {scanning ? (
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <Search className="w-5 h-5" />
+                        )}
+                        ค้นหา
+                    </button>
+                </div>
+                <p className="text-sm text-gray-600 mt-3">
+                    💡 สแกนบาร์โค้ดจากบัตรนิสิตเพื่อตรวจสอบว่าอยู่ร้านไหน พร้อมดูข้อมูล booth assignment
+                </p>
             </div>
 
-            {/* Pending Assignment Card */}
-            {latestPending ? (
-                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-2xl p-6">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <AlertCircle className="w-5 h-5 text-yellow-600" />
-                                <h3 className="text-lg font-semibold text-yellow-800">รอยืนยันตัวตน</h3>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-3xl font-bold text-gray-800">{latestPending.store?.storeName}</p>
-                                <p className="text-gray-600">Booth: <strong className="text-2xl text-orange-600">{latestPending.booth.boothNumber}</strong></p>
-                                <p className="text-sm text-gray-500">Draw Order: #{latestPending.drawOrder}</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => handleForfeit(latestPending.id, latestPending.store?.storeName || '')}
-                            className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
-                        >
-                            <XCircle className="w-5 h-5 inline-block mr-1" />
-                            สละสิทธิ์
-                        </button>
-                    </div>
-
-                    {/* Barcode Scanner */}
-                    <div className="mt-6 p-4 bg-white rounded-xl">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Scan className="w-5 h-5 text-gray-600" />
-                            <label className="font-medium text-gray-700">สแกนบาร์โค้ดบัตรนิสิต</label>
-                        </div>
-                        <div className="flex gap-3">
-                            <input
-                                ref={barcodeInputRef}
-                                type="text"
-                                value={barcode}
-                                onChange={(e) => setBarcode(e.target.value)}
-                                onKeyDown={handleBarcodeKeyDown}
-                                placeholder="สแกนบาร์โค้ดที่นี่... (เช่น 20065105035316)"
-                                className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-mono"
-                                autoComplete="off"
-                            />
+            {/* Lookup Result Display */}
+            {lookupResult && (
+                <div className="mt-6 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-2xl">
+                    <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
+                            <Search className="w-5 h-5" />
+                            ผลการค้นหา
+                        </h3>
+                        <div className="flex items-center gap-2">
+                            {/* Show action buttons only if there's a pending assignment */}
+                            {lookupResult.assignment && lookupResult.assignment.status === 'PENDING' && (
+                                <>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await verifyByStoreId({
+                                                    storeId: lookupResult.store.id,
+                                                    barcode: lookupResult.scannedBarcode
+                                                });
+                                                toast.success(`ยืนยัน booth สำเร็จ! ร้าน "${lookupResult.store.storeName}"`);
+                                                setLookupResult(null);
+                                                fetchData();
+                                            } catch (error: any) {
+                                                console.error('Failed to verify', error);
+                                                const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการยืนยัน';
+                                                toast.error(errorMessage);
+                                            }
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                                    >
+                                        <CheckCircle className="w-4 h-4" />
+                                        ยืนยัน
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (lookupResult.assignment) {
+                                                handleForfeit(lookupResult.assignment.id, lookupResult.store.storeName);
+                                                setLookupResult(null);
+                                            }
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                                    >
+                                        <XCircle className="w-4 h-4" />
+                                        ปฏิเสธ
+                                    </button>
+                                </>
+                            )}
                             <button
-                                onClick={handleScan}
-                                disabled={scanning || !barcode.trim()}
-                                className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                onClick={() => setLookupResult(null)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
                             >
-                                {scanning ? (
-                                    <RefreshCw className="w-5 h-5 animate-spin" />
-                                ) : (
-                                    <CheckCircle className="w-5 h-5" />
-                                )}
-                                ยืนยัน
+                                <XCircle className="w-4 h-4" />
+                                ยกเลิก
                             </button>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                            * สแกนบาร์โค้ดจากบัตรนิสิตแล้วกด Enter หรือคลิกปุ่มยืนยัน
-                        </p>
                     </div>
-                </div>
-            ) : (
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center">
-                    <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                    <p className="text-gray-600 text-lg">ไม่มี assignment ที่รอยืนยัน</p>
-                    <p className="text-gray-500 text-sm mt-1">สุ่มวงล้อเพื่อเพิ่ม assignment ใหม่</p>
+
+                    {/* Assignment Info */}
+                    {lookupResult.assignment ? (
+                        <div className="bg-white rounded-xl p-4 mb-4">
+                            <h4 className="font-semibold text-gray-700 mb-2">ข้อมูล Booth Assignment</h4>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <p className="text-gray-500">Booth Number</p>
+                                    <p className="text-2xl font-bold text-orange-600">{lookupResult.assignment.booth.boothNumber}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">Zone</p>
+                                    <p className="font-semibold">{lookupResult.assignment.booth.zone}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">สถานะ</p>
+                                    <p>{getStatusBadge(lookupResult.assignment.status)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">Draw Order</p>
+                                    <p className="font-mono">#{lookupResult.assignment.drawOrder}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+                            <p className="text-yellow-800 text-sm">⚠️ ร้านนี้ยังไม่มี booth assignment</p>
+                        </div>
+                    )}
+
+                    {/* Nisit Info */}
+                    <div className="bg-white rounded-xl p-4 mb-4">
+                        <h4 className="font-semibold text-gray-700 mb-2">ข้อมูลนิสิต</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <p className="text-gray-500">รหัสนิสิต</p>
+                                <p className="font-mono font-semibold">{lookupResult.nisit.nisitId}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">ชื่อ-นามสกุล</p>
+                                <p className="font-semibold">{lookupResult.nisit.firstName} {lookupResult.nisit.lastName}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">บทบาท</p>
+                                <p className="font-semibold">
+                                    {lookupResult.nisit.role === 'admin' ? (
+                                        <span className="text-purple-600">👑 Admin</span>
+                                    ) : (
+                                        <span className="text-blue-600">👤 Member</span>
+                                    )}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">อีเมล</p>
+                                <p className="text-sm">{lookupResult.nisit.email}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Store Info */}
+                    <div className="bg-white rounded-xl p-4 mb-4">
+                        <h4 className="font-semibold text-gray-700 mb-2">ข้อมูลร้าน</h4>
+                        <div className="space-y-2">
+                            <div>
+                                <p className="text-gray-500 text-sm">ชื่อร้าน</p>
+                                <p className="text-xl font-bold text-gray-800">{lookupResult.store.storeName}</p>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3 text-sm">
+                                <div>
+                                    <p className="text-gray-500">Store ID</p>
+                                    <p className="font-mono font-semibold">{lookupResult.store.id}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">ประเภท</p>
+                                    <p className="font-semibold">{lookupResult.store.goodType || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">สถานะ</p>
+                                    <p className="font-semibold">{lookupResult.store.state}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Store Members */}
+                    <div className="bg-white rounded-xl p-4 mb-4">
+                        <h4 className="font-semibold text-gray-700 mb-3">สมาชิกร้าน</h4>
+
+                        {/* Members */}
+                        {lookupResult.store.members.length > 0 ? (
+                            <div className="space-y-2">
+                                <p className="text-sm text-gray-600 font-medium">สมาชิก ({lookupResult.store.members.length} คน)</p>
+                                {lookupResult.store.members.map((member, index) => (
+                                    <div key={member.nisitId} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <div>
+                                                <p className="text-gray-500 text-xs">ชื่อ-นามสกุล</p>
+                                                <p className="font-semibold">{member.firstName} {member.lastName}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs">รหัสนิสิต</p>
+                                                <p className="font-mono text-xs">{member.nisitId}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs">อีเมล</p>
+                                                <p className="text-xs">{member.email}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs">เบอร์โทรศัพท์</p>
+                                                <p className="text-xs">{member.phone}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 text-xs">บทบาท</p>
+                                                <p className="text-xs">{
+                                                    member.nisitId === lookupResult.store.storeAdmin?.nisitId ? 'Admin' : 'Member'
+                                                }</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500 italic">ไม่มีสมาชิก</p>
+                        )}
+                    </div>
                 </div>
             )}
 

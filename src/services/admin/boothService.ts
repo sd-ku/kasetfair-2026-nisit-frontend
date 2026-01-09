@@ -170,3 +170,58 @@ export async function reDrawForStore(storeId: number): Promise<BoothAssignmentRe
     const res = await http.post(`/api/admin/booth/assignments/re-draw/${storeId}`);
     return res.data;
 }
+
+/**
+ * ค้นหาร้านจาก nisit barcode
+ * POST /api/admin/booth/lookup-store
+ */
+export interface LookupStoreResponse {
+    scannedBarcode: string; // Original barcode that was scanned
+    nisit: {
+        nisitId: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        phone: string | null;
+        role: 'admin' | 'member';
+    };
+    store: {
+        id: number;
+        storeName: string;
+        goodType: string | null;
+        boothNumber: string | null;
+        state: string;
+        storeAdmin: {
+            nisitId: string;
+            firstName: string;
+            lastName: string;
+            email: string;
+            phone: string | null;
+        } | null;
+        members: Array<{
+            nisitId: string;
+            firstName: string;
+            lastName: string;
+            email: string;
+            phone: string | null;
+        }>;
+    };
+    assignment: {
+        id: number;
+        booth: {
+            id: number;
+            boothNumber: string;
+            zone: BoothZone;
+        };
+        status: BoothAssignmentStatus;
+        drawOrder: number;
+        verifiedByNisitId: string | null;
+        verifiedAt: string | null;
+        createdAt: string;
+    } | null;
+}
+
+export async function lookupStoreByBarcode(barcode: string): Promise<LookupStoreResponse> {
+    const res = await http.post('/api/admin/booth/lookup-store', { barcode });
+    return res.data;
+}

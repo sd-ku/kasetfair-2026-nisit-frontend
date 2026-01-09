@@ -21,10 +21,15 @@ interface LuckyDrawWheelProps {
     onWinnerSelected: (winnerName: string) => Promise<any>;
 }
 
+interface StoreEntry {
+    storeId: number;
+    storeName: string;
+}
+
 export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps) {
     const [mustSpin, setMustSpin] = useState(false);
     const [prizeNumber, setPrizeNumber] = useState(0);
-    const [allEntries, setAllEntries] = useState<string[]>([]);
+    const [allEntries, setAllEntries] = useState<StoreEntry[]>([]);
     const [wheelData, setWheelData] = useState<any[]>([{ option: 'Loading...', style: { backgroundColor: '#ccc' } }]);
     const [winnerName, setWinnerName] = useState<string>("");
     const [loadingStores, setLoadingStores] = useState(false);
@@ -174,16 +179,31 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
             const response = await generateWheel({ state: 'Validated' });
 
             if (response.entries && response.entries.length > 0) {
-                setAllEntries(response.entries);
-
-                const maxLength = calculateMaxTextLength(response.entries.length);
-                const wheelEntries = response.entries.map((entry, i) => ({
-                    option: entry.length > maxLength ? entry.substring(0, maxLength) + '...' : entry,
-                    style: {
-                        backgroundColor: COLORS[i % COLORS.length],
-                        textColor: 'white'
+                // แปลง string "123. ชื่อร้าน" เป็น object {storeId, storeName}
+                const parsedEntries: StoreEntry[] = response.entries.map((entry: string) => {
+                    const match = entry.match(/^(\d+)\.\s*(.+)$/);
+                    if (match) {
+                        return {
+                            storeId: parseInt(match[1]),
+                            storeName: match[2]
+                        };
                     }
-                }));
+                    // Fallback ถ้า format ไม่ตรง
+                    return { storeId: 0, storeName: entry };
+                });
+                setAllEntries(parsedEntries);
+
+                const maxLength = calculateMaxTextLength(parsedEntries.length);
+                const wheelEntries = parsedEntries.map((entry, i) => {
+                    const displayText = `${entry.storeId}. ${entry.storeName}`;
+                    return {
+                        option: displayText.length > maxLength ? displayText.substring(0, maxLength) + '...' : displayText,
+                        style: {
+                            backgroundColor: COLORS[i % COLORS.length],
+                            textColor: 'white'
+                        }
+                    };
+                });
                 setWheelData(wheelEntries);
 
                 toast.success(`โหลดข้อมูล ${response.totalStores} ร้านค้าทั้งหมดลงวงล้อเรียบร้อยแล้ว`);
@@ -209,19 +229,33 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
             const entries = await getActiveEntries();
 
             if (entries && entries.length > 0) {
-                setAllEntries(entries);
-
-                const maxLength = calculateMaxTextLength(entries.length);
-                const wheelEntries = entries.map((entry, i) => ({
-                    option: entry.length > maxLength ? entry.substring(0, maxLength) + '...' : entry,
-                    style: {
-                        backgroundColor: COLORS[i % COLORS.length],
-                        textColor: 'white'
+                // แปลง string "123. ชื่อร้าน" เป็น object {storeId, storeName}
+                const parsedEntries: StoreEntry[] = entries.map((entry: string) => {
+                    const match = entry.match(/^(\d+)\.\s*(.+)$/);
+                    if (match) {
+                        return {
+                            storeId: parseInt(match[1]),
+                            storeName: match[2]
+                        };
                     }
-                }));
+                    return { storeId: 0, storeName: entry };
+                });
+                setAllEntries(parsedEntries);
+
+                const maxLength = calculateMaxTextLength(parsedEntries.length);
+                const wheelEntries = parsedEntries.map((entry, i) => {
+                    const displayText = `${entry.storeId}. ${entry.storeName}`;
+                    return {
+                        option: displayText.length > maxLength ? displayText.substring(0, maxLength) + '...' : displayText,
+                        style: {
+                            backgroundColor: COLORS[i % COLORS.length],
+                            textColor: 'white'
+                        }
+                    };
+                });
                 setWheelData(wheelEntries);
 
-                toast.success(`รีเฟรชรายชื่อเรียบร้อย: เหลือ ${entries.length} ร้าน`);
+                toast.success(`รีเฟรชรายชื่อเรียบร้อย: เหลือ ${parsedEntries.length} ร้าน`);
 
                 // ตรวจสอบ booth availability
                 await checkAvailability();
@@ -240,34 +274,37 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
 
     // 🧪 Mock Data สำหรับทดสอบ
     const loadMockData = () => {
-        const mockStores = [
-            'ร้านกาแฟสดใจกลางเมือง',
-            'ร้านขนมหวานแสนอร่อย',
-            'ร้านอาหารเจ้าเด็ด',
-            'ร้านเสื้อผ้าแฟชั่น',
-            'ร้านของใช้ในบ้าน',
-            'ร้านหนังสือและเครื่องเขียน',
-            'ร้านดอกไม้บานสวย',
-            'ร้านขายพืชสวนถูกใจ',
-            'ร้านขนมไทยโบราณ',
-            'ร้านเบเกอรี่หอมกรุ่น',
-            'ร้านน้ำผลไม้สดใหม่',
-            'ร้านอุปกรณ์กีฬา',
-            'ร้านของเล่นเด็ก',
-            'ร้านเครื่องประดับ',
-            'ร้านรองเท้าคุณภาพ'
+        const mockStores: StoreEntry[] = [
+            { storeId: 1, storeName: 'ร้านกาแฟสดใจกลางเมือง' },
+            { storeId: 2, storeName: 'ร้านขนมหวานแสนอร่อย' },
+            { storeId: 3, storeName: 'ร้านอาหารเจ้าเด็ด' },
+            { storeId: 4, storeName: 'ร้านเสื้อผ้าแฟชั่น' },
+            { storeId: 5, storeName: 'ร้านของใช้ในบ้าน' },
+            { storeId: 6, storeName: 'ร้านหนังสือและเครื่องเขียน' },
+            { storeId: 7, storeName: 'ร้านดอกไม้บานสวย' },
+            { storeId: 8, storeName: 'ร้านขายพืชสวนถูกใจ' },
+            { storeId: 9, storeName: 'ร้านขนมไทยโบราณ' },
+            { storeId: 10, storeName: 'ร้านเบเกอรี่หอมกรุ่น' },
+            { storeId: 11, storeName: 'ร้านน้ำผลไม้สดใหม่' },
+            { storeId: 12, storeName: 'ร้านอุปกรณ์กีฬา' },
+            { storeId: 13, storeName: 'ร้านของเล่นเด็ก' },
+            { storeId: 14, storeName: 'ร้านเครื่องประดับ' },
+            { storeId: 15, storeName: 'ร้านรองเท้าคุณภาพ' }
         ];
 
         setAllEntries(mockStores);
 
         const maxLength = calculateMaxTextLength(mockStores.length);
-        const wheelEntries = mockStores.map((entry, i) => ({
-            option: entry.length > maxLength ? entry.substring(0, maxLength) + '...' : entry,
-            style: {
-                backgroundColor: COLORS[i % COLORS.length],
-                textColor: 'white'
-            }
-        }));
+        const wheelEntries = mockStores.map((entry, i) => {
+            const displayText = `${entry.storeId}. ${entry.storeName}`;
+            return {
+                option: displayText.length > maxLength ? displayText.substring(0, maxLength) + '...' : displayText,
+                style: {
+                    backgroundColor: COLORS[i % COLORS.length],
+                    textColor: 'white'
+                }
+            };
+        });
         setWheelData(wheelEntries);
 
         toast.success(`โหลด Mock Data ${mockStores.length} ร้านเรียบร้อยแล้ว (ทดสอบ)`);
@@ -292,7 +329,8 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
         // สุ่มผู้ชนะจากรายชื่อทั้งหมด
         const randomIndex = Math.floor(Math.random() * allEntries.length);
         const winner = allEntries[randomIndex];
-        setWinnerName(winner);
+        const winnerText = `${winner.storeId}. ${winner.storeName}`;
+        setWinnerName(winnerText);
 
         // ตั้งให้วงล้อหยุดที่ช่องนั้นเลย
         setPrizeNumber(randomIndex);
@@ -325,19 +363,22 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
         }
 
         // ✅ ลบผู้ชนะออกจากรายชื่อเสมอ (เพราะ backend เก็บ winner ไว้แล้ว)
-        const updatedEntries = allEntries.filter(entry => entry !== winnerName);
+        const updatedEntries = allEntries.filter(entry => `${entry.storeId}. ${entry.storeName}` !== winnerName);
         setAllEntries(updatedEntries);
 
         // อัปเดตข้อมูลวงล้อ
         if (updatedEntries.length > 0) {
             const maxLength = calculateMaxTextLength(updatedEntries.length);
-            const updatedWheelData = updatedEntries.map((entry, i) => ({
-                option: entry.length > maxLength ? entry.substring(0, maxLength) + '...' : entry,
-                style: {
-                    backgroundColor: COLORS[i % COLORS.length],
-                    textColor: 'white'
-                }
-            }));
+            const updatedWheelData = updatedEntries.map((entry, i) => {
+                const displayText = `${entry.storeId}. ${entry.storeName}`;
+                return {
+                    option: displayText.length > maxLength ? displayText.substring(0, maxLength) + '...' : displayText,
+                    style: {
+                        backgroundColor: COLORS[i % COLORS.length],
+                        textColor: 'white'
+                    }
+                };
+            });
             setWheelData(updatedWheelData);
             toast.info(`เหลือร้านค้าอีก ${updatedEntries.length} ร้าน`);
         } else {
@@ -372,20 +413,20 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
                         onClick={refreshActiveEntries}
                         disabled={loadingStores}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-blue-600 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
-                        title="รีเฟรชรายชื่อร้านที่ยังไม่ถูกสุ่ม"
+                        title="รีเฟรชรายชื่อร้านที่ยังไม่ถูกสุ่ม (isDrawn = false)"
                     >
                         <RefreshCw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
-                        <span className="text-sm font-medium">รีเฟรช</span>
+                        <span className="text-sm font-medium">รีเฟรช (เฉพาะที่เหลือ)</span>
                     </button>
-                    <button
+                    {/* <button
                         onClick={loadWheelData}
                         disabled={loadingStores}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-orange-600 hover:text-orange-700 flex items-center gap-2 disabled:opacity-50"
-                        title="โหลดรายชื่อร้านใหม่ทั้งหมด (reset)"
+                        title="โหลดรายชื่อร้านใหม่ทั้งหมดจาก database (reset entries)"
                     >
                         <RotateCcw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
-                        <span className="text-sm font-medium">โหลดใหม่</span>
-                    </button>
+                        <span className="text-sm font-medium">โหลดใหม่ (ทั้งหมด)</span>
+                    </button> */}
                     <button
                         onClick={loadMockData}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-purple-600 hover:text-purple-700 flex items-center gap-2"

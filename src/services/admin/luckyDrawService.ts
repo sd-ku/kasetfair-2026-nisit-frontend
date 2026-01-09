@@ -5,6 +5,8 @@ export interface LuckyDrawResponse {
     id: number;
     winner: string;
     createdAt: string;
+    boothNumber: string | null;
+    status: 'PENDING' | 'CONFIRMED' | 'FORFEITED' | null;
 }
 
 export interface LuckyDrawEntryResponse {
