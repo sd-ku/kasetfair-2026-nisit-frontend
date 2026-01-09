@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { generateWheel, getActiveEntries, checkBoothAvailability } from '@/services/admin/luckyDrawService';
 import { toast } from 'sonner';
-import { RefreshCw, Maximize, Minimize, RotateCcw } from 'lucide-react';
+import { RefreshCw, Maximize, Minimize, RotateCcw, MoreVertical, Settings } from 'lucide-react';
 
 const Wheel = dynamic(() => import('react-custom-roulette').then((mod) => mod.Wheel), {
     ssr: false,
@@ -36,6 +36,10 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showWinnerPopup, setShowWinnerPopup] = useState(false);
     const [hasAvailableBooths, setHasAvailableBooths] = useState(true);
+    const [showMoreMenu, setShowMoreMenu] = useState(false);
+    const [showConfigModal, setShowConfigModal] = useState(false);
+    const [spinDuration, setSpinDuration] = useState(0.8); // ความเร็วการหมุน (วินาที)
+    const [isMockMode, setIsMockMode] = useState(false); // ติดตามว่ากำลังใช้ mock data หรือไม่
 
     // 🎵 Audio refs for sound effects
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -208,6 +212,9 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
 
                 toast.success(`โหลดข้อมูล ${response.totalStores} ร้านค้าทั้งหมดลงวงล้อเรียบร้อยแล้ว`);
 
+                // ตั้งค่าว่าไม่ใช่ mock mode
+                setIsMockMode(false);
+
                 // ตรวจสอบ booth availability
                 await checkAvailability();
             }
@@ -256,6 +263,9 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
                 setWheelData(wheelEntries);
 
                 toast.success(`รีเฟรชรายชื่อเรียบร้อย: เหลือ ${parsedEntries.length} ร้าน`);
+
+                // ตั้งค่าว่าไม่ใช่ mock mode
+                setIsMockMode(false);
 
                 // ตรวจสอบ booth availability
                 await checkAvailability();
@@ -308,6 +318,9 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
         setWheelData(wheelEntries);
 
         toast.success(`โหลด Mock Data ${mockStores.length} ร้านเรียบร้อยแล้ว (ทดสอบ)`);
+
+        // ตั้งค่าว่าอยู่ใน mock mode
+        setIsMockMode(true);
     };
 
     const handleSpinClick = async () => {
@@ -348,18 +361,23 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
 
         toast.success(`🎉 ผู้ชนะคือ: ${winnerName}`);
 
-        // ⏳ บันทึก winner (backend จะเก็บไว้แม้ assign ไม่สำเร็จ)
-        try {
-            const result: any = await onWinnerSelected(winnerName);
+        // ⏳ บันทึก winner (เฉพาะเมื่อไม่ใช่ mock mode)
+        if (!isMockMode) {
+            try {
+                const result: any = await onWinnerSelected(winnerName);
 
-            // ตรวจสอบว่า assign booth สำเร็จหรือไม่
-            if (result?.assignmentError) {
-                toast.warning(`⚠️ ${result.message}\nร้านถูกบันทึกแล้ว แต่ยังไม่ได้ booth`);
+                // ตรวจสอบว่า assign booth สำเร็จหรือไม่
+                if (result?.assignmentError) {
+                    toast.warning(`⚠️ ${result.message}\nร้านถูกบันทึกแล้ว แต่ยังไม่ได้ booth`);
+                }
+            } catch (error: any) {
+                console.error('Failed to save winner:', error);
+                const errorMessage = error?.response?.data?.message || error?.message || 'เกิดข้อผิดพลาด';
+                toast.error(`❌ ${errorMessage}`);
             }
-        } catch (error: any) {
-            console.error('Failed to save winner:', error);
-            const errorMessage = error?.response?.data?.message || error?.message || 'เกิดข้อผิดพลาด';
-            toast.error(`❌ ${errorMessage}`);
+        } else {
+            // Mock mode - แสดงข้อความว่าไม่ได้บันทึก
+            toast.info('🧪 โหมดทดสอบ: ไม่ได้บันทึกข้อมูลลง database');
         }
 
         // ✅ ลบผู้ชนะออกจากรายชื่อเสมอ (เพราะ backend เก็บ winner ไว้แล้ว)
@@ -402,6 +420,14 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
                 </h2>
                 <div className="flex items-center gap-2">
                     <button
+                        onClick={() => setShowConfigModal(true)}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-700 flex items-center gap-2"
+                        title="ตั้งค่าวงล้อ"
+                    >
+                        <Settings className="w-5 h-5" />
+                        <span className="text-sm font-medium">ตั้งค่า</span>
+                    </button>
+                    <button
                         onClick={toggleFullscreen}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-green-600 hover:text-green-700 flex items-center gap-2"
                         title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
@@ -418,22 +444,61 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
                         <RefreshCw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
                         <span className="text-sm font-medium">รีเฟรช (เฉพาะที่เหลือ)</span>
                     </button>
-                    {/* <button
-                        onClick={loadWheelData}
-                        disabled={loadingStores}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-orange-600 hover:text-orange-700 flex items-center gap-2 disabled:opacity-50"
-                        title="โหลดรายชื่อร้านใหม่ทั้งหมดจาก database (reset entries)"
-                    >
-                        <RotateCcw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
-                        <span className="text-sm font-medium">โหลดใหม่ (ทั้งหมด)</span>
-                    </button> */}
-                    <button
-                        onClick={loadMockData}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-purple-600 hover:text-purple-700 flex items-center gap-2"
-                    >
-                        🧪
-                        <span className="text-sm font-medium">Mock Data (15 ร้าน)</span>
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowMoreMenu(!showMoreMenu)}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-700 flex items-center gap-2"
+                            title="ตัวเลือกเพิ่มเติม"
+                        >
+                            <MoreVertical className="w-5 h-5" />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {showMoreMenu && (
+                            <>
+                                {/* Backdrop to close menu when clicking outside */}
+                                <div
+                                    className="fixed inset-0 z-10"
+                                    onClick={() => setShowMoreMenu(false)}
+                                />
+
+                                {/* Menu Items */}
+                                <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                                    <button
+                                        onClick={() => {
+                                            loadWheelData();
+                                            setShowMoreMenu(false);
+                                        }}
+                                        disabled={loadingStores}
+                                        className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-orange-600 hover:text-orange-700 flex items-center gap-3 disabled:opacity-50 text-left"
+                                        title="โหลดรายชื่อร้านใหม่ทั้งหมดจาก database (reset entries)"
+                                    >
+                                        <RotateCcw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium">รีเซ็ทผลลัพธ์</span>
+                                            <span className="text-xs text-gray-500">โหลดร้านค้าใหม่ทั้งหมด</span>
+                                        </div>
+                                    </button>
+
+                                    <div className="h-px bg-gray-200 my-1" />
+
+                                    <button
+                                        onClick={() => {
+                                            loadMockData();
+                                            setShowMoreMenu(false);
+                                        }}
+                                        className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-purple-600 hover:text-purple-700 flex items-center gap-3 text-left"
+                                    >
+                                        <span className="text-xl">🧪</span>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium">Mock Data</span>
+                                            <span className="text-xs text-gray-500">ทดสอบด้วย 15 ร้าน</span>
+                                        </div>
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -443,6 +508,12 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
                         <p className="text-lg font-semibold text-gray-700">
                             จำนวนร้านค้าทั้งหมด: <span className="text-blue-600">{allEntries.length}</span> ร้าน
                         </p>
+                        {isMockMode && (
+                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 border-2 border-purple-300 rounded-lg">
+                                <span className="text-xl">🧪</span>
+                                <span className="text-sm font-bold text-purple-700">โหมดทดสอบ (Mock Data)</span>
+                            </div>
+                        )}
                         {allEntries.length > 0 && (
                             <p className="text-sm text-gray-500">
                                 แสดงชื่อร้านค้าทั้งหมดบนวงล้อ • คลิกที่วงล้อเพื่อเริ่มหมุน
@@ -475,7 +546,7 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
                         onStopSpinning={handleStopSpinning}
 
                         // Config ให้สวยเหมือน wheelofnames
-                        spinDuration={0.8} // ความเร็ว
+                        spinDuration={spinDuration} // ความเร็ว (ปรับได้จาก config)
                         outerBorderColor="#333"
                         innerRadius={10} // รูตรงกลาง
                         innerBorderColor="#333"
@@ -490,6 +561,107 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
                     />
                 </div>
             </div>
+
+            {/* ⚙️ Config Modal */}
+            {showConfigModal && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in"
+                    onClick={() => setShowConfigModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <Settings className="w-6 h-6 text-gray-600" />
+                                ตั้งค่าวงล้อ
+                            </h3>
+                            <button
+                                onClick={() => setShowConfigModal(false)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Speed Control */}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    ⚡ ความเร็วการหมุน
+                                </label>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="range"
+                                        min="0.3"
+                                        max="3"
+                                        step="0.1"
+                                        value={spinDuration}
+                                        onChange={(e) => setSpinDuration(parseFloat(e.target.value))}
+                                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                    />
+                                    <span className="text-lg font-semibold text-blue-600 min-w-[60px] text-center">
+                                        {spinDuration.toFixed(1)}s
+                                    </span>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                    <span>เร็ว (0.3s)</span>
+                                    <span>ช้า (3.0s)</span>
+                                </div>
+                            </div>
+
+                            {/* Preset Buttons */}
+                            <div className="grid grid-cols-3 gap-2">
+                                <button
+                                    onClick={() => setSpinDuration(0.5)}
+                                    className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${spinDuration === 0.5
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    🚀 เร็ว
+                                </button>
+                                <button
+                                    onClick={() => setSpinDuration(0.8)}
+                                    className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${spinDuration === 0.8
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    ⚡ ปกติ
+                                </button>
+                                <button
+                                    onClick={() => setSpinDuration(1.5)}
+                                    className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${spinDuration === 1.5
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    🐢 ช้า
+                                </button>
+                            </div>
+
+                            {/* Info */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                                <p className="text-xs text-blue-800">
+                                    💡 <strong>คำแนะนำ:</strong> ความเร็วปกติ (0.8s) เหมาะสำหรับการใช้งานทั่วไป
+                                    ความเร็วช้า (1.5s+) จะสร้างความตื่นเต้นมากขึ้น
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Close Button */}
+                        <button
+                            onClick={() => setShowConfigModal(false)}
+                            className="w-full mt-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg"
+                        >
+                            บันทึกการตั้งค่า
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* 🎉 Winner Popup Modal with Confetti */}
             {showWinnerPopup && (
