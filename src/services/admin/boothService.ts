@@ -40,6 +40,15 @@ export async function importBoothList(dto: ImportBoothListDto): Promise<ImportRe
 }
 
 /**
+ * ดึงค่า priority (assignOrder) สูงสุด
+ * GET /api/admin/booth/last-priority
+ */
+export async function getLastPriority(): Promise<{ lastPriority: number }> {
+    const res = await http.get('/api/admin/booth/last-priority');
+    return res.data;
+}
+
+/**
  * ดึง booth ทั้งหมด
  * GET /api/admin/booth
  */
@@ -67,6 +76,15 @@ export async function deleteBooth(id: number): Promise<BoothResponse> {
  */
 export async function deleteAllBooths(): Promise<DeleteResultResponse> {
     const res = await http.delete('/api/admin/booth/all/reset');
+    return res.data;
+}
+
+/**
+ * อัปเดตลำดับ booth (assignOrder)
+ * PUT /api/admin/booth/update-order
+ */
+export async function updateBoothOrder(booths: Array<{ id: number; assignOrder: number }>): Promise<{ message: string; updated: number }> {
+    const res = await http.put('/api/admin/booth/update-order', { booths });
     return res.data;
 }
 

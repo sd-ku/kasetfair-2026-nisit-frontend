@@ -6,40 +6,54 @@ import {
     getBoothStats,
     importBoothRange,
     deleteAllBooths,
+    updateBoothOrder,
+    getLastPriority,
     BoothResponse,
     BoothStatsResponse,
     BoothZone,
 } from '@/services/admin/boothService';
-import { Plus, Trash2, RefreshCw, MapPin, Utensils, Package, LayoutGrid } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, MapPin, Utensils, Package, LayoutGrid, Settings, Save, RotateCcw as ResetIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { ZoneMMap } from '@/components/admin/booth/ZoneMMap';
+import { ImportBoothModal, ImportFormData } from '@/components/admin/booth/ImportBoothModal';
 
 export default function BoothManagementPage() {
     const [booths, setBooths] = useState<BoothResponse[]>([]);
     const [stats, setStats] = useState<BoothStatsResponse[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'all' | BoothZone>('all');
+    const [activeTab, setActiveTab] = useState<'all' | BoothZone | 'config'>('all');
     const [viewMode, setViewMode] = useState<'grid' | 'map'>('map');
 
     // Import modal state
     const [showImportModal, setShowImportModal] = useState(false);
-    const [importForm, setImportForm] = useState({
-        prefix: 'M',
-        start: 1,
-        end: 20,
-        zone: 'FOOD' as BoothZone,
-    });
-    const [importing, setImporting] = useState(false);
+    const [initialPriorityStart, setInitialPriorityStart] = useState(1);
+
+    // Config mode state
+    const [configZone, setConfigZone] = useState<BoothZone>('FOOD');
+    const [foodBooths, setFoodBooths] = useState<BoothResponse[]>([]);
+    const [nonFoodBooths, setNonFoodBooths] = useState<BoothResponse[]>([]);
+    const [saving, setSaving] = useState(false);
 
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const [boothsData, statsData] = await Promise.all([
+            const [boothsData, statsData, lastPriorityData] = await Promise.all([
                 getAllBooths(),
                 getBoothStats(),
+                getLastPriority(),
             ]);
             setBooths(boothsData);
             setStats(statsData);
+
+            // อัปเดต priorityStart ให้เป็นค่าถัดไปจากค่าล่าสุด
+            const nextPriority = (lastPriorityData.lastPriority || 0) + 1;
+            setInitialPriorityStart(nextPriority);
+
+            // แยก booth ตาม zone สำหรับ config mode
+            const food = boothsData.filter(b => b.zone === 'FOOD').sort((a, b) => a.assignOrder - b.assignOrder);
+            const nonFood = boothsData.filter(b => b.zone === 'NON_FOOD').sort((a, b) => a.assignOrder - b.assignOrder);
+            setFoodBooths(food);
+            setNonFoodBooths(nonFood);
         } catch (error) {
             console.error('Failed to fetch data', error);
             toast.error('เกิดข้อผิดพลาดในการโหลดข้อมูล');
@@ -52,26 +66,25 @@ export default function BoothManagementPage() {
         fetchData();
     }, [fetchData]);
 
-    const handleImport = async () => {
+    const handleImport = async (formData: ImportFormData) => {
         try {
-            setImporting(true);
             const result = await importBoothRange({
                 ranges: [{
-                    prefix: importForm.prefix,
-                    start: importForm.start,
-                    end: importForm.end,
-                    zone: importForm.zone,
+                    prefix: formData.prefix,
+                    start: formData.start,
+                    end: formData.end,
+                    // ไม่ส่ง zone เพื่อให้ backend กำหนดเป็น UNDEFINED
+                    // zone จะถูกกำหนดอัตโนมัติตอน assign ร้านตาม goodType
+                    priorityStart: formData.priorityStart,
                 }],
             });
             toast.success(result.message);
-            setShowImportModal(false);
-            fetchData();
+            await fetchData();
         } catch (error: any) {
             console.error('Failed to import booths', error);
             const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการ import booth';
             toast.error(errorMessage);
-        } finally {
-            setImporting(false);
+            throw error; // Re-throw to let modal handle the error state
         }
     };
 
@@ -97,6 +110,69 @@ export default function BoothManagementPage() {
         } else {
             toast.info(`Booth ${booth.boothNumber} is available. Click 'Import Booth' or use Lucky Draw to assign.`);
             // In a real scenario, this could open a manual assignment modal
+        }
+    };
+
+    // Config mode functions
+    const currentConfigBooths = configZone === 'FOOD' ? foodBooths : nonFoodBooths;
+    const setCurrentConfigBooths = configZone === 'FOOD' ? setFoodBooths : setNonFoodBooths;
+
+    const moveBoothUp = (index: number) => {
+        if (index === 0) return;
+
+        const newBooths = [...currentConfigBooths];
+        [newBooths[index], newBooths[index - 1]] = [newBooths[index - 1], newBooths[index]];
+
+        // Update assignOrder
+        newBooths.forEach((booth, i) => {
+            booth.assignOrder = i + 1;
+        });
+
+        setCurrentConfigBooths(newBooths);
+    };
+
+    const moveBoothDown = (index: number) => {
+        if (index === currentConfigBooths.length - 1) return;
+
+        const newBooths = [...currentConfigBooths];
+        [newBooths[index], newBooths[index + 1]] = [newBooths[index + 1], newBooths[index]];
+
+        // Update assignOrder
+        newBooths.forEach((booth, i) => {
+            booth.assignOrder = i + 1;
+        });
+
+        setCurrentConfigBooths(newBooths);
+    };
+
+    const handleSaveConfig = async () => {
+        try {
+            setSaving(true);
+
+            // Combine both zones
+            const allBooths = [...foodBooths, ...nonFoodBooths];
+
+            // Call API to update booth orders
+            await updateBoothOrder(allBooths.map(b => ({
+                id: b.id,
+                assignOrder: b.assignOrder
+            })));
+
+            toast.success('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+            fetchData();
+        } catch (error: any) {
+            console.error('Failed to save booth order', error);
+            const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึก';
+            toast.error(errorMessage);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleResetConfig = () => {
+        if (confirm('คุณต้องการรีเซ็ตการตั้งค่ากลับไปเป็นค่าเดิมหรือไม่?')) {
+            fetchData();
+            toast.info('รีเซ็ตการตั้งค่าแล้ว');
         }
     };
 
@@ -155,7 +231,7 @@ export default function BoothManagementPage() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Food Zone Stats */}
                 <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-2xl border border-orange-200">
                     <div className="flex items-center gap-3 mb-4">
@@ -209,6 +285,33 @@ export default function BoothManagementPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Undefined Zone Stats */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-2xl border border-gray-200">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="p-3 bg-gray-500 rounded-xl">
+                            <LayoutGrid className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-800">ยังไม่กำหนด (UNDEFINED)</h3>
+                            <p className="text-sm text-gray-500">booth ที่รอ assign</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="text-center">
+                            <p className="text-3xl font-bold text-gray-600">{getStatsByZone('UNDEFINED')?.total || 0}</p>
+                            <p className="text-xs text-gray-500">ทั้งหมด</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-3xl font-bold text-green-600">{getStatsByZone('UNDEFINED')?.confirmed || 0}</p>
+                            <p className="text-xs text-gray-500">ยืนยันแล้ว</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-3xl font-bold text-blue-600">{getStatsByZone('UNDEFINED')?.available || 0}</p>
+                            <p className="text-xs text-gray-500">ว่าง</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* View Toggle & Tabs */}
@@ -242,6 +345,16 @@ export default function BoothManagementPage() {
                     >
                         <Package className="w-4 h-4" />
                         NON_FOOD ({booths.filter(b => b.zone === 'NON_FOOD').length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('config')}
+                        className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${activeTab === 'config'
+                            ? 'text-purple-600 border-b-2 border-purple-600'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        <Settings className="w-4 h-4" />
+                        Config
                     </button>
                 </div>
 
@@ -287,6 +400,137 @@ export default function BoothManagementPage() {
                             + Import Booth
                         </button>
                     </div>
+                ) : activeTab === 'config' ? (
+                    /* Config Mode */
+                    <div className="space-y-6">
+                        {/* Config Header */}
+                        <div className="flex justify-between items-center border-b border-gray-200 pb-4">
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800">จัดเรียงลำดับ Booth</h3>
+                                <p className="text-sm text-gray-600 mt-1">กำหนดลำดับการ assign booth สำหรับแต่ละ zone</p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleResetConfig}
+                                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                >
+                                    <ResetIcon className="w-5 h-5" />
+                                    รีเซ็ท
+                                </button>
+                                <button
+                                    onClick={handleSaveConfig}
+                                    disabled={saving}
+                                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                >
+                                    <Save className="w-5 h-5" />
+                                    {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Info Box */}
+                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                            <h4 className="font-semibold text-blue-800 mb-2">💡 วิธีการทำงาน</h4>
+                            <ul className="text-sm text-blue-700 space-y-1">
+                                <li>• <strong>FOOD Zone</strong>: จะ assign booth จากลำดับที่ 1 → 2 → 3 ... (จากบนลงล่าง)</li>
+                                <li>• <strong>NON-FOOD Zone</strong>: จะ assign booth จากลำดับที่สูงสุด → ต่ำลง (จากล่างขึ้นบน)</li>
+                                <li>• ใช้ปุ่มลูกศรเพื่อเปลี่ยนลำดับ booth ตามที่ต้องการ</li>
+                            </ul>
+                        </div>
+
+                        {/* Zone Tabs */}
+                        <div className="flex gap-2 border-b border-gray-200">
+                            <button
+                                onClick={() => setConfigZone('FOOD')}
+                                className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${configZone === 'FOOD'
+                                    ? 'text-orange-600 border-b-2 border-orange-600'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                <Utensils className="w-5 h-5" />
+                                FOOD Zone ({foodBooths.length} booths)
+                            </button>
+                            <button
+                                onClick={() => setConfigZone('NON_FOOD')}
+                                className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${configZone === 'NON_FOOD'
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                <Package className="w-5 h-5" />
+                                NON-FOOD Zone ({nonFoodBooths.length} booths)
+                            </button>
+                        </div>
+
+                        {/* Booth List */}
+                        <div className="border border-gray-200 rounded-xl overflow-hidden">
+                            <div className="p-4 bg-gray-50 border-b border-gray-200">
+                                <h4 className="font-semibold text-gray-800">
+                                    {configZone === 'FOOD' ? '🍔 FOOD Zone' : '📦 NON-FOOD Zone'} - ลำดับการ Assign
+                                </h4>
+                                <p className="text-sm text-gray-600 mt-1">
+                                    {configZone === 'FOOD'
+                                        ? 'Booth ที่อยู่บนสุดจะถูก assign ก่อน (ขยายจากบนลงล่าง)'
+                                        : 'Booth ที่อยู่ล่างสุดจะถูก assign ก่อน (ขยายจากล่างขึ้นบน)'
+                                    }
+                                </p>
+                            </div>
+
+                            <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
+                                {currentConfigBooths.map((booth, index) => (
+                                    <div
+                                        key={booth.id}
+                                        className={`flex items-center justify-between p-4 hover:bg-gray-50 transition-colors ${booth.isAssigned ? 'bg-gray-50 opacity-60' : ''
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-4 flex-1">
+                                            <div className="text-center min-w-[60px]">
+                                                <div className="text-xs text-gray-500 mb-1">ลำดับ</div>
+                                                <div className="text-lg font-bold text-purple-600">
+                                                    #{booth.assignOrder}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xl font-bold text-gray-800">
+                                                        {booth.boothNumber}
+                                                    </span>
+                                                    {booth.isAssigned && (
+                                                        <span className="px-2 py-0.5 bg-gray-200 text-gray-600 text-xs rounded-full">
+                                                            ถูก assign แล้ว
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-sm text-gray-500">
+                                                    Zone: {booth.zone}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => moveBoothUp(index)}
+                                                disabled={index === 0}
+                                                className="p-2 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                                title="เลื่อนขึ้น"
+                                            >
+                                                <ArrowUp className="w-5 h-5 text-gray-600" />
+                                            </button>
+                                            <button
+                                                onClick={() => moveBoothDown(index)}
+                                                disabled={index === currentConfigBooths.length - 1}
+                                                className="p-2 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                                title="เลื่อนลง"
+                                            >
+                                                <ArrowDown className="w-5 h-5 text-gray-600" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 ) : viewMode === 'map' ? (
                     <ZoneMMap booths={booths} onBoothClick={handleBoothClick} />
                 ) : (
@@ -330,86 +574,13 @@ export default function BoothManagementPage() {
             </div>
 
             {/* Import Modal */}
-            {showImportModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Import Booth (Range)</h2>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Prefix</label>
-                                <input
-                                    type="text"
-                                    value={importForm.prefix}
-                                    onChange={(e) => setImportForm({ ...importForm, prefix: e.target.value.toUpperCase() })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                    placeholder="M"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Start</label>
-                                    <input
-                                        type="number"
-                                        value={importForm.start}
-                                        onChange={(e) => setImportForm({ ...importForm, start: parseInt(e.target.value) || 1 })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                        min={1}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">End</label>
-                                    <input
-                                        type="number"
-                                        value={importForm.end}
-                                        onChange={(e) => setImportForm({ ...importForm, end: parseInt(e.target.value) || 1 })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                        min={1}
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
-                                <select
-                                    value={importForm.zone}
-                                    onChange={(e) => setImportForm({ ...importForm, zone: e.target.value as BoothZone })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                >
-                                    <option value="FOOD">🍜 FOOD (อาหาร)</option>
-                                    <option value="NON_FOOD">📦 NON_FOOD (ไม่ใช่อาหาร)</option>
-                                </select>
-                            </div>
-
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="text-sm text-gray-600">
-                                    <strong>Preview:</strong> {importForm.prefix}{importForm.start} - {importForm.prefix}{importForm.end}
-                                </p>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    จำนวน: {Math.max(0, importForm.end - importForm.start + 1)} booth
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowImportModal(false)}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                ยกเลิก
-                            </button>
-                            <button
-                                onClick={handleImport}
-                                disabled={importing}
-                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {importing ? 'กำลัง Import...' : 'Import'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ImportBoothModal
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                onImport={handleImport}
+                initialPriorityStart={initialPriorityStart}
+                existingBooths={booths}
+            />
         </div>
     );
 }

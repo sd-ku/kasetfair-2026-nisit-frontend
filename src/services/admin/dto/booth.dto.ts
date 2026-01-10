@@ -1,5 +1,5 @@
 // ----- Enums -----
-export type BoothZone = 'FOOD' | 'NON_FOOD';
+export type BoothZone = 'FOOD' | 'NON_FOOD' | 'UNDEFINED';
 export type BoothAssignmentStatus = 'PENDING' | 'CONFIRMED' | 'FORFEITED';
 
 // ----- Import Booth DTOs -----
@@ -7,7 +7,8 @@ export interface BoothRangeDto {
     prefix: string;
     start: number;
     end: number;
-    zone: BoothZone;
+    zone?: BoothZone; // Optional: จะถูกกำหนดอัตโนมัติเมื่อ assign ร้านตาม goodType
+    priorityStart?: number; // ลำดับ priority เริ่มต้น (assignOrder)
 }
 
 export interface BoothListDto {
@@ -93,6 +94,7 @@ export interface BoothStatsResponse {
     confirmed: number;
     forfeited: number;
     available: number;
+    undefined: number; // จำนวน booth ที่อยู่ใน UNDEFINED zone และยังไม่ได้ assign
 }
 
 export interface NextBoothInfoResponse {
