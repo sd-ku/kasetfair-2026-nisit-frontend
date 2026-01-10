@@ -6,6 +6,7 @@ import {
     getBoothStats,
     importBoothRange,
     deleteAllBooths,
+    bulkDisableBooths,
     updateBoothOrder,
     getLastPriority,
     BoothResponse,
@@ -16,6 +17,7 @@ import { Plus, Trash2, RefreshCw, MapPin, Utensils, Package, LayoutGrid, Setting
 import { toast } from 'sonner';
 import { ZoneMMap } from '@/components/admin/booth/ZoneMMap';
 import { ImportBoothModal, ImportFormData } from '@/components/admin/booth/ImportBoothModal';
+import { BulkDeleteBooths } from '@/components/admin/booth/BulkDeleteBooths';
 
 export default function BoothManagementPage() {
     const [booths, setBooths] = useState<BoothResponse[]>([]);
@@ -27,6 +29,9 @@ export default function BoothManagementPage() {
     // Import modal state
     const [showImportModal, setShowImportModal] = useState(false);
     const [initialPriorityStart, setInitialPriorityStart] = useState(1);
+
+    // Bulk delete modal state
+    const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
     // Config mode state
     const [configZone, setConfigZone] = useState<BoothZone>('FOOD');
@@ -101,6 +106,19 @@ export default function BoothManagementPage() {
             console.error('Failed to delete booths', error);
             const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการลบ booth';
             toast.error(errorMessage);
+        }
+    };
+
+    const handleBulkDisable = async (boothIds: number[]) => {
+        try {
+            const result = await bulkDisableBooths(boothIds);
+            toast.success(result.message);
+            await fetchData();
+        } catch (error: any) {
+            console.error('Failed to disable booths', error);
+            const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการปิดการใช้งาน booth';
+            toast.error(errorMessage);
+            throw error;
         }
     };
 
@@ -219,6 +237,13 @@ export default function BoothManagementPage() {
                     >
                         <Plus className="w-5 h-5" />
                         Import Booth
+                    </button>
+                    <button
+                        onClick={() => setShowBulkDeleteModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                    >
+                        <Trash2 className="w-5 h-5" />
+                        Bulk Delete
                     </button>
                     <button
                         onClick={handleDeleteAll}
@@ -581,6 +606,16 @@ export default function BoothManagementPage() {
                 initialPriorityStart={initialPriorityStart}
                 existingBooths={booths}
             />
+
+            {/* Bulk Delete Modal */}
+            {showBulkDeleteModal && (
+                <BulkDeleteBooths
+                    booths={booths}
+                    onDelete={handleBulkDisable}
+                    onRefresh={fetchData}
+                    onClose={() => setShowBulkDeleteModal(false)}
+                />
+            )}
         </div>
     );
 }

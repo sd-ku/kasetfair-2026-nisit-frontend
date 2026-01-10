@@ -54,6 +54,7 @@ export interface BoothResponse {
     zone: BoothZone;
     assignOrder: number;
     isAssigned: boolean;
+    isActive: boolean; // false = ปิดการใช้งาน (soft delete)
     createdAt: string;
     updatedAt: string;
     assignment?: BoothAssignmentResponse;

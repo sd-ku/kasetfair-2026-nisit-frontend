@@ -80,6 +80,24 @@ export async function deleteAllBooths(): Promise<DeleteResultResponse> {
 }
 
 /**
+ * ปิดการใช้งาน booth หลายอันพร้อมกัน (Soft Delete / Disable)
+ * PUT /api/admin/booth/bulk-disable
+ */
+export async function bulkDisableBooths(boothIds: number[]): Promise<{ message: string; disabled: number }> {
+    const res = await http.put('/api/admin/booth/bulk-disable', { boothIds });
+    return res.data;
+}
+
+/**
+ * เปิดการใช้งาน booth หลายอันพร้อมกัน (Enable)
+ * PUT /api/admin/booth/bulk-enable
+ */
+export async function bulkEnableBooths(boothIds: number[]): Promise<{ message: string; enabled: number }> {
+    const res = await http.put('/api/admin/booth/bulk-enable', { boothIds });
+    return res.data;
+}
+
+/**
  * อัปเดตลำดับ booth (assignOrder)
  * PUT /api/admin/booth/update-order
  */
