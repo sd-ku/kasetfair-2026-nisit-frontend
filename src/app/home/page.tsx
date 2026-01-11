@@ -126,28 +126,6 @@ export default function HomePage() {
     [displayName]
   )
 
-  // const fetchInvitations = useCallback(async () => {
-  //   setLoadingInvites(true)
-  //   setInviteError(null)
-  //   try {
-  //     const res = await http.get<Invitation[]>("/shops/invitations")
-  //     const data = Array.isArray(res.data) ? res.data : []
-  //     setInvitations(data)
-  //   } catch (error) {
-  //     console.error("Failed to load invitations", error)
-  //     setInviteError("โหลดคำเชิญไม่สำเร็จ")
-  //     setInvitations([])
-  //     // Toast Error
-  //     toast({
-  //       variant: "error",
-  //       title: "ผิดพลาด",
-  //       description: "ไม่สามารถโหลดข้อมูลคำเชิญได้",
-  //     })
-  //   } finally {
-  //     setLoadingInvites(false)
-  //   }
-  // }, [toast])
-
   const handleLogout = async () => {
     try {
       const res = await logout();
@@ -600,6 +578,41 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="mx-auto grid w-full max-w-3xl gap-3">
+
+        {/* Lucky Draw Winners Card */}
+        <Card className={cn(
+          "gap-4 border-2 transition-all duration-500 ease-in-out hover:scale-[1.01] active:scale-[0.99] cursor-pointer",
+          theme.cardBg,
+          theme.cardBorder,
+          theme.cardShadow
+        )}
+          onClick={() => router.push('/winners')}
+        >
+          <CardHeader className="gap-0">
+            <CardTitle className="flex items-center gap-2 sm:gap-3 text-slate-900 text-sm sm:text-base">
+              <div className={cn(
+                "p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-300",
+                "bg-gradient-to-br from-yellow-500 to-orange-600 text-white shadow-lg shadow-yellow-300/50"
+              )}>
+                <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </div>
+              <span className="truncate">รายชื่อผู้โชคดี</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 sm:space-y-3 pt-0">
+            <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+              ดูรายชื่อร้านที่ได้รับสิทธิ์จากการจับฉลาก
+            </p>
+            <div className="flex items-center justify-between p-2.5 sm:p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+              <span className="text-xs sm:text-sm font-semibold text-yellow-800">คลิกเพื่อดูรายชื่อ</span>
+              <svg className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* My Store Card */}
         <Card className={cn(
