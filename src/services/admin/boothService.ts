@@ -261,3 +261,34 @@ export async function lookupStoreByBarcode(barcode: string): Promise<LookupStore
     const res = await http.post('/api/admin/booth/lookup-store', { barcode });
     return res.data;
 }
+
+/**
+ * Assign booth เฉพาะเจาะจงให้ร้าน
+ * POST /api/admin/booth/assignments/specific
+ */
+export interface AssignSpecificBoothDto {
+    storeId: number;
+    boothNumber: string;
+    note?: string;
+}
+
+export async function assignSpecificBooth(dto: AssignSpecificBoothDto): Promise<BoothAssignmentResponse> {
+    const res = await http.post('/api/admin/booth/assignments/specific', dto);
+    return res.data;
+}
+
+/**
+ * Recover และ assign booth ให้ร้านที่ถูกสุ่มไปแล้วแต่ยังไม่มี booth
+ * POST /api/admin/booth/assignments/recover-drawn
+ */
+export interface RecoverDrawnStoresResponse {
+    message: string;
+    recovered: number;
+    assignments: BoothAssignmentResponse[];
+}
+
+export async function recoverDrawnStoresWithoutBooth(): Promise<RecoverDrawnStoresResponse> {
+    const res = await http.post('/api/admin/booth/assignments/recover-drawn');
+    return res.data;
+}
+

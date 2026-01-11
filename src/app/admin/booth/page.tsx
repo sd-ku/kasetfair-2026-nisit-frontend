@@ -22,6 +22,8 @@ import { ZoneMMap } from '@/components/admin/booth/ZoneMMap';
 import { ImportBoothModal, ImportFormData } from '@/components/admin/booth/ImportBoothModal';
 import { BulkDeleteBooths } from '@/components/admin/booth/BulkDeleteBooths';
 import { SortableBoothItem } from '@/components/admin/booth/SortableBoothItem';
+import { BoothGridView } from '@/components/admin/booth/BoothGridView';
+import { ManualAssignBoothModal } from '@/components/admin/booth/ManualAssignBoothModal';
 
 export default function BoothManagementPage() {
     const [booths, setBooths] = useState<BoothResponse[]>([]);
@@ -42,10 +44,13 @@ export default function BoothManagementPage() {
     const [selectedBoothIds, setSelectedBoothIds] = useState<Set<number>>(new Set());
     const [lastSelectedBoothId, setLastSelectedBoothId] = useState<number | null>(null);
 
-    // Context menu state
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; boothId: number } | null>(null);
+    // Modal state for context menu actions
     const [showMoveToPositionModal, setShowMoveToPositionModal] = useState(false);
     const [targetPosition, setTargetPosition] = useState<string>('');
+
+    // Manual assign modal state
+    const [showManualAssignModal, setShowManualAssignModal] = useState(false);
+    const [selectedBoothForAssign, setSelectedBoothForAssign] = useState<BoothResponse | null>(null);
 
     const [saving, setSaving] = useState(false);
 
@@ -74,15 +79,6 @@ export default function BoothManagementPage() {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
-
-    // Close context menu when clicking outside
-    useEffect(() => {
-        const handleClick = () => setContextMenu(null);
-        if (contextMenu) {
-            document.addEventListener('click', handleClick);
-            return () => document.removeEventListener('click', handleClick);
-        }
-    }, [contextMenu]);
 
     const handleImport = async (formData: ImportFormData) => {
         try {
@@ -136,12 +132,8 @@ export default function BoothManagementPage() {
     };
 
     const handleBoothClick = (booth: BoothResponse) => {
-        if (booth.isAssigned) {
-            toast.info(`Booth ${booth.boothNumber} is assigned to ${booth.assignment?.store?.storeName} (${booth.assignment?.status})`);
-        } else {
-            toast.info(`Booth ${booth.boothNumber} is available. Click 'Import Booth' or use Lucky Draw to assign.`);
-            // In a real scenario, this could open a manual assignment modal
-        }
+        setSelectedBoothForAssign(booth);
+        setShowManualAssignModal(true);
     };
 
     // Sensors for drag and drop
@@ -274,16 +266,7 @@ export default function BoothManagementPage() {
         setLastSelectedBoothId(null); // Clear last selected booth ID
     };
 
-    // Context menu handlers
-    const handleContextMenu = (e: React.MouseEvent, boothId: number) => {
-        if (!isConfigOrderMode || selectedBoothIds.size === 0) return;
-
-        e.preventDefault();
-        setContextMenu({ x: e.clientX, y: e.clientY, boothId });
-    };
-
     const handleMoveToPosition = () => {
-        setContextMenu(null);
         setShowMoveToPositionModal(true);
     };
 
@@ -351,7 +334,6 @@ export default function BoothManagementPage() {
         const otherBooths = booths.filter(b => !reorderedBoothIds.has(b.id));
         setBooths([...reorderedBooths, ...otherBooths]);
 
-        setContextMenu(null);
         toast.success(`กลับลำดับ ${selectedBooths.length} Booth แล้ว`);
     };
 
@@ -592,103 +574,27 @@ export default function BoothManagementPage() {
             </div>
 
             {/* Booth Content */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                {/* Config Order Mode Banner */}
-                {isConfigOrderMode && activeTab === 'all' && viewMode === 'grid' && (
-                    <div className="mb-6 bg-purple-50 border-2 border-purple-300 rounded-xl p-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-purple-500 rounded-lg">
-                                    <GripVertical className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-purple-900">
-                                        โหมดจัดลำดับ Booth
-                                        {selectedBoothIds.size > 0 && (
-                                            <span className="ml-2 px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
-                                                เลือก {selectedBoothIds.size} รายการ
-                                            </span>
-                                        )}
-                                    </h4>
-                                    <p className="text-sm text-purple-700">
-                                        {selectedBoothIds.size > 0
-                                            ? 'ลาก Booth ที่เลือกเพื่อเปลี่ยนลำดับ | คลิกที่ว่างเพื่อยกเลิกการเลือก'
-                                            : 'คลิก: เลือก 1 รายการ | Ctrl+คลิก: เลือกหลายรายการ | Shift+คลิก: เลือกช่วง | ลาก: เปลี่ยนลำดับ'
-                                        }
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        fetchData();
-                                        setIsConfigOrderMode(false);
-                                    }}
-                                    className="flex items-center gap-2 px-4 py-2 border-2 border-purple-300 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
-                                >
-                                    <ResetIcon className="w-5 h-5" />
-                                    ยกเลิก
-                                </button>
-                                <button
-                                    onClick={handleSaveConfigOrder}
-                                    disabled={saving}
-                                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-                                >
-                                    <Save className="w-5 h-5" />
-                                    {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {loading ? (
-                    <div className="text-center py-12">
-                        <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500">กำลังโหลด...</p>
-                    </div>
-                ) : booths.length === 0 ? (
-                    <div className="text-center py-12">
-                        <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-500">ยังไม่มี booth</p>
-                        <button
-                            onClick={() => setShowImportModal(true)}
-                            className="mt-4 text-green-600 hover:underline"
-                        >
-                            + Import Booth
-                        </button>
-                    </div>
-                ) : viewMode === 'map' ? (
-                    <ZoneMMap booths={booths} onBoothClick={handleBoothClick} />
-                ) : (
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={onDragEnd}
-                    >
-                        <SortableContext
-                            items={filteredBooths.map(b => b.id.toString())}
-                            strategy={rectSortingStrategy}
-                            disabled={!isConfigOrderMode}
-                        >
-                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
-                                {filteredBooths.map((booth) => (
-                                    <SortableBoothItem
-                                        key={booth.id}
-                                        booth={booth}
-                                        isConfigOrderMode={isConfigOrderMode}
-                                        onBoothClick={handleBoothClick}
-                                        isSelected={selectedBoothIds.has(booth.id)}
-                                        onSelect={handleBoothSelection}
-                                        selectedCount={selectedBoothIds.size}
-                                        onContextMenu={handleContextMenu}
-                                    />
-                                ))}
-                            </div>
-                        </SortableContext>
-                    </DndContext>
-                )}
-            </div>
+            <BoothGridView
+                booths={booths}
+                filteredBooths={filteredBooths}
+                loading={loading}
+                viewMode={viewMode}
+                activeTab={activeTab}
+                isConfigOrderMode={isConfigOrderMode}
+                selectedBoothIds={selectedBoothIds}
+                saving={saving}
+                onBoothClick={handleBoothClick}
+                onBoothSelection={handleBoothSelection}
+                onMoveToPosition={handleMoveToPosition}
+                onReverseOrder={handleReverseOrder}
+                onDragEnd={onDragEnd}
+                onSaveConfigOrder={handleSaveConfigOrder}
+                onCancelConfigOrder={() => {
+                    fetchData();
+                    setIsConfigOrderMode(false);
+                }}
+                onShowImportModal={() => setShowImportModal(true)}
+            />
 
             {/* Import Modal */}
             <ImportBoothModal
@@ -711,31 +617,6 @@ export default function BoothManagementPage() {
                 )
             }
 
-            {/* Context Menu */}
-            {contextMenu && (
-                <div
-                    className="fixed bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
-                    style={{ top: contextMenu.y, left: contextMenu.x }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <button
-                        onClick={handleMoveToPosition}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-sm"
-                    >
-                        <ArrowDown className="w-4 h-4" />
-                        ย้ายไปยังลำดับที่...
-                    </button>
-                    {selectedBoothIds.size > 1 && (
-                        <button
-                            onClick={handleReverseOrder}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-sm"
-                        >
-                            <RotateCcw className="w-4 h-4" />
-                            กลับลำดับ ({selectedBoothIds.size} รายการ)
-                        </button>
-                    )}
-                </div>
-            )}
 
             {/* Move to Position Modal */}
             {showMoveToPositionModal && (
@@ -782,6 +663,19 @@ export default function BoothManagementPage() {
                     </div>
                 </div>
             )}
+
+            {/* Manual Assign Booth Modal */}
+            <ManualAssignBoothModal
+                isOpen={showManualAssignModal}
+                booth={selectedBoothForAssign}
+                onClose={() => {
+                    setShowManualAssignModal(false);
+                    setSelectedBoothForAssign(null);
+                }}
+                onSuccess={() => {
+                    fetchData();
+                }}
+            />
         </div >
     );
 }

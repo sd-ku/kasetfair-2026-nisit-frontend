@@ -6,24 +6,27 @@ import {
     getBoothStats,
     getLatestPendingAssignment,
     createAssignment,
+    assignSpecificBooth,
     verifyAssignment,
     verifyByStoreId,
     forfeitAssignment,
     lookupStoreByBarcode,
+    recoverDrawnStoresWithoutBooth,
     BoothAssignmentResponse,
     BoothStatsResponse,
     BoothZone,
     BoothAssignmentStatus,
     LookupStoreResponse,
+    RecoverDrawnStoresResponse,
 } from '@/services/admin/boothService';
-import { QrCode, CheckCircle, XCircle, RefreshCw, AlertCircle, Utensils, Package, Scan, UserCheck, Search } from 'lucide-react';
+import { QrCode, CheckCircle, XCircle, RefreshCw, AlertCircle, Utensils, Package, Scan, UserCheck, Search, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function BoothAssignmentPage() {
     const [assignments, setAssignments] = useState<BoothAssignmentResponse[]>([]);
     const [stats, setStats] = useState<BoothStatsResponse[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeZone, setActiveZone] = useState<BoothZone>('FOOD');
+    const [activeZone, setActiveZone] = useState<BoothZone | undefined>(undefined);
     const [latestPending, setLatestPending] = useState<BoothAssignmentResponse | null>(null);
 
     // Barcode scan state
@@ -35,10 +38,15 @@ export default function BoothAssignmentPage() {
     // Manual assign state
     const [showManualAssignModal, setShowManualAssignModal] = useState(false);
     const [manualStoreId, setManualStoreId] = useState('');
+    const [manualBoothNumber, setManualBoothNumber] = useState('');
+    const [assignMode, setAssignMode] = useState<'auto' | 'manual'>('auto'); // auto = ให้ระบบเลือก, manual = ระบุเอง
     const [assigning, setAssigning] = useState(false);
 
     // Filter state
     const [statusFilter, setStatusFilter] = useState<'all' | BoothAssignmentStatus>('all');
+
+    // Recover state
+    const [recovering, setRecovering] = useState(false);
 
     const fetchData = useCallback(async () => {
         try {
@@ -118,12 +126,32 @@ export default function BoothAssignmentPage() {
             return;
         }
 
+        if (assignMode === 'manual' && !manualBoothNumber.trim()) {
+            toast.error('กรุณาระบุหมายเลข Booth');
+            return;
+        }
+
         try {
             setAssigning(true);
-            const result = await createAssignment({ storeId });
-            toast.success(`สร้าง Assignment สำเร็จ! ร้าน ID ${storeId} ได้รับ Booth ${result.booth.boothNumber}`);
+
+            if (assignMode === 'auto') {
+                // Auto assign - ให้ระบบเลือก booth ถัดไป
+                const result = await createAssignment({ storeId });
+                toast.success(`สร้าง Assignment สำเร็จ! ร้าน ID ${storeId} ได้รับ Booth ${result.booth.boothNumber}`);
+            } else {
+                // Manual assign - ระบุหมายเลข booth เอง
+                const result = await assignSpecificBooth({
+                    storeId,
+                    boothNumber: manualBoothNumber.trim().toUpperCase()
+                });
+                toast.success(`สร้าง Assignment สำเร็จ! ร้าน ID ${storeId} ได้รับ Booth ${result.booth.boothNumber}`);
+            }
+
             setShowManualAssignModal(false);
             setManualStoreId('');
+            setManualBoothNumber('');
+            setAssignMode('auto');
+            setLookupResult(null); // Clear lookup result if exists
             fetchData();
         } catch (error: any) {
             console.error('Failed to assign', error);
@@ -141,7 +169,45 @@ export default function BoothAssignmentPage() {
         }
     };
 
-    const getStatsByZone = (zone: BoothZone) => {
+    const handleRecoverDrawnStores = async () => {
+        if (!confirm('คุณต้องการ recover และ assign booth ให้ร้านที่ถูกสุ่มไปแล้วแต่ยังไม่มี booth หรือไม่?')) {
+            return;
+        }
+
+        try {
+            setRecovering(true);
+            const result = await recoverDrawnStoresWithoutBooth();
+
+            if (result.recovered > 0) {
+                toast.success(`✅ Recover สำเร็จ! จัดสรร booth ให้ ${result.recovered} ร้าน`);
+            } else {
+                toast.info('ℹ️ ไม่พบร้านที่ต้อง recover');
+            }
+
+            fetchData(); // Refresh data
+        } catch (error: any) {
+            console.error('Failed to recover drawn stores', error);
+            const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการ recover';
+            toast.error(errorMessage);
+        } finally {
+            setRecovering(false);
+        }
+    };
+
+    const getStatsByZone = (zone?: BoothZone) => {
+        if (!zone) {
+            // Aggregate all stats
+            return stats.reduce((acc, curr) => ({
+                zone: 'ALL' as any,
+                total: (acc.total || 0) + curr.total,
+                assigned: (acc.assigned || 0) + curr.assigned,
+                available: (acc.available || 0) + curr.available,
+                pending: (acc.pending || 0) + curr.pending,
+                confirmed: (acc.confirmed || 0) + curr.confirmed,
+                forfeited: (acc.forfeited || 0) + curr.forfeited,
+                undefined: (acc.undefined || 0) + curr.undefined,
+            }), {} as BoothStatsResponse);
+        }
         return stats.find(s => s.zone === zone);
     };
 
@@ -182,6 +248,19 @@ export default function BoothAssignmentPage() {
                         title="Refresh"
                     >
                         <RefreshCw className="w-5 h-5 text-gray-600" />
+                    </button>
+                    <button
+                        onClick={handleRecoverDrawnStores}
+                        disabled={recovering}
+                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Recover และ assign booth ให้ร้านที่ถูกสุ่มไปแล้วแต่ยังไม่มี booth"
+                    >
+                        {recovering ? (
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <Wrench className="w-5 h-5" />
+                        )}
+                        {recovering ? 'กำลัง Recover...' : 'Recover Drawn Stores'}
                     </button>
                     <button
                         onClick={() => setShowManualAssignModal(true)}
@@ -310,7 +389,20 @@ export default function BoothAssignmentPage() {
                         </div>
                     ) : (
                         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
-                            <p className="text-yellow-800 text-sm">⚠️ ร้านนี้ยังไม่มี booth assignment</p>
+                            <div className="flex items-center justify-between">
+                                <p className="text-yellow-800 text-sm">⚠️ ร้านนี้ยังไม่มี booth assignment</p>
+                                <button
+                                    onClick={() => {
+                                        // Set the store ID and open the manual assign modal
+                                        setManualStoreId(lookupResult.store.id.toString());
+                                        setShowManualAssignModal(true);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                                >
+                                    <QrCode className="w-4 h-4" />
+                                    Assign Booth
+                                </button>
+                            </div>
                         </div>
                     )}
 
@@ -439,6 +531,7 @@ export default function BoothAssignmentPage() {
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">#</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Booth</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">ร้าน</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Type</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Status</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">ยืนยันโดย</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">เวลา</th>
@@ -448,14 +541,14 @@ export default function BoothAssignmentPage() {
                         <tbody className="divide-y divide-gray-100">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-12 text-center">
+                                    <td colSpan={8} className="px-4 py-12 text-center">
                                         <RefreshCw className="w-6 h-6 animate-spin text-gray-400 mx-auto mb-2" />
                                         <p className="text-gray-500">กำลังโหลด...</p>
                                     </td>
                                 </tr>
                             ) : filteredAssignments.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                                    <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                                         ไม่มีข้อมูล
                                     </td>
                                 </tr>
@@ -469,6 +562,16 @@ export default function BoothAssignmentPage() {
                                         <td className="px-4 py-3">
                                             <p className="font-medium text-gray-800">{assignment.store?.storeName}</p>
                                             <p className="text-xs text-gray-500">ID: {assignment.storeId}</p>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {assignment.store?.goodType && (
+                                                <span className={`text-[10px] px-2 py-1 rounded-full font-medium ${assignment.store.goodType === 'Food'
+                                                    ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                                                    : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                                    }`}>
+                                                    {assignment.store.goodType}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3">{getStatusBadge(assignment.status)}</td>
                                         <td className="px-4 py-3">
@@ -515,7 +618,7 @@ export default function BoothAssignmentPage() {
             {showManualAssignModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Manual Assign</h2>
+                        <h2 className="text-xl font-bold text-gray-800 mb-4">Assign Booth</h2>
                         <p className="text-gray-600 text-sm mb-4">
                             ใช้สำหรับ assign booth ให้ร้านโดยตรง (ไม่ผ่านการสุ่ม)
                         </p>
@@ -533,9 +636,52 @@ export default function BoothAssignmentPage() {
                                 />
                             </div>
 
-                            <div className="bg-yellow-50 p-3 rounded-lg">
-                                <p className="text-sm text-yellow-700">
-                                    ⚠️ ร้านจะได้ booth ถัดไปตาม zone ของร้าน (ขึ้นอยู่กับ goodType)
+                            {/* Mode Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">โหมดการ Assign</label>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setAssignMode('auto')}
+                                        className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${assignMode === 'auto'
+                                            ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
+                                            : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        🤖 Auto
+                                    </button>
+                                    <button
+                                        onClick={() => setAssignMode('manual')}
+                                        className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${assignMode === 'manual'
+                                            ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
+                                            : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        ✍️ Manual
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Booth Number Input (only show in manual mode) */}
+                            {assignMode === 'manual' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">หมายเลข Booth</label>
+                                    <input
+                                        type="text"
+                                        value={manualBoothNumber}
+                                        onChange={(e) => setManualBoothNumber(e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono uppercase"
+                                        placeholder="เช่น M1, M55"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Info Box */}
+                            <div className={`p-3 rounded-lg ${assignMode === 'auto' ? 'bg-blue-50' : 'bg-yellow-50'}`}>
+                                <p className={`text-sm ${assignMode === 'auto' ? 'text-blue-700' : 'text-yellow-700'}`}>
+                                    {assignMode === 'auto'
+                                        ? '🤖 ระบบจะเลือก booth ถัดไปตาม zone ของร้าน (ขึ้นอยู่กับ goodType)'
+                                        : '✍️ คุณสามารถระบุหมายเลข booth ที่ต้องการได้เอง'
+                                    }
                                 </p>
                             </div>
                         </div>
@@ -545,6 +691,8 @@ export default function BoothAssignmentPage() {
                                 onClick={() => {
                                     setShowManualAssignModal(false);
                                     setManualStoreId('');
+                                    setManualBoothNumber('');
+                                    setAssignMode('auto');
                                 }}
                                 className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                             >
@@ -552,7 +700,7 @@ export default function BoothAssignmentPage() {
                             </button>
                             <button
                                 onClick={handleManualAssign}
-                                disabled={assigning || !manualStoreId}
+                                disabled={assigning || !manualStoreId || (assignMode === 'manual' && !manualBoothNumber)}
                                 className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {assigning ? 'กำลัง Assign...' : 'Assign'}

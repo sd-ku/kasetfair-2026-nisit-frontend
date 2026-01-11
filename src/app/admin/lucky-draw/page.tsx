@@ -5,6 +5,7 @@ import { createLuckyDrawWinner, getLuckyDrawWinners, getLuckyDrawEntries, LuckyD
 import { toast } from 'sonner';
 import { RefreshCw, Users, X } from 'lucide-react';
 import LuckyDrawWheel from '@/components/admin/LuckyDrawWheel';
+import { WinnersDisplay } from '@/components/WinnersDisplay';
 
 export default function LuckyDrawPage() {
     const [winners, setWinners] = useState<LuckyDrawResponse[]>([]);
@@ -69,77 +70,26 @@ export default function LuckyDrawPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Wheel Section */}
-                <LuckyDrawWheel onWinnerSelected={handleWinnerSelected} />
+                <LuckyDrawWheel
+                    onWinnerSelected={handleWinnerSelected}
+                    winners={winners.map(w => ({
+                        ...w,
+                        boothNumber: w.boothNumber ?? undefined,
+                        status: w.status ?? undefined
+                    }))}
+                    onRefreshWinners={fetchWinners}
+                />
 
                 {/* Winners Section */}
-                <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 flex flex-col h-[700px]">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
-                            <span className="text-2xl">🏆</span> Winners History
-                        </h2>
-                        <button onClick={fetchWinners} className="p-2 hover:bg-gray-100 rounded-full text-gray-500">
-                            <RefreshCw className="w-5 h-5" />
-                        </button>
-                    </div>
-
-                    {latestWinner && (
-                        <div className="mb-6 p-8 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl text-center shadow-sm animate-bounce">
-                            <p className="text-sm text-orange-600 uppercase tracking-wide font-bold mb-1">🎉 Recent Winner 🎉</p>
-                            <p className="text-4xl lg:text-5xl font-extrabold text-gray-800 break-words">{latestWinner}</p>
-                        </div>
-                    )}
-
-                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="sticky top-0 bg-white z-10">
-                                <tr>
-                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">No.</th>
-                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Name</th>
-                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 text-center">Booth</th>
-                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 text-center">Status</th>
-                                    <th className="px-4 py-3 text-xs font-bold text-gray-400 text-right uppercase tracking-wider border-b border-gray-100">Time</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {winners.map((w, index) => (
-                                    <tr key={w.id} className="group hover:bg-gray-50">
-                                        <td className="px-4 py-4 text-gray-400 text-sm font-mono">#{winners.length - index}</td>
-                                        <td className="px-4 py-4 font-semibold text-gray-700 text-lg">{w.winner}</td>
-                                        <td className="px-4 py-4 text-center">
-                                            {w.boothNumber ? (
-                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
-                                                    {w.boothNumber}
-                                                </span>
-                                            ) : (
-                                                <span className="text-gray-400 text-sm">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-4 text-center">
-                                            {w.status === 'CONFIRMED' ? (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-600 text-white">
-                                                    ✓ ยืนยันแล้ว
-                                                </span>
-                                            ) : w.status === 'PENDING' ? (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                                    ⏳ รอยืนยัน
-                                                </span>
-                                            ) : w.status === 'FORFEITED' ? (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                    ✗ สละสิทธิ์
-                                                </span>
-                                            ) : (
-                                                <span className="text-gray-400 text-sm">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-4 text-right text-gray-500 text-sm">
-                                            {new Date(w.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <WinnersDisplay
+                    winners={winners.map(w => ({
+                        ...w,
+                        boothNumber: w.boothNumber ?? undefined,
+                        status: w.status ?? undefined
+                    }))}
+                    latestWinner={latestWinner || undefined}
+                    onRefresh={fetchWinners}
+                />
             </div>
 
             {/* Entries Modal */}

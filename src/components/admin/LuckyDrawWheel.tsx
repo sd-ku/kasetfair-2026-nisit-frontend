@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { generateWheel, getActiveEntries, checkBoothAvailability } from '@/services/admin/luckyDrawService';
 import { toast } from 'sonner';
-import { RefreshCw, Maximize, Minimize, RotateCcw, MoreVertical, Settings } from 'lucide-react';
+import { RefreshCw, Maximize, Minimize, RotateCcw, MoreVertical, Settings, Trophy } from 'lucide-react';
+import { WinnersDisplay, WinnerEntry } from '@/components/WinnersDisplay';
 
 const Wheel = dynamic(() => import('react-custom-roulette').then((mod) => mod.Wheel), {
     ssr: false,
@@ -19,6 +20,8 @@ const COLORS = [
 
 interface LuckyDrawWheelProps {
     onWinnerSelected: (winnerName: string) => Promise<any>;
+    winners?: WinnerEntry[];
+    onRefreshWinners?: () => void;
 }
 
 interface StoreEntry {
@@ -26,7 +29,7 @@ interface StoreEntry {
     storeName: string;
 }
 
-export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps) {
+export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefreshWinners }: LuckyDrawWheelProps) {
     const [mustSpin, setMustSpin] = useState(false);
     const [prizeNumber, setPrizeNumber] = useState(0);
     const [allEntries, setAllEntries] = useState<StoreEntry[]>([]);
@@ -40,6 +43,7 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [spinDuration, setSpinDuration] = useState(0.8); // ความเร็วการหมุน (วินาที)
     const [isMockMode, setIsMockMode] = useState(false); // ติดตามว่ากำลังใช้ mock data หรือไม่
+    const [showWinnersInFullscreen, setShowWinnersInFullscreen] = useState(false); // แสดง Winners Display ในโหมดเต็มจอ
 
     // 🎵 Audio refs for sound effects
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -409,158 +413,184 @@ export default function LuckyDrawWheel({ onWinnerSelected }: LuckyDrawWheelProps
     return (
         <div
             ref={wheelContainerRef}
-            className={`bg-white p-6 rounded-2xl shadow-xl border border-gray-100 flex flex-col ${isFullscreen
-                ? 'h-screen w-screen fixed inset-0 z-50 bg-gradient-to-br from-blue-50 to-purple-50'
-                : 'h-[700px]'
+            className={`bg-white p-6 rounded-2xl shadow-xl border border-gray-100 ${isFullscreen
+                ? 'h-screen w-screen fixed inset-0 z-50 bg-gradient-to-br from-blue-50 to-purple-50 flex flex-row gap-6'
+                : 'h-[700px] flex flex-col'
                 }`}
         >
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
-                    <span className="text-2xl">🎡</span> Lucky Draw Wheel
-                </h2>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setShowConfigModal(true)}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-700 flex items-center gap-2"
-                        title="ตั้งค่าวงล้อ"
-                    >
-                        <Settings className="w-5 h-5" />
-                        <span className="text-sm font-medium">ตั้งค่า</span>
-                    </button>
-                    <button
-                        onClick={toggleFullscreen}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-green-600 hover:text-green-700 flex items-center gap-2"
-                        title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
-                    >
-                        {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-                        <span className="text-sm font-medium">{isFullscreen ? 'ย่อ' : 'ขยาย'}</span>
-                    </button>
-                    <button
-                        onClick={refreshActiveEntries}
-                        disabled={loadingStores}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-blue-600 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
-                        title="รีเฟรชรายชื่อร้านที่ยังไม่ถูกสุ่ม (isDrawn = false)"
-                    >
-                        <RefreshCw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
-                        <span className="text-sm font-medium">รีเฟรช (เฉพาะที่เหลือ)</span>
-                    </button>
-                    <div className="relative">
+            {/* Main Wheel Section */}
+            <div className={`flex flex-col ${isFullscreen && showWinnersInFullscreen ? 'flex-1' : 'w-full'}`}>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
+                        <span className="text-2xl">🎡</span> Lucky Draw Wheel
+                    </h2>
+                    <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setShowMoreMenu(!showMoreMenu)}
+                            onClick={() => setShowConfigModal(true)}
                             className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-700 flex items-center gap-2"
-                            title="ตัวเลือกเพิ่มเติม"
+                            title="ตั้งค่าวงล้อ"
                         >
-                            <MoreVertical className="w-5 h-5" />
+                            <Settings className="w-5 h-5" />
+                            <span className="text-sm font-medium">ตั้งค่า</span>
                         </button>
-
-                        {/* Dropdown Menu */}
-                        {showMoreMenu && (
-                            <>
-                                {/* Backdrop to close menu when clicking outside */}
-                                <div
-                                    className="fixed inset-0 z-10"
-                                    onClick={() => setShowMoreMenu(false)}
-                                />
-
-                                {/* Menu Items */}
-                                <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                                    <button
-                                        onClick={() => {
-                                            loadWheelData();
-                                            setShowMoreMenu(false);
-                                        }}
-                                        disabled={loadingStores}
-                                        className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-orange-600 hover:text-orange-700 flex items-center gap-3 disabled:opacity-50 text-left"
-                                        title="โหลดรายชื่อร้านใหม่ทั้งหมดจาก database (reset entries)"
-                                    >
-                                        <RotateCcw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-medium">รีเซ็ทผลลัพธ์</span>
-                                            <span className="text-xs text-gray-500">โหลดร้านค้าใหม่ทั้งหมด</span>
-                                        </div>
-                                    </button>
-
-                                    <div className="h-px bg-gray-200 my-1" />
-
-                                    <button
-                                        onClick={() => {
-                                            loadMockData();
-                                            setShowMoreMenu(false);
-                                        }}
-                                        className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-purple-600 hover:text-purple-700 flex items-center gap-3 text-left"
-                                    >
-                                        <span className="text-xl">🧪</span>
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-medium">Mock Data</span>
-                                            <span className="text-xs text-gray-500">ทดสอบด้วย 15 ร้าน</span>
-                                        </div>
-                                    </button>
-                                </div>
-                            </>
+                        {isFullscreen && (
+                            <button
+                                onClick={() => setShowWinnersInFullscreen(!showWinnersInFullscreen)}
+                                className={`p-2 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-2 ${showWinnersInFullscreen ? 'text-purple-600 hover:text-purple-700' : 'text-gray-600 hover:text-gray-700'
+                                    }`}
+                                title={showWinnersInFullscreen ? 'ซ่อน Winners' : 'แสดง Winners'}
+                            >
+                                <Trophy className="w-5 h-5" />
+                                <span className="text-sm font-medium">{showWinnersInFullscreen ? 'ซ่อน Winners' : 'แสดง Winners'}</span>
+                            </button>
                         )}
+                        <button
+                            onClick={toggleFullscreen}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-green-600 hover:text-green-700 flex items-center gap-2"
+                            title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
+                        >
+                            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+                            <span className="text-sm font-medium">{isFullscreen ? 'ย่อ' : 'ขยาย'}</span>
+                        </button>
+                        <button
+                            onClick={refreshActiveEntries}
+                            disabled={loadingStores}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-blue-600 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
+                            title="รีเฟรชรายชื่อร้านที่ยังไม่ถูกสุ่ม (isDrawn = false)"
+                        >
+                            <RefreshCw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
+                            <span className="text-sm font-medium">รีเฟรช (เฉพาะที่เหลือ)</span>
+                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowMoreMenu(!showMoreMenu)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-700 flex items-center gap-2"
+                                title="ตัวเลือกเพิ่มเติม"
+                            >
+                                <MoreVertical className="w-5 h-5" />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {showMoreMenu && (
+                                <>
+                                    {/* Backdrop to close menu when clicking outside */}
+                                    <div
+                                        className="fixed inset-0 z-10"
+                                        onClick={() => setShowMoreMenu(false)}
+                                    />
+
+                                    {/* Menu Items */}
+                                    <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                                        <button
+                                            onClick={() => {
+                                                loadWheelData();
+                                                setShowMoreMenu(false);
+                                            }}
+                                            disabled={loadingStores}
+                                            className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-orange-600 hover:text-orange-700 flex items-center gap-3 disabled:opacity-50 text-left"
+                                            title="โหลดรายชื่อร้านใหม่ทั้งหมดจาก database (reset entries)"
+                                        >
+                                            <RotateCcw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium">รีเซ็ทผลลัพธ์</span>
+                                                <span className="text-xs text-gray-500">โหลดร้านค้าใหม่ทั้งหมด</span>
+                                            </div>
+                                        </button>
+
+                                        <div className="h-px bg-gray-200 my-1" />
+
+                                        <button
+                                            onClick={() => {
+                                                loadMockData();
+                                                setShowMoreMenu(false);
+                                            }}
+                                            className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-purple-600 hover:text-purple-700 flex items-center gap-3 text-left"
+                                        >
+                                            <span className="text-xl">🧪</span>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium">Mock Data</span>
+                                                <span className="text-xs text-gray-500">ทดสอบด้วย 15 ร้าน</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+                    {!isFullscreen && (
+                        <div className="text-center space-y-2">
+                            <p className="text-lg font-semibold text-gray-700">
+                                จำนวนร้านค้าทั้งหมด: <span className="text-blue-600">{allEntries.length}</span> ร้าน
+                            </p>
+                            {isMockMode && (
+                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 border-2 border-purple-300 rounded-lg">
+                                    <span className="text-xl">🧪</span>
+                                    <span className="text-sm font-bold text-purple-700">โหมดทดสอบ (Mock Data)</span>
+                                </div>
+                            )}
+                            {allEntries.length > 0 && (
+                                <p className="text-sm text-gray-500">
+                                    แสดงชื่อร้านค้าทั้งหมดบนวงล้อ • คลิกที่วงล้อเพื่อเริ่มหมุน
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 🔥 ส่วนปรับแต่งวงล้อ - คลิกเพื่อหมุน */}
+                    <div
+                        className={`relative ${isFullscreen
+                            ? 'scale-[1.2] sm:scale-[1.4] md:scale-[1.5] lg:scale-[1.6]'
+                            : 'scale-100 lg:scale-110'
+                            } ${mustSpin
+                                ? 'cursor-not-allowed'
+                                : allEntries.length === 0
+                                    ? 'cursor-not-allowed opacity-50'
+                                    : isFullscreen
+                                        ? 'cursor-pointer'
+                                        : 'cursor-pointer hover:scale-105 transition-transform duration-200'
+                            }`}
+                        onClick={handleSpinClick}
+                        title={mustSpin ? 'กำลังหมุน...' : allEntries.length === 0 ? 'กรุณาโหลดรายชื่อร้านค้าก่อน' : 'คลิกเพื่อหมุนวงล้อ'}
+                    >
+
+                        <Wheel
+                            mustStartSpinning={mustSpin}
+                            prizeNumber={prizeNumber}
+                            data={wheelData}
+                            onStopSpinning={handleStopSpinning}
+
+                            // Config ให้สวยเหมือน wheelofnames
+                            spinDuration={spinDuration} // ความเร็ว (ปรับได้จาก config)
+                            outerBorderColor="#333"
+                            innerRadius={10} // รูตรงกลาง
+                            innerBorderColor="#333"
+                            innerBorderWidth={0}
+                            outerBorderWidth={0}
+                            radiusLineWidth={0} // ไม่มีเส้นขอบระหว่างช่อง
+
+                            // ✨ จุดสำคัญ: การจัดตัวอักษร
+                            fontSize={calculateFontSize(allEntries.length)} // 🔥 ปรับขนาดอัตโนมัติตามจำนวนช่อง
+                            perpendicularText={false} // 🔥 ให้ตัวหนังสือเป็นแนวนอนไปตามรัศมี
+                            textDistance={75} // ขยับตัวหนังสือออกไปทางขอบวงล้อ
+                        />
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center space-y-6">
-                {!isFullscreen && (
-                    <div className="text-center space-y-2">
-                        <p className="text-lg font-semibold text-gray-700">
-                            จำนวนร้านค้าทั้งหมด: <span className="text-blue-600">{allEntries.length}</span> ร้าน
-                        </p>
-                        {isMockMode && (
-                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 border-2 border-purple-300 rounded-lg">
-                                <span className="text-xl">🧪</span>
-                                <span className="text-sm font-bold text-purple-700">โหมดทดสอบ (Mock Data)</span>
-                            </div>
-                        )}
-                        {allEntries.length > 0 && (
-                            <p className="text-sm text-gray-500">
-                                แสดงชื่อร้านค้าทั้งหมดบนวงล้อ • คลิกที่วงล้อเพื่อเริ่มหมุน
-                            </p>
-                        )}
-                    </div>
-                )}
-
-                {/* 🔥 ส่วนปรับแต่งวงล้อ - คลิกเพื่อหมุน */}
-                <div
-                    className={`relative ${isFullscreen
-                        ? 'scale-[1.2] sm:scale-[1.4] md:scale-[1.5] lg:scale-[1.6]'
-                        : 'scale-100 lg:scale-110'
-                        } ${mustSpin
-                            ? 'cursor-not-allowed'
-                            : allEntries.length === 0
-                                ? 'cursor-not-allowed opacity-50'
-                                : isFullscreen
-                                    ? 'cursor-pointer'
-                                    : 'cursor-pointer hover:scale-105 transition-transform duration-200'
-                        }`}
-                    onClick={handleSpinClick}
-                    title={mustSpin ? 'กำลังหมุน...' : allEntries.length === 0 ? 'กรุณาโหลดรายชื่อร้านค้าก่อน' : 'คลิกเพื่อหมุนวงล้อ'}
-                >
-
-                    <Wheel
-                        mustStartSpinning={mustSpin}
-                        prizeNumber={prizeNumber}
-                        data={wheelData}
-                        onStopSpinning={handleStopSpinning}
-
-                        // Config ให้สวยเหมือน wheelofnames
-                        spinDuration={spinDuration} // ความเร็ว (ปรับได้จาก config)
-                        outerBorderColor="#333"
-                        innerRadius={10} // รูตรงกลาง
-                        innerBorderColor="#333"
-                        innerBorderWidth={0}
-                        outerBorderWidth={0}
-                        radiusLineWidth={0} // ไม่มีเส้นขอบระหว่างช่อง
-
-                        // ✨ จุดสำคัญ: การจัดตัวอักษร
-                        fontSize={calculateFontSize(allEntries.length)} // 🔥 ปรับขนาดอัตโนมัติตามจำนวนช่อง
-                        perpendicularText={false} // 🔥 ให้ตัวหนังสือเป็นแนวนอนไปตามรัศมี
-                        textDistance={75} // ขยับตัวหนังสือออกไปทางขอบวงล้อ
+            {/* Winners Display in Fullscreen */}
+            {isFullscreen && showWinnersInFullscreen && (
+                <div className="w-[600px] flex-shrink-0">
+                    <WinnersDisplay
+                        winners={winners}
+                        latestWinner={winners[0]?.winner}
+                        onRefresh={onRefreshWinners}
+                        className="h-full"
                     />
                 </div>
-            </div>
+            )}
 
             {/* ⚙️ Config Modal */}
             {showConfigModal && (
