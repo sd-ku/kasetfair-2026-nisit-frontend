@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
     getAllBooths,
     getBoothStats,
@@ -13,18 +16,20 @@ import {
     BoothStatsResponse,
     BoothZone,
 } from '@/services/admin/boothService';
-import { Plus, Trash2, RefreshCw, MapPin, Utensils, Package, LayoutGrid, Settings, Save, RotateCcw as ResetIcon, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, MapPin, Utensils, Package, LayoutGrid, Settings, Save, RotateCcw as ResetIcon, ArrowUp, ArrowDown, GripVertical, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { ZoneMMap } from '@/components/admin/booth/ZoneMMap';
 import { ImportBoothModal, ImportFormData } from '@/components/admin/booth/ImportBoothModal';
 import { BulkDeleteBooths } from '@/components/admin/booth/BulkDeleteBooths';
+import { SortableBoothItem } from '@/components/admin/booth/SortableBoothItem';
 
 export default function BoothManagementPage() {
     const [booths, setBooths] = useState<BoothResponse[]>([]);
     const [stats, setStats] = useState<BoothStatsResponse[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'all' | BoothZone | 'config'>('all');
-    const [viewMode, setViewMode] = useState<'grid' | 'map'>('map');
+    const [activeTab, setActiveTab] = useState<'all' | BoothZone>('all');
+    const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+    const [isConfigOrderMode, setIsConfigOrderMode] = useState(false);
 
     // Import modal state
     const [showImportModal, setShowImportModal] = useState(false);
@@ -33,10 +38,15 @@ export default function BoothManagementPage() {
     // Bulk delete modal state
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
-    // Config mode state
-    const [configZone, setConfigZone] = useState<BoothZone>('FOOD');
-    const [foodBooths, setFoodBooths] = useState<BoothResponse[]>([]);
-    const [nonFoodBooths, setNonFoodBooths] = useState<BoothResponse[]>([]);
+    // Multi-selection state for config order mode
+    const [selectedBoothIds, setSelectedBoothIds] = useState<Set<number>>(new Set());
+    const [lastSelectedBoothId, setLastSelectedBoothId] = useState<number | null>(null);
+
+    // Context menu state
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; boothId: number } | null>(null);
+    const [showMoveToPositionModal, setShowMoveToPositionModal] = useState(false);
+    const [targetPosition, setTargetPosition] = useState<string>('');
+
     const [saving, setSaving] = useState(false);
 
     const fetchData = useCallback(async () => {
@@ -53,12 +63,6 @@ export default function BoothManagementPage() {
             // อัปเดต priorityStart ให้เป็นค่าถัดไปจากค่าล่าสุด
             const nextPriority = (lastPriorityData.lastPriority || 0) + 1;
             setInitialPriorityStart(nextPriority);
-
-            // แยก booth ตาม zone สำหรับ config mode
-            const food = boothsData.filter(b => b.zone === 'FOOD').sort((a, b) => a.assignOrder - b.assignOrder);
-            const nonFood = boothsData.filter(b => b.zone === 'NON_FOOD').sort((a, b) => a.assignOrder - b.assignOrder);
-            setFoodBooths(food);
-            setNonFoodBooths(nonFood);
         } catch (error) {
             console.error('Failed to fetch data', error);
             toast.error('เกิดข้อผิดพลาดในการโหลดข้อมูล');
@@ -70,6 +74,15 @@ export default function BoothManagementPage() {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // Close context menu when clicking outside
+    useEffect(() => {
+        const handleClick = () => setContextMenu(null);
+        if (contextMenu) {
+            document.addEventListener('click', handleClick);
+            return () => document.removeEventListener('click', handleClick);
+        }
+    }, [contextMenu]);
 
     const handleImport = async (formData: ImportFormData) => {
         try {
@@ -131,52 +144,228 @@ export default function BoothManagementPage() {
         }
     };
 
-    // Config mode functions
-    const currentConfigBooths = configZone === 'FOOD' ? foodBooths : nonFoodBooths;
-    const setCurrentConfigBooths = configZone === 'FOOD' ? setFoodBooths : setNonFoodBooths;
+    // Sensors for drag and drop
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8, // 8px movement required to start drag
+            },
+        })
+    );
 
-    const moveBoothUp = (index: number) => {
-        if (index === 0) return;
+    // Drag and drop handler for config order mode
+    const onDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
 
-        const newBooths = [...currentConfigBooths];
-        [newBooths[index], newBooths[index - 1]] = [newBooths[index - 1], newBooths[index]];
+        if (!over || active.id === over.id) return;
 
-        // Update assignOrder
-        newBooths.forEach((booth, i) => {
-            booth.assignOrder = i + 1;
+        const draggedId = parseInt(active.id.toString());
+        const overId = parseInt(over.id.toString());
+
+        // Check if dragged item is part of selection
+        const isDraggingSelected = selectedBoothIds.has(draggedId);
+        const boothsToMove = isDraggingSelected
+            ? Array.from(selectedBoothIds)
+            : [draggedId];
+
+        const oldIndex = filteredBooths.findIndex((booth) => booth.id === draggedId);
+        const newIndex = filteredBooths.findIndex((booth) => booth.id === overId);
+
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        // Create a copy of filtered booths
+        let reorderedBooths = [...filteredBooths];
+
+        if (boothsToMove.length === 1) {
+            // Single item drag
+            reorderedBooths = arrayMove(reorderedBooths, oldIndex, newIndex);
+        } else {
+            // Multi-item drag
+            // 1. Extract selected booths in their current order
+            const selectedBooths = reorderedBooths.filter(b => boothsToMove.includes(b.id));
+            // 2. Remove selected booths from array
+            reorderedBooths = reorderedBooths.filter(b => !boothsToMove.includes(b.id));
+
+            // 3. Find the new insertion index (accounting for removed items)
+            let insertIndex = newIndex;
+            // Adjust insert index based on how many selected items were before the target
+            const selectedBeforeTarget = selectedBooths.filter((_, idx) => {
+                const originalIdx = filteredBooths.findIndex(b => b.id === selectedBooths[idx].id);
+                return originalIdx < newIndex;
+            }).length;
+            insertIndex = newIndex - selectedBeforeTarget;
+
+            // 4. Insert all selected booths at the new position
+            reorderedBooths.splice(insertIndex, 0, ...selectedBooths);
+        }
+
+        // Update assignOrder for all reordered booths
+        reorderedBooths.forEach((booth, index) => {
+            booth.assignOrder = index + 1;
         });
 
-        setCurrentConfigBooths(newBooths);
+        // Create a map of reordered booth IDs for quick lookup
+        const reorderedBoothIds = new Set(reorderedBooths.map(b => b.id));
+
+        // Separate booths into reordered and non-reordered
+        const nonReorderedBooths = booths.filter(b => !reorderedBoothIds.has(b.id));
+
+        // Combine: put reordered booths first (in new order), then non-reordered booths
+        const updatedBooths = [...reorderedBooths, ...nonReorderedBooths];
+
+        setBooths(updatedBooths);
     };
 
-    const moveBoothDown = (index: number) => {
-        if (index === currentConfigBooths.length - 1) return;
+    // Multi-selection handler
+    const handleBoothSelection = (boothId: number, event: React.MouseEvent) => {
+        if (!isConfigOrderMode) return;
 
-        const newBooths = [...currentConfigBooths];
-        [newBooths[index], newBooths[index + 1]] = [newBooths[index + 1], newBooths[index]];
+        const newSelection = new Set(selectedBoothIds);
+
+        if (event.ctrlKey || event.metaKey) {
+            // Ctrl/Cmd + Click: Toggle selection
+            if (newSelection.has(boothId)) {
+                newSelection.delete(boothId);
+                // If we're deselecting the last selected booth, clear lastSelectedBoothId
+                if (lastSelectedBoothId === boothId) {
+                    setLastSelectedBoothId(newSelection.size > 0 ? Array.from(newSelection)[0] : null);
+                }
+            } else {
+                newSelection.add(boothId);
+                setLastSelectedBoothId(boothId);
+            }
+        } else if (event.shiftKey && lastSelectedBoothId !== null) {
+            // Shift + Click: Select range from last selected booth to current booth
+            const boothIds = filteredBooths.map(b => b.id);
+            const lastIndex = boothIds.indexOf(lastSelectedBoothId);
+            const currentIndex = boothIds.indexOf(boothId);
+
+            if (lastIndex !== -1 && currentIndex !== -1) {
+                const start = Math.min(lastIndex, currentIndex);
+                const end = Math.max(lastIndex, currentIndex);
+
+                // Add all booths in the range
+                for (let i = start; i <= end; i++) {
+                    newSelection.add(boothIds[i]);
+                }
+            }
+            // Don't update lastSelectedBoothId on Shift+Click, keep it for next range selection
+        } else {
+            // Regular click: Select only this booth
+            newSelection.clear();
+            newSelection.add(boothId);
+            setLastSelectedBoothId(boothId);
+        }
+
+        setSelectedBoothIds(newSelection);
+    };
+
+    const handleToggleConfigOrder = () => {
+        if (isConfigOrderMode) {
+            // Exiting config mode - ask to save
+            if (confirm('คุณต้องการบันทึกการเปลี่ยนแปลงหรือไม่?')) {
+                handleSaveConfigOrder();
+            } else {
+                fetchData(); // Reset to original
+            }
+        }
+        setIsConfigOrderMode(!isConfigOrderMode);
+        setSelectedBoothIds(new Set()); // Clear selection when toggling
+        setLastSelectedBoothId(null); // Clear last selected booth ID
+    };
+
+    // Context menu handlers
+    const handleContextMenu = (e: React.MouseEvent, boothId: number) => {
+        if (!isConfigOrderMode || selectedBoothIds.size === 0) return;
+
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, boothId });
+    };
+
+    const handleMoveToPosition = () => {
+        setContextMenu(null);
+        setShowMoveToPositionModal(true);
+    };
+
+    const handleConfirmMoveToPosition = () => {
+        const position = parseInt(targetPosition);
+        if (isNaN(position) || position < 1 || position > filteredBooths.length) {
+            toast.error('กรุณาใส่ลำดับที่ถูกต้อง (1-' + filteredBooths.length + ')');
+            return;
+        }
+
+        // Get selected booths in current order
+        const selectedBooths = filteredBooths.filter(b => selectedBoothIds.has(b.id));
+        const nonSelectedBooths = filteredBooths.filter(b => !selectedBoothIds.has(b.id));
+
+        // Insert at target position (convert to 0-based index)
+        const insertIndex = position - 1;
+        const reorderedBooths = [...nonSelectedBooths];
+        reorderedBooths.splice(insertIndex, 0, ...selectedBooths);
 
         // Update assignOrder
-        newBooths.forEach((booth, i) => {
-            booth.assignOrder = i + 1;
+        reorderedBooths.forEach((booth, index) => {
+            booth.assignOrder = index + 1;
         });
 
-        setCurrentConfigBooths(newBooths);
+        // Update state
+        const reorderedBoothIds = new Set(reorderedBooths.map(b => b.id));
+        const otherBooths = booths.filter(b => !reorderedBoothIds.has(b.id));
+        setBooths([...reorderedBooths, ...otherBooths]);
+
+        setShowMoveToPositionModal(false);
+        setTargetPosition('');
+        toast.success(`ย้าย ${selectedBooths.length} Booth ไปยังลำดับที่ ${position}`);
     };
 
-    const handleSaveConfig = async () => {
+    const handleReverseOrder = () => {
+        if (selectedBoothIds.size < 2) {
+            toast.error('กรุณาเลือก Booth อย่างน้อย 2 อันเพื่อกลับลำดับ');
+            return;
+        }
+
+        // Get selected booths in current order
+        const selectedBooths = filteredBooths.filter(b => selectedBoothIds.has(b.id));
+        const reversedSelectedBooths = [...selectedBooths].reverse();
+
+        // Create new array with reversed selection
+        let reorderedBooths = [...filteredBooths];
+
+        // Find indices of selected booths
+        const selectedIndices = selectedBooths.map(booth =>
+            filteredBooths.findIndex(b => b.id === booth.id)
+        );
+
+        // Replace selected booths with reversed ones at their positions
+        selectedIndices.forEach((index, i) => {
+            reorderedBooths[index] = reversedSelectedBooths[i];
+        });
+
+        // Update assignOrder
+        reorderedBooths.forEach((booth, index) => {
+            booth.assignOrder = index + 1;
+        });
+
+        // Update state
+        const reorderedBoothIds = new Set(reorderedBooths.map(b => b.id));
+        const otherBooths = booths.filter(b => !reorderedBoothIds.has(b.id));
+        setBooths([...reorderedBooths, ...otherBooths]);
+
+        setContextMenu(null);
+        toast.success(`กลับลำดับ ${selectedBooths.length} Booth แล้ว`);
+    };
+
+    const handleSaveConfigOrder = async () => {
         try {
             setSaving(true);
 
-            // Combine both zones
-            const allBooths = [...foodBooths, ...nonFoodBooths];
-
-            // Call API to update booth orders
-            await updateBoothOrder(allBooths.map(b => ({
+            await updateBoothOrder(booths.map(b => ({
                 id: b.id,
                 assignOrder: b.assignOrder
             })));
 
             toast.success('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+            setIsConfigOrderMode(false);
             fetchData();
         } catch (error: any) {
             console.error('Failed to save booth order', error);
@@ -184,13 +373,6 @@ export default function BoothManagementPage() {
             toast.error(errorMessage);
         } finally {
             setSaving(false);
-        }
-    };
-
-    const handleResetConfig = () => {
-        if (confirm('คุณต้องการรีเซ็ตการตั้งค่ากลับไปเป็นค่าเดิมหรือไม่?')) {
-            fetchData();
-            toast.info('รีเซ็ตการตั้งค่าแล้ว');
         }
     };
 
@@ -231,6 +413,18 @@ export default function BoothManagementPage() {
                     >
                         <RefreshCw className="w-5 h-5 text-gray-600" />
                     </button>
+                    {activeTab === 'all' && viewMode === 'grid' && (
+                        <button
+                            onClick={handleToggleConfigOrder}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${isConfigOrderMode
+                                ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                }`}
+                        >
+                            <Settings className="w-5 h-5" />
+                            {isConfigOrderMode ? 'ออกจากโหมดจัดลำดับ' : 'Config Order'}
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowImportModal(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -371,16 +565,6 @@ export default function BoothManagementPage() {
                         <Package className="w-4 h-4" />
                         NON_FOOD ({booths.filter(b => b.zone === 'NON_FOOD').length})
                     </button>
-                    <button
-                        onClick={() => setActiveTab('config')}
-                        className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${activeTab === 'config'
-                            ? 'text-purple-600 border-b-2 border-purple-600'
-                            : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                    >
-                        <Settings className="w-4 h-4" />
-                        Config
-                    </button>
                 </div>
 
                 <div className="flex bg-gray-100 p-1 rounded-lg">
@@ -409,6 +593,55 @@ export default function BoothManagementPage() {
 
             {/* Booth Content */}
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                {/* Config Order Mode Banner */}
+                {isConfigOrderMode && activeTab === 'all' && viewMode === 'grid' && (
+                    <div className="mb-6 bg-purple-50 border-2 border-purple-300 rounded-xl p-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-purple-500 rounded-lg">
+                                    <GripVertical className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-purple-900">
+                                        โหมดจัดลำดับ Booth
+                                        {selectedBoothIds.size > 0 && (
+                                            <span className="ml-2 px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
+                                                เลือก {selectedBoothIds.size} รายการ
+                                            </span>
+                                        )}
+                                    </h4>
+                                    <p className="text-sm text-purple-700">
+                                        {selectedBoothIds.size > 0
+                                            ? 'ลาก Booth ที่เลือกเพื่อเปลี่ยนลำดับ | คลิกที่ว่างเพื่อยกเลิกการเลือก'
+                                            : 'คลิก: เลือก 1 รายการ | Ctrl+คลิก: เลือกหลายรายการ | Shift+คลิก: เลือกช่วง | ลาก: เปลี่ยนลำดับ'
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        fetchData();
+                                        setIsConfigOrderMode(false);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 border-2 border-purple-300 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
+                                >
+                                    <ResetIcon className="w-5 h-5" />
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    onClick={handleSaveConfigOrder}
+                                    disabled={saving}
+                                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                >
+                                    <Save className="w-5 h-5" />
+                                    {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {loading ? (
                     <div className="text-center py-12">
                         <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4" />
@@ -425,176 +658,35 @@ export default function BoothManagementPage() {
                             + Import Booth
                         </button>
                     </div>
-                ) : activeTab === 'config' ? (
-                    /* Config Mode */
-                    <div className="space-y-6">
-                        {/* Config Header */}
-                        <div className="flex justify-between items-center border-b border-gray-200 pb-4">
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-800">จัดเรียงลำดับ Booth</h3>
-                                <p className="text-sm text-gray-600 mt-1">กำหนดลำดับการ assign booth สำหรับแต่ละ zone</p>
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={handleResetConfig}
-                                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                                >
-                                    <ResetIcon className="w-5 h-5" />
-                                    รีเซ็ท
-                                </button>
-                                <button
-                                    onClick={handleSaveConfig}
-                                    disabled={saving}
-                                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-                                >
-                                    <Save className="w-5 h-5" />
-                                    {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Info Box */}
-                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                            <h4 className="font-semibold text-blue-800 mb-2">💡 วิธีการทำงาน</h4>
-                            <ul className="text-sm text-blue-700 space-y-1">
-                                <li>• <strong>FOOD Zone</strong>: จะ assign booth จากลำดับที่ 1 → 2 → 3 ... (จากบนลงล่าง)</li>
-                                <li>• <strong>NON-FOOD Zone</strong>: จะ assign booth จากลำดับที่สูงสุด → ต่ำลง (จากล่างขึ้นบน)</li>
-                                <li>• ใช้ปุ่มลูกศรเพื่อเปลี่ยนลำดับ booth ตามที่ต้องการ</li>
-                            </ul>
-                        </div>
-
-                        {/* Zone Tabs */}
-                        <div className="flex gap-2 border-b border-gray-200">
-                            <button
-                                onClick={() => setConfigZone('FOOD')}
-                                className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${configZone === 'FOOD'
-                                    ? 'text-orange-600 border-b-2 border-orange-600'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                            >
-                                <Utensils className="w-5 h-5" />
-                                FOOD Zone ({foodBooths.length} booths)
-                            </button>
-                            <button
-                                onClick={() => setConfigZone('NON_FOOD')}
-                                className={`flex items-center gap-2 px-6 py-3 font-semibold transition-colors ${configZone === 'NON_FOOD'
-                                    ? 'text-blue-600 border-b-2 border-blue-600'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                            >
-                                <Package className="w-5 h-5" />
-                                NON-FOOD Zone ({nonFoodBooths.length} booths)
-                            </button>
-                        </div>
-
-                        {/* Booth List */}
-                        <div className="border border-gray-200 rounded-xl overflow-hidden">
-                            <div className="p-4 bg-gray-50 border-b border-gray-200">
-                                <h4 className="font-semibold text-gray-800">
-                                    {configZone === 'FOOD' ? '🍔 FOOD Zone' : '📦 NON-FOOD Zone'} - ลำดับการ Assign
-                                </h4>
-                                <p className="text-sm text-gray-600 mt-1">
-                                    {configZone === 'FOOD'
-                                        ? 'Booth ที่อยู่บนสุดจะถูก assign ก่อน (ขยายจากบนลงล่าง)'
-                                        : 'Booth ที่อยู่ล่างสุดจะถูก assign ก่อน (ขยายจากล่างขึ้นบน)'
-                                    }
-                                </p>
-                            </div>
-
-                            <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
-                                {currentConfigBooths.map((booth, index) => (
-                                    <div
-                                        key={booth.id}
-                                        className={`flex items-center justify-between p-4 hover:bg-gray-50 transition-colors ${booth.isAssigned ? 'bg-gray-50 opacity-60' : ''
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-4 flex-1">
-                                            <div className="text-center min-w-[60px]">
-                                                <div className="text-xs text-gray-500 mb-1">ลำดับ</div>
-                                                <div className="text-lg font-bold text-purple-600">
-                                                    #{booth.assignOrder}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xl font-bold text-gray-800">
-                                                        {booth.boothNumber}
-                                                    </span>
-                                                    {booth.isAssigned && (
-                                                        <span className="px-2 py-0.5 bg-gray-200 text-gray-600 text-xs rounded-full">
-                                                            ถูก assign แล้ว
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="text-sm text-gray-500">
-                                                    Zone: {booth.zone}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => moveBoothUp(index)}
-                                                disabled={index === 0}
-                                                className="p-2 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                                title="เลื่อนขึ้น"
-                                            >
-                                                <ArrowUp className="w-5 h-5 text-gray-600" />
-                                            </button>
-                                            <button
-                                                onClick={() => moveBoothDown(index)}
-                                                disabled={index === currentConfigBooths.length - 1}
-                                                className="p-2 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                                title="เลื่อนลง"
-                                            >
-                                                <ArrowDown className="w-5 h-5 text-gray-600" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
                 ) : viewMode === 'map' ? (
                     <ZoneMMap booths={booths} onBoothClick={handleBoothClick} />
                 ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
-                        {filteredBooths.map((booth) => (
-                            <div
-                                key={booth.id}
-                                onClick={() => handleBoothClick(booth)}
-                                className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer ${booth.isAssigned
-                                    ? booth.assignment?.status === 'CONFIRMED'
-                                        ? 'bg-green-50 border-green-300'
-                                        : booth.assignment?.status === 'PENDING'
-                                            ? 'bg-yellow-50 border-yellow-300'
-                                            : 'bg-red-50 border-red-300'
-                                    : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                                    }`}
-                                title={booth.isAssigned
-                                    ? `${booth.assignment?.store?.storeName || 'Unknown'} (${booth.assignment?.status})`
-                                    : 'ว่าง'
-                                }
-                            >
-                                <div className="flex justify-center mb-1">
-                                    {getZoneIcon(booth.zone)}
-                                </div>
-                                <p className="font-bold text-gray-800">{booth.boothNumber}</p>
-                                <p className="text-xs text-gray-500">#{booth.assignOrder}</p>
-                                {booth.isAssigned && (
-                                    <p className={`text-xs mt-1 font-medium ${booth.assignment?.status === 'CONFIRMED'
-                                        ? 'text-green-600'
-                                        : booth.assignment?.status === 'PENDING'
-                                            ? 'text-yellow-600'
-                                            : 'text-red-600'
-                                        }`}>
-                                        {booth.assignment?.status === 'CONFIRMED' ? '✓' : booth.assignment?.status === 'PENDING' ? '⏳' : '✗'}
-                                    </p>
-                                )}
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={onDragEnd}
+                    >
+                        <SortableContext
+                            items={filteredBooths.map(b => b.id.toString())}
+                            strategy={rectSortingStrategy}
+                            disabled={!isConfigOrderMode}
+                        >
+                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+                                {filteredBooths.map((booth) => (
+                                    <SortableBoothItem
+                                        key={booth.id}
+                                        booth={booth}
+                                        isConfigOrderMode={isConfigOrderMode}
+                                        onBoothClick={handleBoothClick}
+                                        isSelected={selectedBoothIds.has(booth.id)}
+                                        onSelect={handleBoothSelection}
+                                        selectedCount={selectedBoothIds.size}
+                                        onContextMenu={handleContextMenu}
+                                    />
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                        </SortableContext>
+                    </DndContext>
                 )}
             </div>
 
@@ -608,14 +700,88 @@ export default function BoothManagementPage() {
             />
 
             {/* Bulk Delete Modal */}
-            {showBulkDeleteModal && (
-                <BulkDeleteBooths
-                    booths={booths}
-                    onDelete={handleBulkDisable}
-                    onRefresh={fetchData}
-                    onClose={() => setShowBulkDeleteModal(false)}
-                />
+            {
+                showBulkDeleteModal && (
+                    <BulkDeleteBooths
+                        booths={booths}
+                        onDelete={handleBulkDisable}
+                        onRefresh={fetchData}
+                        onClose={() => setShowBulkDeleteModal(false)}
+                    />
+                )
+            }
+
+            {/* Context Menu */}
+            {contextMenu && (
+                <div
+                    className="fixed bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        onClick={handleMoveToPosition}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-sm"
+                    >
+                        <ArrowDown className="w-4 h-4" />
+                        ย้ายไปยังลำดับที่...
+                    </button>
+                    {selectedBoothIds.size > 1 && (
+                        <button
+                            onClick={handleReverseOrder}
+                            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-sm"
+                        >
+                            <RotateCcw className="w-4 h-4" />
+                            กลับลำดับ ({selectedBoothIds.size} รายการ)
+                        </button>
+                    )}
+                </div>
             )}
-        </div>
+
+            {/* Move to Position Modal */}
+            {showMoveToPositionModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">ย้ายไปยังลำดับที่</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            เลือก {selectedBoothIds.size} Booth จะถูกย้ายไปวางต่อท้ายลำดับที่ระบุ
+                        </p>
+                        <input
+                            type="number"
+                            min="1"
+                            max={filteredBooths.length}
+                            value={targetPosition}
+                            onChange={(e) => setTargetPosition(e.target.value)}
+                            placeholder={`ใส่ลำดับ (1-${filteredBooths.length})`}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleConfirmMoveToPosition();
+                                if (e.key === 'Escape') {
+                                    setShowMoveToPositionModal(false);
+                                    setTargetPosition('');
+                                }
+                            }}
+                        />
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowMoveToPositionModal(false);
+                                    setTargetPosition('');
+                                }}
+                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={handleConfirmMoveToPosition}
+                                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                            >
+                                ยืนยัน
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div >
     );
 }
