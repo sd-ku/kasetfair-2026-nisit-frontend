@@ -44,6 +44,8 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
     const [spinDuration, setSpinDuration] = useState(0.8); // ความเร็วการหมุน (วินาที)
     const [isMockMode, setIsMockMode] = useState(false); // ติดตามว่ากำลังใช้ mock data หรือไม่
     const [showWinnersInFullscreen, setShowWinnersInFullscreen] = useState(false); // แสดง Winners Display ในโหมดเต็มจอ
+    const [selectedStoreType, setSelectedStoreType] = useState<'ALL' | 'Nisit' | 'Club'>('ALL'); // ประเภทร้านที่เลือก
+    const [showRefreshMenu, setShowRefreshMenu] = useState(false); // แสดง dropdown menu สำหรับเลือกประเภทร้าน
 
     // 🎵 Audio refs for sound effects
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -233,11 +235,12 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
 
     /**
      * Refresh รายชื่อร้านค้า (ดึงเฉพาะที่ยังไม่ถูกสุ่ม)
+     * @param type - ประเภทร้าน: 'Nisit', 'Club', หรือ undefined (ALL)
      */
-    const refreshActiveEntries = async () => {
+    const refreshActiveEntries = async (type?: 'Nisit' | 'Club') => {
         try {
             setLoadingStores(true);
-            const entries = await getActiveEntries();
+            const entries = await getActiveEntries(type);
 
             if (entries && entries.length > 0) {
                 // แปลง string "123. ชื่อร้าน" เป็น object {storeId, storeName}
@@ -266,7 +269,8 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
                 });
                 setWheelData(wheelEntries);
 
-                toast.success(`รีเฟรชรายชื่อเรียบร้อย: เหลือ ${parsedEntries.length} ร้าน`);
+                const typeLabel = type ? (type === 'Nisit' ? 'นิสิต' : 'ชุมนุม') : 'ทั้งหมด';
+                toast.success(`รีเฟรชรายชื่อเรียบร้อย (${typeLabel}): เหลือ ${parsedEntries.length} ร้าน`);
 
                 // ตั้งค่าว่าไม่ใช่ mock mode
                 setIsMockMode(false);
@@ -276,7 +280,8 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
             } else {
                 setAllEntries([]);
                 setWheelData([{ option: 'ไม่มีร้านค้าที่ยังไม่ถูกสุ่ม', style: { backgroundColor: '#ccc', textColor: '#666' } }]);
-                toast.info('ไม่มีร้านค้าที่ยังไม่ถูกสุ่ม');
+                const typeLabel = type ? (type === 'Nisit' ? 'นิสิต' : 'ชุมนุม') : '';
+                toast.info(`ไม่มีร้านค้า${typeLabel}ที่ยังไม่ถูกสุ่ม`);
             }
         } catch (error: any) {
             console.error('Failed to refresh entries', error);
@@ -452,15 +457,93 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
                             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
                             <span className="text-sm font-medium">{isFullscreen ? 'ย่อ' : 'ขยาย'}</span>
                         </button>
-                        <button
-                            onClick={refreshActiveEntries}
-                            disabled={loadingStores}
-                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-blue-600 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
-                            title="รีเฟรชรายชื่อร้านที่ยังไม่ถูกสุ่ม (isDrawn = false)"
-                        >
-                            <RefreshCw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
-                            <span className="text-sm font-medium">รีเฟรช (เฉพาะที่เหลือ)</span>
-                        </button>
+                        {/* Refresh Button with Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowRefreshMenu(!showRefreshMenu)}
+                                disabled={loadingStores}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-blue-600 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
+                                title="รีเฟรชรายชื่อร้านที่ยังไม่ถูกสุ่ม"
+                            >
+                                <RefreshCw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
+                                <span className="text-sm font-medium">
+                                    รีเฟรช ({selectedStoreType === 'ALL' ? 'ทั้งหมด' : selectedStoreType === 'Nisit' ? 'นิสิต' : 'ชุมนุม'})
+                                </span>
+                            </button>
+
+                            {/* Refresh Dropdown Menu */}
+                            {showRefreshMenu && (
+                                <>
+                                    {/* Backdrop */}
+                                    <div
+                                        className="fixed inset-0 z-10"
+                                        onClick={() => setShowRefreshMenu(false)}
+                                    />
+
+                                    {/* Menu Items */}
+                                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
+                                            เลือกประเภทร้าน
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedStoreType('ALL');
+                                                refreshActiveEntries(undefined);
+                                                setShowRefreshMenu(false);
+                                            }}
+                                            disabled={loadingStores}
+                                            className={`w-full px-4 py-3 hover:bg-blue-50 transition-colors flex items-center gap-3 disabled:opacity-50 text-left ${selectedStoreType === 'ALL' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                                }`}
+                                        >
+                                            <span className="text-xl">🏪</span>
+                                            <div className="flex flex-col flex-1">
+                                                <span className="text-sm font-medium">ทั้งหมด</span>
+                                                <span className="text-xs text-gray-500">นิสิต + ชุมนุม</span>
+                                            </div>
+                                            {selectedStoreType === 'ALL' && <span className="text-blue-600">✓</span>}
+                                        </button>
+
+                                        <div className="h-px bg-gray-200 my-1" />
+
+                                        <button
+                                            onClick={() => {
+                                                setSelectedStoreType('Nisit');
+                                                refreshActiveEntries('Nisit');
+                                                setShowRefreshMenu(false);
+                                            }}
+                                            disabled={loadingStores}
+                                            className={`w-full px-4 py-3 hover:bg-green-50 transition-colors flex items-center gap-3 disabled:opacity-50 text-left ${selectedStoreType === 'Nisit' ? 'bg-green-50 text-green-700' : 'text-gray-700'
+                                                }`}
+                                        >
+                                            <span className="text-xl">🎓</span>
+                                            <div className="flex flex-col flex-1">
+                                                <span className="text-sm font-medium">นิสิต</span>
+                                                <span className="text-xs text-gray-500">ร้านค้านิสิต</span>
+                                            </div>
+                                            {selectedStoreType === 'Nisit' && <span className="text-green-600">✓</span>}
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setSelectedStoreType('Club');
+                                                refreshActiveEntries('Club');
+                                                setShowRefreshMenu(false);
+                                            }}
+                                            disabled={loadingStores}
+                                            className={`w-full px-4 py-3 hover:bg-purple-50 transition-colors flex items-center gap-3 disabled:opacity-50 text-left ${selectedStoreType === 'Club' ? 'bg-purple-50 text-purple-700' : 'text-gray-700'
+                                                }`}
+                                        >
+                                            <span className="text-xl">🎪</span>
+                                            <div className="flex flex-col flex-1">
+                                                <span className="text-sm font-medium">ชุมนุม</span>
+                                                <span className="text-xs text-gray-500">ร้านค้าชุมนุม</span>
+                                            </div>
+                                            {selectedStoreType === 'Club' && <span className="text-purple-600">✓</span>}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                         <div className="relative">
                             <button
                                 onClick={() => setShowMoreMenu(!showMoreMenu)}

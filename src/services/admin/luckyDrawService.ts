@@ -49,8 +49,9 @@ export async function generateWheel(request: GenerateWheelRequest): Promise<Gene
     return res.data;
 }
 
-export async function getActiveEntries(): Promise<string[]> {
-    const res = await http.get('/api/admin/lucky-draw/active-entries');
+export async function getActiveEntries(type?: 'Nisit' | 'Club'): Promise<string[]> {
+    const params = type ? { type } : {};
+    const res = await http.get('/api/admin/lucky-draw/active-entries', { params });
     return res.data;
 }
 
