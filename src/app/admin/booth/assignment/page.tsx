@@ -81,9 +81,9 @@ export default function BoothAssignmentPage() {
 
         // Global keydown listener - refocus input when any key is pressed
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
-            // Don't interfere if user is typing in another input/textarea or if a modal is open
+            // Don't interfere if user is typing in another input/textarea/select or if a modal is open
             const target = e.target as HTMLElement;
-            const isTypingElsewhere = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+            const isTypingElsewhere = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
 
             // If not typing in another field, focus the barcode input
             if (!isTypingElsewhere && inputElement) {
@@ -95,9 +95,9 @@ export default function BoothAssignmentPage() {
         const handleBlur = (e: FocusEvent) => {
             // Small delay to allow other elements to receive focus first
             setTimeout(() => {
-                // Only refocus if no modal is open and not focusing on another input
+                // Only refocus if no modal is open and not focusing on another input/textarea/select
                 const activeElement = document.activeElement as HTMLElement;
-                const isInputOrTextarea = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
+                const isInputOrTextarea = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA' || activeElement?.tagName === 'SELECT';
 
                 if (!isInputOrTextarea && inputElement && !showManualAssignModal) {
                     inputElement.focus();

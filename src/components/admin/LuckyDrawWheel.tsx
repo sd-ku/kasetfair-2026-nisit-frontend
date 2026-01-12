@@ -317,7 +317,7 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
                 });
                 setWheelData(wheelEntries);
 
-                const typeLabel = type ? (type === 'Nisit' ? 'นิสิต' : 'ชุมนุม') : 'ทั้งหมด';
+                const typeLabel = type ? (type === 'Nisit' ? 'นิสิต' : 'องค์กรนิสิต') : 'ทั้งหมด';
                 toast.success(`รีเฟรชรายชื่อเรียบร้อย (${typeLabel}): เหลือ ${parsedEntries.length} ร้าน`);
 
                 // ตั้งค่าว่าไม่ใช่ mock mode
@@ -328,7 +328,7 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
             } else {
                 setAllEntries([]);
                 setWheelData([{ option: 'ไม่มีร้านค้าที่ยังไม่ถูกสุ่ม', style: { backgroundColor: '#ccc', textColor: '#666' } }]);
-                const typeLabel = type ? (type === 'Nisit' ? 'นิสิต' : 'ชุมนุม') : '';
+                const typeLabel = type ? (type === 'Nisit' ? 'นิสิต' : 'องค์กรนิสิต') : '';
                 toast.info(`ไม่มีร้านค้า${typeLabel}ที่ยังไม่ถูกสุ่ม`);
             }
         } catch (error: any) {
@@ -515,7 +515,7 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
                             >
                                 <RefreshCw className={`w-5 h-5 ${loadingStores ? 'animate-spin' : ''}`} />
                                 <span className="text-sm font-medium">
-                                    รีเฟรช ({selectedStoreType === 'ALL' ? 'ทั้งหมด' : selectedStoreType === 'Nisit' ? 'นิสิต' : 'ชุมนุม'})
+                                    รีเฟรช ({selectedStoreType === 'ALL' ? 'ทั้งหมด' : selectedStoreType === 'Nisit' ? 'นิสิต' : 'องค์กรนิสิต'})
                                 </span>
                             </button>
 
@@ -546,7 +546,7 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
                                             <span className="text-xl">🏪</span>
                                             <div className="flex flex-col flex-1">
                                                 <span className="text-sm font-medium">ทั้งหมด</span>
-                                                <span className="text-xs text-gray-500">นิสิต + ชุมนุม</span>
+                                                <span className="text-xs text-gray-500">นิสิต + องค์กรนิสิต</span>
                                             </div>
                                             {selectedStoreType === 'ALL' && <span className="text-blue-600">✓</span>}
                                         </button>
@@ -583,8 +583,8 @@ export default function LuckyDrawWheel({ onWinnerSelected, winners = [], onRefre
                                         >
                                             <span className="text-xl">🎪</span>
                                             <div className="flex flex-col flex-1">
-                                                <span className="text-sm font-medium">ชุมนุม</span>
-                                                <span className="text-xs text-gray-500">ร้านค้าชุมนุม</span>
+                                                <span className="text-sm font-medium">องค์กรนิสิต</span>
+                                                <span className="text-xs text-gray-500">ร้านค้าองค์กรนิสิต</span>
                                             </div>
                                             {selectedStoreType === 'Club' && <span className="text-purple-600">✓</span>}
                                         </button>
