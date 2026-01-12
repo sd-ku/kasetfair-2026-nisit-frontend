@@ -71,12 +71,57 @@ export default function BoothAssignmentPage() {
         fetchData();
     }, [fetchData]);
 
-    // Auto-focus barcode input
+    // Auto-focus barcode input and keep it focused
     useEffect(() => {
-        if (barcodeInputRef.current) {
-            barcodeInputRef.current.focus();
+        const inputElement = barcodeInputRef.current;
+        if (!inputElement) return;
+
+        // Initial focus
+        inputElement.focus();
+
+        // Global keydown listener - refocus input when any key is pressed
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            // Don't interfere if user is typing in another input/textarea or if a modal is open
+            const target = e.target as HTMLElement;
+            const isTypingElsewhere = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+
+            // If not typing in another field, focus the barcode input
+            if (!isTypingElsewhere && inputElement) {
+                inputElement.focus();
+            }
+        };
+
+        // Refocus when input loses focus (unless clicking on a button or other interactive element)
+        const handleBlur = (e: FocusEvent) => {
+            // Small delay to allow other elements to receive focus first
+            setTimeout(() => {
+                // Only refocus if no modal is open and not focusing on another input
+                const activeElement = document.activeElement as HTMLElement;
+                const isInputOrTextarea = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
+
+                if (!isInputOrTextarea && inputElement && !showManualAssignModal) {
+                    inputElement.focus();
+                }
+            }, 100);
+        };
+
+        // Add event listeners
+        document.addEventListener('keydown', handleGlobalKeyDown);
+        inputElement.addEventListener('blur', handleBlur);
+
+        // Cleanup
+        return () => {
+            document.removeEventListener('keydown', handleGlobalKeyDown);
+            inputElement.removeEventListener('blur', handleBlur);
+        };
+    }, [latestPending, showManualAssignModal]);
+
+    // Auto-search when barcode reaches 14 characters
+    useEffect(() => {
+        if (barcode.trim().length === 14 && !scanning) {
+            handleScan();
         }
-    }, [latestPending]);
+    }, [barcode]);
 
     const handleScan = async () => {
         if (!barcode.trim()) {
@@ -286,7 +331,7 @@ export default function BoothAssignmentPage() {
                         onChange={(e) => setBarcode(e.target.value)}
                         onKeyDown={handleBarcodeKeyDown}
                         placeholder="สแกนบาร์โค้ดที่นี่... (เช่น 20065105035316)"
-                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg font-mono"
+                        className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg font-mono"
                         autoComplete="off"
                     />
                     <button
@@ -302,9 +347,9 @@ export default function BoothAssignmentPage() {
                         ค้นหา
                     </button>
                 </div>
-                <p className="text-sm text-gray-600 mt-3">
+                {/* <p className="text-sm text-gray-600 mt-3">
                     💡 สแกนบาร์โค้ดจากบัตรนิสิตเพื่อตรวจสอบว่าอยู่ร้านไหน พร้อมดูข้อมูล booth assignment
-                </p>
+                </p> */}
             </div>
 
             {/* Lookup Result Display */}
