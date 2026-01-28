@@ -643,12 +643,38 @@ export default function BoothAssignmentPage() {
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {assignment.status === 'PENDING' && (
-                                                <button
-                                                    onClick={() => handleForfeit(assignment.id, assignment.store?.storeName || '')}
-                                                    className="text-red-600 hover:text-red-800 text-sm font-medium"
-                                                >
-                                                    สละสิทธิ์
-                                                </button>
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={async () => {
+                                                            const storeAdminNisitId = assignment.store?.storeAdminNisitId;
+                                                            if (!storeAdminNisitId) {
+                                                                toast.error('ไม่พบข้อมูล admin ของร้านนี้');
+                                                                return;
+                                                            }
+                                                            // สร้าง barcode ตาม pattern 200{nisitId}8
+                                                            const barcode = `200${storeAdminNisitId}8`;
+                                                            try {
+                                                                await verifyAssignment({ assignmentId: assignment.id, barcode });
+                                                                toast.success(`ยืนยัน booth สำเร็จ! ร้าน "${assignment.store?.storeName}"`);
+                                                                fetchData();
+                                                            } catch (error: any) {
+                                                                console.error('Failed to verify', error);
+                                                                const errorMessage = error?.response?.data?.message || 'เกิดข้อผิดพลาดในการยืนยัน';
+                                                                toast.error(errorMessage);
+                                                            }
+                                                        }}
+                                                        className="text-green-600 hover:text-green-800 text-sm font-medium"
+                                                    >
+                                                        ยืนยัน
+                                                    </button>
+                                                    <span className="text-gray-300">|</span>
+                                                    <button
+                                                        onClick={() => handleForfeit(assignment.id, assignment.store?.storeName || '')}
+                                                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                                    >
+                                                        สละสิทธิ์
+                                                    </button>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
